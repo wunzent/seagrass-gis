@@ -1,5 +1,6 @@
 import { Controller, Get, Header, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common';
-import { ApiBody, ApiCookieAuth, ApiHeader, ApiOkResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiCookieAuth, ApiOkResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiCsrfHeaders } from '../shared/decorators/api-csrf-headers.decorator';
 import { ApiErrorResponse } from '../shared/decorators/api-error-response.decorator';
 import { tokenOf } from './middleware/auth.middleware';
 import { CsrfGuard } from './guards/csrf.guard';
@@ -14,16 +15,7 @@ import { MeResponseDto } from './dto/me-response.dto';
 import { JsonBody } from '../shared/decorators/json-body.decorator';
 
 const CSRF_HEADERS: MethodDecorator = (target, key, descriptor) => {
-  ApiHeader({ name: 'X-CSRF-Protection', required: true, schema: { type: 'string', enum: ['1'] } })(
-    target,
-    key,
-    descriptor,
-  );
-  ApiHeader({ name: 'Origin', required: true, description: 'ต้องตรงกับ PUBLIC_WEB_ORIGIN หรือ API_DOCS_ORIGIN' })(
-    target,
-    key,
-    descriptor,
-  );
+  ApiCsrfHeaders()(target, key, descriptor);
   ApiErrorResponse(403, ['CSRF_REJECTED'])(target, key, descriptor);
 };
 

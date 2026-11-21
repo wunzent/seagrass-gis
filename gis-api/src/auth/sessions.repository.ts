@@ -1,8 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { PoolClient } from 'pg';
 import { AuthenticatedContext } from './entities/user.entity';
 import { ActiveSessionRow } from './entities/session.entity';
 import { DATABASE, Database } from '../core/database/database.module';
+import { withTransaction } from '../core/database/transaction';
 import { toDependencyError } from '../shared/errors/api-error';
 
 const REVOKE = `UPDATE access_sessions SET revoked_at = now(), updated_at = now(), updated_by = user_id
@@ -32,27 +32,13 @@ export class SessionsRepository {
     previous: { sid: string; userId: string } | null,
     next: { sid: string; userId: string; expiresAt: Date },
   ) {
-    if (!this.db.connect) throw new Error('database does not support transactions');
-    let client: PoolClient;
-    try {
-      client = await this.db.connect();
-    } catch (error) {
-      throw toDependencyError(error);
-    }
-    try {
-      await client.query('BEGIN');
-      if (previous) await client.query(REVOKE, [previous.sid, previous.userId]);
-      await client.query(
+    await withTransaction(this.db, async (tx) => {
+      if (previous) await tx.query(REVOKE, [previous.sid, previous.userId]);
+      await tx.query(
         `INSERT INTO access_sessions(id, user_id, expires_at, created_by, updated_by) VALUES($1, $2, $3, $2, $2)`,
         [next.sid, next.userId, next.expiresAt],
       );
-      await client.query('COMMIT');
-    } catch (error) {
-      await client.query('ROLLBACK').catch(() => undefined);
-      throw toDependencyError(error);
-    } finally {
-      client.release();
-    }
+    });
   }
 
   async revoke(sid: string, userId: string) {

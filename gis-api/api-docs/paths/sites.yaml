@@ -73,3 +73,103 @@ get:
   summary: รายการแหล่งหญ้าทะเลที่ใช้งาน (ไม่มี geometry) เรียง code
   tags:
     - sites
+post:
+  operationId: SitesController_create
+  parameters:
+    - name: X-CSRF-Protection
+      in: header
+      required: true
+      schema:
+        type: string
+        enum:
+          - '1'
+    - name: Origin
+      in: header
+      description: ต้องตรงกับ PUBLIC_WEB_ORIGIN หรือ API_DOCS_ORIGIN
+      required: true
+      schema:
+        type: string
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/CreateSite.yaml
+  responses:
+    '201':
+      description: ''
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/SiteFeature.yaml
+    '400':
+      description: VALIDATION_ERROR | INVALID_GEOMETRY
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: ...
+              details: {}
+    '401':
+      description: UNAUTHORIZED
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: UNAUTHORIZED
+              message: ...
+              details: {}
+    '403':
+      description: FORBIDDEN | CSRF_REJECTED
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: FORBIDDEN
+              message: ...
+              details: {}
+    '409':
+      description: DUPLICATE_CODE
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: DUPLICATE_CODE
+              message: ...
+              details: {}
+    '422':
+      description: OUTSIDE_COVERAGE
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: OUTSIDE_COVERAGE
+              message: ...
+              details: {}
+    '503':
+      description: SERVICE_UNAVAILABLE
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: SERVICE_UNAVAILABLE
+              message: ...
+              details: {}
+  security:
+    - gis_access: []
+  summary: 'สร้างแหล่ง (admin): คำนวณ province_code และ area_rai จาก geometry, version 1'
+  tags:
+    - sites

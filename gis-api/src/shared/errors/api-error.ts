@@ -11,6 +11,9 @@ export class ApiError extends HttpException {
 export const validationError = (details: Record<string, unknown> = {}) =>
   new ApiError(400, 'VALIDATION_ERROR', 'ข้อมูลไม่ถูกต้อง', details);
 
+export const invalidGeometry = () =>
+  new ApiError(400, 'INVALID_GEOMETRY', 'geometry ต้องเป็น Polygon/MultiPolygon ที่ถูกต้องใน EPSG:4326 และมีพื้นที่');
+
 export function isErrorBody(value: unknown): value is ErrorResponseDto {
   const error = (value as ErrorResponseDto | undefined)?.error;
   return typeof error?.code === 'string' && typeof error.message === 'string';

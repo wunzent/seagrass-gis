@@ -29,3 +29,21 @@ export interface SiteRow {
   count: number | null;
   geometry?: unknown;
 }
+
+/** GeoJSON MultiPolygon after the BR-01/02 shape check (Polygon input is wrapped, never repaired). */
+export interface MultiPolygonGeometry {
+  type: string;
+  coordinates: unknown;
+}
+/** Validated POST /sites input; computed fields come from PostGIS. */
+export interface CreateSite {
+  code: string;
+  name: string;
+  geometry: MultiPolygonGeometry;
+}
+/** Validated PATCH /sites/:code input. */
+export interface UpdateSite {
+  version: number;
+  name?: string;
+  geometry?: MultiPolygonGeometry;
+}

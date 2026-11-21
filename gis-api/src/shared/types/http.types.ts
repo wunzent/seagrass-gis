@@ -3,6 +3,8 @@ export interface HttpRequest {
   headers: Record<string, string | string[] | undefined>;
   socket: { remoteAddress?: string };
   is(type: string): string | false | null;
+  /** Parsed by the platform body parser before guards run; untrusted until the validation pipe has checked it. */
+  body?: unknown;
   auth?: import('../../auth/entities/user.entity').AuthenticatedContext | null;
 }
 export interface HttpResponse {

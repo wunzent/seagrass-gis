@@ -51,3 +51,218 @@ get:
   summary: รายละเอียดแหล่งพร้อมสรุปวันสำรวจล่าสุด
   tags:
     - sites
+patch:
+  operationId: SitesController_update
+  parameters:
+    - name: code
+      required: true
+      in: path
+      schema:
+        maxLength: 64
+        example: KBI-001
+        type: string
+    - name: X-CSRF-Protection
+      in: header
+      required: true
+      schema:
+        type: string
+        enum:
+          - '1'
+    - name: Origin
+      in: header
+      description: ต้องตรงกับ PUBLIC_WEB_ORIGIN หรือ API_DOCS_ORIGIN
+      required: true
+      schema:
+        type: string
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/UpdateSite.yaml
+  responses:
+    '200':
+      description: ''
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/SiteFeature.yaml
+    '400':
+      description: VALIDATION_ERROR | INVALID_GEOMETRY
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: ...
+              details: {}
+    '401':
+      description: UNAUTHORIZED
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: UNAUTHORIZED
+              message: ...
+              details: {}
+    '403':
+      description: FORBIDDEN | CSRF_REJECTED
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: FORBIDDEN
+              message: ...
+              details: {}
+    '404':
+      description: SITE_NOT_FOUND
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: SITE_NOT_FOUND
+              message: ...
+              details: {}
+    '409':
+      description: VERSION_CONFLICT
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: VERSION_CONFLICT
+              message: ...
+              details: {}
+    '422':
+      description: OUTSIDE_COVERAGE
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: OUTSIDE_COVERAGE
+              message: ...
+              details: {}
+    '503':
+      description: SERVICE_UNAVAILABLE
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: SERVICE_UNAVAILABLE
+              message: ...
+              details: {}
+  security:
+    - gis_access: []
+  summary: แก้ไขแหล่งด้วย version ปัจจุบัน (editor แก้ name; admin แก้ name/geometry); สำเร็จแล้ว version+1
+  tags:
+    - sites
+delete:
+  operationId: SitesController_remove
+  parameters:
+    - name: code
+      required: true
+      in: path
+      schema:
+        maxLength: 64
+        example: KBI-001
+        type: string
+    - name: X-CSRF-Protection
+      in: header
+      required: true
+      schema:
+        type: string
+        enum:
+          - '1'
+    - name: Origin
+      in: header
+      description: ต้องตรงกับ PUBLIC_WEB_ORIGIN หรือ API_DOCS_ORIGIN
+      required: true
+      schema:
+        type: string
+  responses:
+    '204':
+      description: No content
+    '400':
+      description: VALIDATION_ERROR
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: ...
+              details: {}
+    '401':
+      description: UNAUTHORIZED
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: UNAUTHORIZED
+              message: ...
+              details: {}
+    '403':
+      description: FORBIDDEN | CSRF_REJECTED
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: FORBIDDEN
+              message: ...
+              details: {}
+    '404':
+      description: SITE_NOT_FOUND
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: SITE_NOT_FOUND
+              message: ...
+              details: {}
+    '409':
+      description: SITE_HAS_SURVEYS
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: SITE_HAS_SURVEYS
+              message: ...
+              details: {}
+    '503':
+      description: SERVICE_UNAVAILABLE
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: SERVICE_UNAVAILABLE
+              message: ...
+              details: {}
+  security:
+    - gis_access: []
+  summary: ลบแหล่งแบบ soft delete (admin) เมื่อไม่มีข้อมูลการสำรวจ
+  tags:
+    - sites

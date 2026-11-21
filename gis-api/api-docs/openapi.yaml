@@ -53,3 +53,9 @@ components:
       $ref: ./components/schemas/SiteFeature.yaml
     SiteFeatureCollection:
       $ref: ./components/schemas/SiteFeatureCollection.yaml
+    CreateSiteProperties:
+      $ref: ./components/schemas/CreateSiteProperties.yaml
+    CreateSite:
+      $ref: ./components/schemas/CreateSite.yaml
+    UpdateSite:
+      $ref: ./components/schemas/UpdateSite.yaml

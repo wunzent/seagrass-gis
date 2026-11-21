@@ -1,0 +1,15 @@
+type: object
+properties:
+  version:
+    type: integer
+    minimum: 1
+    maximum: 2147483647
+    description: version ปัจจุบันที่ผู้แก้ไขเห็น
+  name:
+    type: string
+    maxLength: 255
+  geometry:
+    type: object
+    description: GeoJSON Polygon หรือ MultiPolygon (admin เท่านั้น แม้ส่งเป็น null)
+required:
+  - version

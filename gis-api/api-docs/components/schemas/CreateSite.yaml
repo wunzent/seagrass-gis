@@ -1,0 +1,28 @@
+type: object
+properties:
+  type:
+    type: string
+    enum:
+      - Feature
+  geometry:
+    type: object
+    description: GeoJSON Polygon หรือ MultiPolygon, EPSG:4326, positions [lon,lat]; เก็บเป็น MultiPolygon ไม่ซ่อม geometry
+    example:
+      type: Polygon
+      coordinates:
+        - - - 99.3
+            - 7.3
+          - - 99.31
+            - 7.3
+          - - 99.31
+            - 7.31
+          - - 99.3
+            - 7.31
+          - - 99.3
+            - 7.3
+  properties:
+    $ref: ./CreateSiteProperties.yaml
+required:
+  - type
+  - geometry
+  - properties

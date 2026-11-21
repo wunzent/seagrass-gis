@@ -41,13 +41,16 @@ describe('api docs', () => {
         Object.entries(item as Record<string, any>).map(([m, op]) => [`${m.toUpperCase()} ${p}`, op] as const),
       );
       expect(operations.map(([k]) => k).sort()).toEqual([
+        'DELETE /sites/{code}',
         'GET /auth/me',
         'GET /health',
         'GET /sites',
         'GET /sites.geojson',
         'GET /sites/{code}',
+        'PATCH /sites/{code}',
         'POST /auth/login',
         'POST /auth/logout',
+        'POST /sites',
       ]);
       for (const [key, op] of operations) {
         expect([key, Boolean(op.summary)]).toEqual([key, true]);

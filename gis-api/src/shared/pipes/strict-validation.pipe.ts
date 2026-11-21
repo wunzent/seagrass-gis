@@ -1,24 +1,29 @@
 import { ArgumentMetadata, ValidationError, ValidationPipe } from '@nestjs/common';
-import { ApiError, validationError } from '../errors/api-error';
+import { ApiError, invalidGeometry, validationError } from '../errors/api-error';
+import { GEOMETRY_MEMBERS_CONSTRAINT, unknownGeometryMembers } from '../validators/polygon-geometry.validator';
 
 const flatten = (errors: ValidationError[]): ValidationError[] =>
   errors.flatMap((e) => [e, ...flatten(e.children ?? [])]);
 
-/**
- * Maps class-validator failures to the shared envelope:
- * unknown properties → VALIDATION_ERROR (bounded echo), any failure on `bbox` → INVALID_BBOX (dedicated code per shared contract),
- * anything else → VALIDATION_ERROR with the failing field names. Messages never echo submitted values.
- */
+/** Precedence: unknown fields incl. `geometry.<member>` (bounded echo) → INVALID_BBOX / INVALID_GEOMETRY (dedicated
+ * codes per shared contract) → VALIDATION_ERROR with field names. Never echoes submitted values. */
 export function toApiError(errors: ValidationError[]) {
   const all = flatten(errors);
   const unknown = all
-    .filter((e) => e.constraints?.whitelistValidation)
-    .map((e) => e.property.slice(0, 64))
+    .flatMap((e) =>
+      e.constraints?.whitelistValidation
+        ? [e.property]
+        : e.constraints && GEOMETRY_MEMBERS_CONSTRAINT in e.constraints
+          ? unknownGeometryMembers(e.value).map((key) => `${e.property}.${key}`)
+          : [],
+    )
+    .map((key) => key.slice(0, 64))
     .slice(0, 10);
   if (unknown.length) return validationError({ unknown });
   // class-validator 0.15 does not keep `context` for custom constraints, so the dedicated code is keyed on the property name.
   if (all.some((e) => e.property === 'bbox' && e.constraints))
     return new ApiError(400, 'INVALID_BBOX', 'bbox ต้องเป็น minLon,minLat,maxLon,maxLat');
+  if (all.some((e) => e.property === 'geometry' && e.constraints)) return invalidGeometry();
   return validationError({
     fields: [...new Set(all.filter((e) => e.constraints).map((e) => e.property))].slice(0, 10),
   });

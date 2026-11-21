@@ -1,0 +1,13 @@
+type: object
+properties:
+  code:
+    type: string
+    maxLength: 64
+    example: DEMO-001
+  name:
+    type: string
+    maxLength: 255
+    example: แหล่งตัวอย่าง
+required:
+  - code
+  - name
