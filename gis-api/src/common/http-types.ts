@@ -3,6 +3,6 @@ export interface HttpRequest {
   headers: Record<string, string | string[] | undefined>;
   socket: { remoteAddress?: string };
   is(type: string): string | false | null;
-  auth?: import('../auth/user.model').AuthenticatedContext | null;
+  auth?: import('../auth/entities/user.entity').AuthenticatedContext | null;
 }
 export interface HttpResponse { setHeader(name: string, value: string): unknown }

@@ -6,29 +6,71 @@
     "node": ">=22.18.0 <23"
   },
   "scripts": {
-    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.json",
+    "build": "nest build",
+    "start:dev": "nest start --watch",
     "start": "node --env-file-if-exists=.env dist/main.js",
     "migrate": "node --env-file-if-exists=.env dist/migrate.js",
     "import": "node --env-file-if-exists=.env dist/import.js",
     "docs:generate": "npm run build && node dist/docs.js",
-    "test:import:unit": "npm run build && node --test test/unit/import.test.cjs",
-    "test:import:integration": "npm run build && node --test test/e2e/import.e2e.cjs",
-    "test:unit": "npm run build && node --test --test-timeout=2000 test/unit/runtime.test.cjs test/unit/sites.test.cjs test/unit/auth.test.cjs test/unit/api-docs.test.cjs",
-    "test:integration": "npm run build && node --test --test-concurrency=1 --test-timeout=30000 test/e2e/runtime.e2e.cjs test/e2e/sites.e2e.cjs test/e2e/auth.e2e.cjs"
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config test/jest-e2e.json --runInBand",
+    "test:unit": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config test/jest-e2e.json --runInBand --testPathIgnorePatterns import\\.e2e-spec",
+    "test:import:unit": "node --experimental-vm-modules node_modules/jest/bin/jest.js import",
+    "test:import:integration": "node --require ./test/import-required.cjs --experimental-vm-modules node_modules/jest/bin/jest.js --config test/jest-e2e.json --runInBand import"
   },
   "dependencies": {
     "@nestjs/common": "12.6.0",
     "@nestjs/core": "12.6.0",
     "@nestjs/platform-express": "12.6.0",
     "@nestjs/swagger": "12.1.2",
+    "class-transformer": "0.5.1",
+    "class-validator": "0.15.1",
     "js-yaml": "5.5.0",
     "pg": "8.23.1",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2"
   },
   "devDependencies": {
+    "@nestjs/cli": "12.0.15",
+    "@nestjs/testing": "12.6.0",
+    "@types/jest": "30.0.0",
     "@types/node": "22.18.0",
     "@types/pg": "8.15.5",
+    "jest": "30.5.2",
+    "ts-jest": "29.4.15",
     "typescript": "5.9.3"
+  },
+  "jest": {
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "testEnvironment": "node",
+    "extensionsToTreatAsEsm": [
+      ".ts"
+    ],
+    "transform": {
+      "^.+\\.ts$": [
+        "ts-jest",
+        {
+          "useESM": true,
+          "tsconfig": {
+            "target": "ES2022",
+            "module": "ESNext",
+            "moduleResolution": "Bundler",
+            "strict": true,
+            "esModuleInterop": true,
+            "experimentalDecorators": true,
+            "emitDecoratorMetadata": true,
+            "skipLibCheck": true,
+            "forceConsistentCasingInFileNames": true,
+            "types": [
+              "jest",
+              "node"
+            ]
+          }
+        }
+      ]
+    },
+    "testTimeout": 5000
   }
 }

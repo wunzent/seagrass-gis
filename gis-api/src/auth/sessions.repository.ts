@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { PoolClient } from 'pg';
-import { AuthenticatedContext, Role } from './user.model';
+import { AuthenticatedContext, Role } from './entities/user.entity';
 import { DATABASE, Database } from '../database/database.module';
 import { toDependencyError } from '../common/errors';
 

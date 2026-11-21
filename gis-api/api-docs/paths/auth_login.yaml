@@ -19,7 +19,7 @@ post:
     content:
       application/json:
         schema:
-          $ref: ../components/schemas/LoginRequest.yaml
+          $ref: ../components/schemas/LoginDto.yaml
   responses:
     '200':
       headers:

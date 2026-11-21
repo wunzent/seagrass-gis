@@ -1,7 +1,7 @@
 import { CanActivate, ExecutionContext, Inject, Injectable, SetMetadata } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthConfig } from '../../config/config';
-import { Role } from '../user.model';
+import { Role } from '../entities/user.entity';
 import { ApiError } from '../../common/errors';
 import type { HttpRequest } from '../../common/http-types';
 import { AUTH_CONFIG } from '../auth.constants';

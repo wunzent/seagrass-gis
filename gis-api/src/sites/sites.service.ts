@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { toSiteFeature, toSiteSummary } from './site.model';
+import { toSiteFeature, toSiteSummary } from './entities/site.entity';
 import { SitesRepository } from './sites.repository';
 import { ApiError } from '../common/errors';
-import { GeoJsonQuery, ListQuery } from './pipes/sites-query.pipes';
+import { GeoJsonQuery, ListQuery } from './entities/site.entity';
 
 @Injectable()
 export class SitesService {

@@ -5,8 +5,9 @@ get:
       required: true
       in: path
       schema:
-        type: string
         maxLength: 64
+        example: KBI-001
+        type: string
   responses:
     '200':
       description: ''

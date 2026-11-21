@@ -3,7 +3,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { AUTH_CONFIG, LOGIN_LIMITER } from './auth.constants';
 import { LoginRateLimiter } from './login-rate-limiter';
 import { AuthConfig } from '../config/config';
-import { AuthenticatedContext } from './user.model';
+import { AuthenticatedContext } from './entities/user.entity';
 import { SessionsRepository } from './sessions.repository';
 import { UsersRepository } from './users.repository';
 import { ACCESS_TTL_SECONDS, isVerifiableHash, signAccessToken, verifyAccessToken, verifyAgainstDummy, verifyPassword } from './crypto';

@@ -1,4 +1,4 @@
-import { SITE_STATUSES } from '../sites/site.model';
+import { SITE_STATUSES } from '../sites/entities/site.entity';
 
 /** Shared OpenAPI component schemas; controllers reference them with `ref()`. Generated into api-docs/components/. */
 export const ref = (name: keyof typeof SCHEMAS) => ({ $ref: `#/components/schemas/${name}` });
@@ -49,10 +49,6 @@ export const SCHEMAS = {
   User: {
     type: 'object', required: ['id', 'email', 'role'],
     properties: { id: { type: 'string', format: 'uuid' }, email: { type: 'string', format: 'email' }, role: { type: 'string', enum: ['viewer', 'editor', 'admin'] } },
-  },
-  LoginRequest: {
-    type: 'object', required: ['email', 'password'], additionalProperties: false,
-    properties: { email: { type: 'string', maxLength: 254, example: 'admin@demo.local' }, password: { type: 'string', maxLength: 256 } },
   },
   LoginResponse: {
     type: 'object', required: ['user', 'expires_in', 'expires_at'],

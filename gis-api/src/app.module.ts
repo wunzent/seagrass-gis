@@ -1,10 +1,11 @@
 import 'reflect-metadata';
 import { randomBytes } from 'node:crypto';
 import { Module } from '@nestjs/common';
-import { APP_FILTER, NestFactory } from '@nestjs/core';
+import { APP_FILTER, APP_PIPE, NestFactory } from '@nestjs/core';
 import { AuthModule } from './auth/auth.module';
 import { SafeErrorFilter } from './common/error.filter';
 import { setupDocs } from './common/openapi';
+import { createValidationPipe } from './common/validation';
 import { AuthConfig } from './config/config';
 import { Database, DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
@@ -30,7 +31,7 @@ export function appModule(database: Database, options: AppOptions = {}) {
       HealthModule,
       SitesModule,
     ],
-    providers: [{ provide: APP_FILTER, useClass: SafeErrorFilter }],
+    providers: [{ provide: APP_FILTER, useClass: SafeErrorFilter }, { provide: APP_PIPE, useFactory: createValidationPipe }],
   })
   class AppModule {}
   return AppModule;

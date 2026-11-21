@@ -1,27 +1,13 @@
 get:
   operationId: SitesController_list
   parameters:
-    - name: pageSize
-      required: false
-      in: query
-      schema:
-        type: integer
-        minimum: 1
-        maximum: 100
-        default: 20
-    - name: page
-      required: false
-      in: query
-      schema:
-        type: integer
-        minimum: 1
-        default: 1
     - name: province
       required: false
       in: query
       schema:
-        type: string
         pattern: ^[0-9A-Za-z]{1,2}$
+        example: '81'
+        type: string
     - name: status
       required: false
       in: query
@@ -38,8 +24,23 @@ get:
       in: query
       description: ค้นหา code/name แบบ literal substring ไม่สนตัวพิมพ์
       schema:
-        type: string
         maxLength: 100
+        type: string
+    - name: page
+      required: false
+      in: query
+      schema:
+        minimum: 1
+        default: 1
+        type: integer
+    - name: pageSize
+      required: false
+      in: query
+      schema:
+        minimum: 1
+        maximum: 100
+        default: 20
+        type: integer
   responses:
     '200':
       description: ''

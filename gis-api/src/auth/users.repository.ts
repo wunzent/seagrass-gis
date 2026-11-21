@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { Role } from './user.model';
+import { Role } from './entities/user.entity';
 import { DATABASE, Database } from '../database/database.module';
 import { toDependencyError } from '../common/errors';
 

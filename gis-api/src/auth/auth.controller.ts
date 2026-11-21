@@ -8,7 +8,8 @@ import { AuthService } from './auth.service';
 import { accessCookie, clearedAccessCookie } from './cookies';
 import { ACCESS_TTL_SECONDS } from './crypto';
 import type { HttpRequest, HttpResponse } from '../common/http-types';
-import { JsonBody, LoginBodyPipe, LoginInput } from './pipes/login-body.pipe';
+import { LoginDto } from './dto/login.dto';
+import { JsonBody } from './json-body.decorator';
 
 const CSRF_HEADERS: MethodDecorator = (target, key, descriptor) => {
   ApiHeader({ name: 'X-CSRF-Protection', required: true, schema: { type: 'string', enum: ['1'] } })(target, key, descriptor);
@@ -24,7 +25,7 @@ export class AuthController {
   @Post('login')
   @ApiOperation({ summary: 'เข้าสู่ระบบ: ตั้ง HttpOnly cookie gis_access (JWT 15 นาที) ไม่คืน token ใน JSON' })
   @CSRF_HEADERS
-  @ApiBody({ schema: ref('LoginRequest') })
+  @ApiBody({ type: LoginDto })
   @ApiResponse({ status: 200, schema: ref('LoginResponse'), headers: { 'Set-Cookie': { schema: { type: 'string' }, description: 'gis_access=<JWT>; Max-Age=900; Path=/; HttpOnly; SameSite=Lax' } } })
   @ApiResponse(errorResponse(400, ['VALIDATION_ERROR']))
   @ApiResponse(errorResponse(401, ['INVALID_CREDENTIALS']))
@@ -33,7 +34,7 @@ export class AuthController {
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
   @UseGuards(CsrfGuard)
-  async login(@Req() request: HttpRequest, @Res({ passthrough: true }) response: HttpResponse, @JsonBody(LoginBodyPipe) body: LoginInput) {
+  async login(@Req() request: HttpRequest, @Res({ passthrough: true }) response: HttpResponse, @JsonBody() body: LoginDto) {
     const result = await this.auth.login(body.email, body.password, tokenOf(request), request.socket.remoteAddress ?? 'unknown');
     response.setHeader('Set-Cookie', accessCookie(result.token, ACCESS_TTL_SECONDS, this.auth.config.cookieSecure));
     return { user: result.user, expires_in: ACCESS_TTL_SECONDS, expires_at: result.expiresAt.toISOString() };

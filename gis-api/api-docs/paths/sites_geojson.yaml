@@ -5,8 +5,9 @@ get:
       required: false
       in: query
       schema:
-        type: string
         pattern: ^[0-9A-Za-z]{1,2}$
+        example: '81'
+        type: string
     - name: status
       required: false
       in: query
@@ -23,15 +24,15 @@ get:
       in: query
       description: ค้นหา code/name แบบ literal substring ไม่สนตัวพิมพ์
       schema:
-        type: string
         maxLength: 100
+        type: string
     - name: bbox
       required: true
       in: query
       description: minLon,minLat,maxLon,maxLat
       schema:
-        type: string
         example: 99,7,100,8
+        type: string
   responses:
     '200':
       description: ''

@@ -1,8 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { SiteRow } from './site.model';
+import { SiteRow } from './entities/site.entity';
 import { DATABASE, Database } from '../database/database.module';
 import { toDependencyError } from '../common/errors';
-import { GeoJsonQuery, ListQuery, SiteFilters } from './pipes/sites-query.pipes';
+import { GeoJsonQuery, ListQuery, SiteFilters } from './entities/site.entity';
 
 
 // BR-04: status uses the unrounded AVG of every survey on the site's latest survey day; computed on read, never cached.
