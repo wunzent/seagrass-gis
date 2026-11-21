@@ -30,6 +30,13 @@ services:
       TZ: Asia/Bangkok
       SEED_DATA_DIR: /seed-data
       IMPORT_REPORT_DIR: /reports
+      # Demo-only auth settings for loopback Docker; override in .env, never reuse outside local assessment.
+      JWT_SECRET: ${JWT_SECRET:-local-demo-only-jwt-secret-not-for-production}
+      PUBLIC_WEB_ORIGIN: http://localhost:${WEB_PORT:-3000}
+      API_DOCS_ORIGIN: http://localhost:${API_PORT:-3001}
+      DEMO_VIEWER_PASSWORD: ${DEMO_VIEWER_PASSWORD:-viewer-demo-only}
+      DEMO_EDITOR_PASSWORD: ${DEMO_EDITOR_PASSWORD:-editor-demo-only}
+      DEMO_ADMIN_PASSWORD: ${DEMO_ADMIN_PASSWORD:-admin-demo-only}
     ports:
       - "127.0.0.1:${API_PORT:-3001}:3001"
     volumes:

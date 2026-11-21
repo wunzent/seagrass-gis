@@ -60,6 +60,18 @@ Local API tests หลังติดตั้ง dependencies (`npm ci --ignore
 Web tests ใน `gis-web/`: `npm run test:unit`, `npm run build`, `npm run typecheck`
 GitLab CI อยู่ใน `.gitlab-ci.yml` ของแต่ละ repository: `gis-api` (tests + real PostGIS + image build), `gis-web` (unit/build/typecheck + image build), `gis-docs` (Compose syntax) และทุก repo มี GitLab Secret Detection; actual GitLab pipeline ยังไม่ผ่านการรันจนกว่าจะมี run evidence ไม่ถือว่า local green เท่ากับ CI green
 
+## Demo Accounts and API Docs
+
+API สร้างบัญชีสาธิตตอน start จาก environment (ค่า default ใน Compose ใช้บนเครื่องนี้เท่านั้น ห้ามใช้ที่อื่น):
+
+| Email | Role | Password (demo-only) |
+|---|---|---|
+| `viewer@demo.local` | viewer | `viewer-demo-only` |
+| `editor@demo.local` | editor | `editor-demo-only` |
+| `admin@demo.local` | admin | `admin-demo-only` |
+
+เปลี่ยนได้ด้วย `DEMO_*_PASSWORD` และ `JWT_SECRET` ใน `gis-docs/.env`. Login ตั้ง HttpOnly cookie `gis_access` (JWT 15 นาที) ไม่คืน token ใน JSON; คำขอ POST/PATCH/DELETE ต้องส่ง `Origin` ที่อนุญาต และ `X-CSRF-Protection: 1`. Swagger UI: http://localhost:3001/docs; spec แยกไฟล์อยู่ใน `gis-api/api-docs/` (generate ด้วย `npm run docs:generate`)
+
 ## Seed Import
 
 API startup เรียก importer หลัง migrations ก่อนเปิด HTTP; อ่าน `seed-data/` แบบ read-only และเขียนรายงาน `reports/import_report.csv`. รันซ้ำด้วยคำสั่งเดียว:
