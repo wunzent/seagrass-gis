@@ -52,7 +52,7 @@ test:
     - npm run test:import:unit
     - npm run test:import:integration
 
-image:
+docker-image:
   stage: build
   image: docker:27.5.1
   timeout: 20m
