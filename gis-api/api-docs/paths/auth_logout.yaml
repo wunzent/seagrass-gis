@@ -1,0 +1,48 @@
+post:
+  operationId: AuthController_logout
+  parameters:
+    - name: X-CSRF-Protection
+      in: header
+      required: true
+      schema:
+        type: string
+        enum:
+          - '1'
+    - name: Origin
+      in: header
+      description: ต้องตรงกับ PUBLIC_WEB_ORIGIN หรือ API_DOCS_ORIGIN
+      required: true
+      schema:
+        type: string
+  responses:
+    '204':
+      description: No content
+    '403':
+      description: CSRF_REJECTED
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: ../components/schemas/ErrorBody.yaml
+            example:
+              error:
+                code: CSRF_REJECTED
+                message: ...
+                details: {}
+    '503':
+      description: SERVICE_UNAVAILABLE
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: ../components/schemas/ErrorBody.yaml
+            example:
+              error:
+                code: SERVICE_UNAVAILABLE
+                message: ...
+                details: {}
+  security:
+    - gis_access: []
+  summary: 'ออกจากระบบ: เพิกถอน session และล้าง cookie (idempotent)'
+  tags:
+    - auth

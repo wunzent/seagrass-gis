@@ -1,0 +1,68 @@
+get:
+  operationId: SitesController_geojson
+  parameters:
+    - name: province
+      required: false
+      in: query
+      schema:
+        type: string
+        pattern: ^[0-9A-Za-z]{1,2}$
+    - name: status
+      required: false
+      in: query
+      schema:
+        type: string
+        enum:
+          - very_good
+          - good
+          - fair
+          - poor
+          - no_data
+    - name: q
+      required: false
+      in: query
+      description: ค้นหา code/name แบบ literal substring ไม่สนตัวพิมพ์
+      schema:
+        type: string
+        maxLength: 100
+    - name: bbox
+      required: true
+      in: query
+      description: minLon,minLat,maxLon,maxLat
+      schema:
+        type: string
+        example: 99,7,100,8
+  responses:
+    '200':
+      description: ''
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/SiteFeatureCollection.yaml
+    '400':
+      description: INVALID_BBOX | VALIDATION_ERROR
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: ../components/schemas/ErrorBody.yaml
+            example:
+              error:
+                code: INVALID_BBOX
+                message: ...
+                details: {}
+    '503':
+      description: SERVICE_UNAVAILABLE
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: ../components/schemas/ErrorBody.yaml
+            example:
+              error:
+                code: SERVICE_UNAVAILABLE
+                message: ...
+                details: {}
+  summary: แหล่งที่ตัดกับ bbox ของแผนที่ (ไม่มี paging)
+  tags:
+    - sites

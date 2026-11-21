@@ -2,21 +2,26 @@
   "name": "gis-api",
   "version": "0.1.0",
   "private": true,
-  "engines": { "node": ">=22.18.0 <23" },
+  "engines": {
+    "node": ">=22.18.0 <23"
+  },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.json",
     "start": "node --env-file-if-exists=.env dist/main.js",
     "migrate": "node --env-file-if-exists=.env dist/migrate.js",
     "import": "node --env-file-if-exists=.env dist/import.js",
-    "test:import:unit": "npm run build && node --test test/import-unit.cjs",
-    "test:import:integration": "npm run build && node --test test/import-integration.cjs",
-    "test:unit": "npm run build && node --test test/unit.test.cjs test/sites-unit.cjs",
-    "test:integration": "npm run build && node --test --test-concurrency=1 test/integration.test.cjs test/sites-integration.cjs"
+    "docs:generate": "npm run build && node dist/docs.js",
+    "test:import:unit": "npm run build && node --test test/unit/import.test.cjs",
+    "test:import:integration": "npm run build && node --test test/e2e/import.e2e.cjs",
+    "test:unit": "npm run build && node --test --test-timeout=2000 test/unit/runtime.test.cjs test/unit/sites.test.cjs test/unit/auth.test.cjs test/unit/api-docs.test.cjs",
+    "test:integration": "npm run build && node --test --test-concurrency=1 --test-timeout=30000 test/e2e/runtime.e2e.cjs test/e2e/sites.e2e.cjs test/e2e/auth.e2e.cjs"
   },
   "dependencies": {
     "@nestjs/common": "12.6.0",
     "@nestjs/core": "12.6.0",
     "@nestjs/platform-express": "12.6.0",
+    "@nestjs/swagger": "12.1.2",
+    "js-yaml": "5.5.0",
     "pg": "8.23.1",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2"

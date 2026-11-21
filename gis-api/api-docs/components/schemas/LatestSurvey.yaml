@@ -1,0 +1,13 @@
+type: object
+required:
+  - surveyed_on
+  - average_cover_percent
+  - count
+properties:
+  surveyed_on:
+    type: string
+    format: date
+  average_cover_percent:
+    type: number
+  count:
+    type: integer

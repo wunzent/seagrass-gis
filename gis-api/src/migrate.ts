@@ -1,5 +1,5 @@
-import { readConfig } from './config';
-import { createPool, migrate } from './database';
+import { readConfig } from './config/config';
+import { createPool, migrate } from './database/connection';
 async function main() {
   const pool = createPool(readConfig(process.env).databaseUrl);
   try { await migrate(pool); } finally { await pool.end(); }

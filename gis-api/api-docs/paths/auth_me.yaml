@@ -1,0 +1,27 @@
+get:
+  operationId: AuthController_me
+  parameters: []
+  responses:
+    '200':
+      description: ''
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/MeResponse.yaml
+    '401':
+      description: UNAUTHORIZED
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: ../components/schemas/ErrorBody.yaml
+            example:
+              error:
+                code: UNAUTHORIZED
+                message: ...
+                details: {}
+  security:
+    - gis_access: []
+  summary: ผู้ใช้ปัจจุบันจาก cookie session (ไม่ต่ออายุ)
+  tags:
+    - auth

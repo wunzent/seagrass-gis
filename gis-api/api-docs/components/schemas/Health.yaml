@@ -1,0 +1,12 @@
+type: object
+required:
+  - db
+  - postgis
+properties:
+  db:
+    type: string
+    enum:
+      - ok
+  postgis:
+    type: string
+    example: '3.5'

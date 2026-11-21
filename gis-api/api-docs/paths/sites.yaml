@@ -1,0 +1,76 @@
+get:
+  operationId: SitesController_list
+  parameters:
+    - name: pageSize
+      required: false
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    - name: page
+      required: false
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    - name: province
+      required: false
+      in: query
+      schema:
+        type: string
+        pattern: ^[0-9A-Za-z]{1,2}$
+    - name: status
+      required: false
+      in: query
+      schema:
+        type: string
+        enum:
+          - very_good
+          - good
+          - fair
+          - poor
+          - no_data
+    - name: q
+      required: false
+      in: query
+      description: ค้นหา code/name แบบ literal substring ไม่สนตัวพิมพ์
+      schema:
+        type: string
+        maxLength: 100
+  responses:
+    '200':
+      description: ''
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/SitesPage.yaml
+    '400':
+      description: VALIDATION_ERROR
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: ../components/schemas/ErrorBody.yaml
+            example:
+              error:
+                code: VALIDATION_ERROR
+                message: ...
+                details: {}
+    '503':
+      description: SERVICE_UNAVAILABLE
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: ../components/schemas/ErrorBody.yaml
+            example:
+              error:
+                code: SERVICE_UNAVAILABLE
+                message: ...
+                details: {}
+  summary: รายการแหล่งหญ้าทะเลที่ใช้งาน (ไม่มี geometry) เรียง code
+  tags:
+    - sites

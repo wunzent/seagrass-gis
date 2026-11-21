@@ -1,0 +1,18 @@
+type: object
+required:
+  - error
+properties:
+  error:
+    type: object
+    required:
+      - code
+      - message
+      - details
+    properties:
+      code:
+        type: string
+        example: VALIDATION_ERROR
+      message:
+        type: string
+      details:
+        type: object

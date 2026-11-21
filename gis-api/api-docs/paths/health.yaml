@@ -1,0 +1,25 @@
+get:
+  operationId: HealthController_health
+  parameters: []
+  responses:
+    '200':
+      description: ''
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Health.yaml
+    '503':
+      description: SERVICE_UNAVAILABLE
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: ../components/schemas/ErrorBody.yaml
+            example:
+              error:
+                code: SERVICE_UNAVAILABLE
+                message: ...
+                details: {}
+  summary: ความพร้อมของ API และ PostGIS (query ฐานข้อมูลจริง)
+  tags:
+    - health

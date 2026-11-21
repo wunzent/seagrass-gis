@@ -1,0 +1,15 @@
+type: object
+required:
+  - user
+  - expires_in
+  - expires_at
+properties:
+  user:
+    $ref: ./User.yaml
+  expires_in:
+    type: integer
+    enum:
+      - 900
+  expires_at:
+    type: string
+    format: date-time

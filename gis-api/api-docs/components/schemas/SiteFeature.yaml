@@ -1,0 +1,28 @@
+type: object
+required:
+  - type
+  - geometry
+  - properties
+properties:
+  type:
+    type: string
+    enum:
+      - Feature
+  geometry:
+    type: object
+    description: GeoJSON MultiPolygon, SRID 4326, [lon,lat]
+  properties:
+    allOf:
+      - $ref: ./SiteSummary.yaml
+      - type: object
+        required:
+          - id
+          - latestSurvey
+        properties:
+          id:
+            type: string
+            format: uuid
+          latestSurvey:
+            allOf:
+              - $ref: ./LatestSurvey.yaml
+            nullable: true

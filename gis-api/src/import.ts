@@ -1,6 +1,6 @@
-import {readConfig} from './config';
-import {createPool,migrate} from './database';
-import {importSeed} from './import/runner';
+import {readConfig} from './config/config';
+import {createPool,migrate} from './database/connection';
+import {importSeed} from './database/seeders/seed-import';
 
 async function main() {
   const pool=createPool(readConfig(process.env).databaseUrl);
