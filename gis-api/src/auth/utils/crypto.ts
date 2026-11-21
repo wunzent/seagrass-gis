@@ -38,7 +38,10 @@ export async function verifyPassword(password: string, stored: string) {
 /** Burn equivalent work for unknown users so response time does not reveal account existence. */
 let dummyHash: Promise<string> | undefined;
 export async function verifyAgainstDummy(password: string) {
-  dummyHash ??= hashPassword(randomBytes(16).toString('hex'));
+  dummyHash ??= hashPassword(randomBytes(16).toString('hex')).catch((error) => {
+    dummyHash = undefined; // a transient failure must not poison every later unknown-user login
+    throw error;
+  });
   await verifyPassword(password, await dummyHash);
   return false;
 }

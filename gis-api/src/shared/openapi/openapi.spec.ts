@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { runInNewContext } from 'node:vm';
 import { Test } from '@nestjs/testing';
 import { appModule } from '../../app.module';
 import { buildOpenApiDocument, renderApiDocs, setupDocs } from './openapi';
@@ -79,6 +80,26 @@ describe('api docs', () => {
       const spec: any = await (await fetch(`${base}/docs/openapi.json`)).json();
       expect(spec.components.securitySchemes.gis_access.in).toBe('cookie');
       expect(spec.paths['/sites']).toBeTruthy();
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('Swagger UI adds X-CSRF-Protection: 1 to non-GET try-it-out requests', async () => {
+    const app = await makeApp();
+    await app.listen(0, '127.0.0.1');
+    try {
+      const init = await (await fetch(`${await app.getUrl()}/docs/swagger-ui-init.js`)).text();
+      // Run the served init script with a stub SwaggerUIBundle to capture the options the browser would get.
+      let options: any;
+      const bundle = Object.assign((o: unknown) => ((options = o), {}), { presets: { apis: {} }, plugins: {} });
+      const window: any = { location: { origin: 'http://localhost:3001' } };
+      runInNewContext(init, { window, SwaggerUIBundle: bundle, SwaggerUIStandalonePreset: {} });
+      window.onload();
+      const intercept = (method: string) => options.requestInterceptor({ method, url: '/sites', headers: {} }).headers;
+      for (const method of ['POST', 'PATCH', 'DELETE', 'post'])
+        expect([method, intercept(method)['X-CSRF-Protection']]).toEqual([method, '1']);
+      for (const method of ['GET', 'HEAD', 'OPTIONS']) expect([method, intercept(method)]).toEqual([method, {}]);
     } finally {
       await app.close();
     }

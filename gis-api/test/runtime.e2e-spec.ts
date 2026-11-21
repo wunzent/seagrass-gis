@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing';
-import { appModule } from '../src/app.module';
+import { appModule, createApp } from '../src/app.module';
 import { readConfig } from '../src/core/config/config';
 import { createPool } from '../src/core/database/connection';
 import { assertTestDatabase, migrate } from './helpers';
@@ -47,6 +47,49 @@ describe('runtime (real PostGIS)', () => {
       });
     } finally {
       if (app) await app.close();
+      await pool.end();
+    }
+  });
+
+  it('every response carries security headers; /docs gets a CSP Swagger UI can run under', async () => {
+    const pool = createPool(config.databaseUrl);
+    const app = await createApp(pool);
+    try {
+      await app.listen(0, '127.0.0.1');
+      const base = await app.getUrl();
+      const common = (response: Response) => [
+        response.headers.get('x-content-type-options'),
+        response.headers.get('x-frame-options'),
+        response.headers.get('referrer-policy'),
+      ];
+      const json = "default-src 'none'; frame-ancestors 'none'";
+      for (const path of ['/health', '/sites?page=1', '/missing']) {
+        const response = await fetch(`${base}${path}`);
+        expect([path, ...common(response), response.headers.get('content-security-policy')]).toEqual([
+          path,
+          'nosniff',
+          'DENY',
+          'no-referrer',
+          json,
+        ]);
+      }
+      for (const path of ['/docs', '/docs/swagger-ui-init.js', '/docs/openapi.json']) {
+        const response = await fetch(`${base}${path}`);
+        expect([path, response.status, ...common(response)]).toEqual([path, 200, 'nosniff', 'DENY', 'no-referrer']);
+        const csp = response.headers.get('content-security-policy') ?? '';
+        for (const directive of [
+          "default-src 'none'",
+          "script-src 'self'",
+          "style-src 'self' 'unsafe-inline'",
+          "img-src 'self' data:",
+          "connect-src 'self'",
+          "frame-ancestors 'none'",
+        ])
+          expect([path, csp.split('; ')]).toEqual([path, expect.arrayContaining([directive])]);
+        expect([path, csp]).not.toEqual([path, expect.stringContaining("'unsafe-eval'")]);
+      }
+    } finally {
+      await app.close();
       await pool.end();
     }
   });

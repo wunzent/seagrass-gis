@@ -8,6 +8,7 @@ import { AuthConfig } from './core/config/config';
 import { Database } from './core/database/database.module';
 import { HealthModule } from './health/health.module';
 import { SafeErrorFilter } from './shared/filters/http-exception.filter';
+import { securityHeaders } from './shared/http/security-headers';
 import { setupDocs } from './shared/openapi/openapi';
 import { createValidationPipe } from './shared/pipes/strict-validation.pipe';
 import { LookupsModule } from './lookups/lookups.module';
@@ -49,6 +50,7 @@ export function appModule(database: Database, options: AppOptions = {}) {
 
 export async function createApp(database: Database, options: AppOptions = {}) {
   const app = await NestFactory.create(appModule(database, options), { logger: false });
+  app.use(securityHeaders); // before setupDocs so the Swagger routes get the headers too
   setupDocs(app);
   return app;
 }

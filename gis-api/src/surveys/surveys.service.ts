@@ -41,8 +41,11 @@ export class SurveysService {
 
   /** BR-05 on the complete record (after a PATCH merge too); species and distance need the database. */
   private async check(tx: Queryable, siteId: string, survey: SurveyFields, speciesChanged: boolean) {
-    if (!isSurveyDate(survey.surveyed_on) || !(survey.cover_percent >= 0 && survey.cover_percent <= 100))
-      throw validationError({ fields: ['surveyed_on', 'cover_percent'] });
+    const fields = [
+      ...(isSurveyDate(survey.surveyed_on) ? [] : ['surveyed_on']),
+      ...(survey.cover_percent >= 0 && survey.cover_percent <= 100 ? [] : ['cover_percent']),
+    ];
+    if (fields.length) throw validationError({ fields });
     if (speciesChanged && (await this.surveys.unknownSpecies(tx, survey.species)).length)
       throw validationError({ fields: ['species'], reason: 'unknown species code' });
     if (!(await this.surveys.isWithinSite(tx, siteId, survey.lon, survey.lat))) throw outsideSite();

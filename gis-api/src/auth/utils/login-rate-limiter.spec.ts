@@ -26,4 +26,24 @@ describe('LoginRateLimiter', () => {
       limiter.succeed(b);
     } // successful logins never accumulate
   });
+
+  it('keeps the key map under a hard cap by evicting the oldest entries when pruning expired ones is not enough', () => {
+    const limiter = new LoginRateLimiter(1, 60_000, 3);
+    const now = 1_000_000;
+    for (const key of ['k1', 'k2', 'k3', 'k4', 'k5']) limiter.attempt(key, now);
+    expect(limiter.size).toBe(3);
+    // k1 and k2 were evicted (oldest), so they start a fresh budget; k5 is still limited.
+    expect(status(() => limiter.attempt('k5', now))).toEqual([429, 'AUTH_RATE_LIMITED']);
+    expect(status(() => limiter.attempt('k1', now))).toBe('no error');
+    expect(limiter.size).toBe(3);
+  });
+
+  it('prunes expired entries before evicting live ones', () => {
+    const limiter = new LoginRateLimiter(1, 60_000, 2);
+    limiter.attempt('old', 0);
+    limiter.attempt('live', 59_000);
+    limiter.attempt('new', 60_000); // 'old' expired at 60_000 and is pruned; 'live' survives
+    expect(limiter.size).toBe(2);
+    expect(status(() => limiter.attempt('live', 60_000))).toEqual([429, 'AUTH_RATE_LIMITED']);
+  });
 });

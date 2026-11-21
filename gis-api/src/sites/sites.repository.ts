@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { SiteRow } from './entities/site.entity';
 import { DATABASE, Database } from '../core/database/database.module';
 import { Queryable, withTransaction } from '../core/database/transaction';
-import { ApiError, toDependencyError } from '../shared/errors/api-error';
+import { ApiError, invalidGeometry, toDependencyError } from '../shared/errors/api-error';
 import { GeoJsonQuery, ListQuery, SiteFilters } from './entities/site.entity';
 
 /** Input geometry as GeoJSON text; only shape-checked GeoJSON (BR-01/02) reaches PostGIS. */
@@ -104,16 +104,24 @@ export class SitesRepository {
   /**
    * BR-03: province with the largest positive geography intersection, tie → lowest code (byte order); area_rai is the
    * unrounded geography area / 1600. Null when no province has a positive-area intersection (OUTSIDE_COVERAGE).
+   * A GEOS TopologyException in ST_Intersection (SQLSTATE XX000) on an ST_IsValid-passing input is a 400 INVALID_GEOMETRY.
    */
   async coverage(tx: Queryable, geojson: string): Promise<{ province_code: string; area_rai: number } | null> {
-    const { rows } = await tx.query(
-      `WITH input AS (SELECT ${INPUT_GEOM} AS g)
-       SELECT p.code AS province_code, ST_Area(i.g::geography) / 1600 AS area_rai,
-         ST_Area(ST_Intersection(p.geom::geography, i.g::geography)) AS covered
-       FROM provinces p CROSS JOIN input i WHERE ST_Intersects(p.geom, i.g)
-       ORDER BY covered DESC, p.code COLLATE "C" ASC LIMIT 1`,
-      [geojson],
-    );
+    let rows: Record<string, any>[];
+    try {
+      ({ rows } = await tx.query(
+        `WITH input AS (SELECT ${INPUT_GEOM} AS g)
+         SELECT p.code AS province_code, ST_Area(i.g::geography) / 1600 AS area_rai,
+           ST_Area(ST_Intersection(p.geom::geography, i.g::geography)) AS covered
+         FROM provinces p CROSS JOIN input i WHERE ST_Intersects(p.geom, i.g)
+         ORDER BY covered DESC, p.code COLLATE "C" ASC LIMIT 1`,
+        [geojson],
+      ));
+    } catch (error) {
+      const e = error as { code?: string; message?: string };
+      if (e.code === 'XX000' && /TopologyException|GEOS/i.test(e.message ?? '')) throw invalidGeometry();
+      throw error;
+    }
     const [row] = rows;
     return row && Number(row.covered) > 0 ? { province_code: row.province_code, area_rai: row.area_rai } : null;
   }

@@ -24,4 +24,9 @@ describe('login body DTO', () => {
     ]);
     expect(await outcome(() => loginBody({ email: 1, password: 'x' }))).toEqual([400, 'VALIDATION_ERROR']);
   });
+
+  it('rejects an email PostgreSQL cannot store (NUL or lone surrogate) with 400 instead of a database 500', async () => {
+    expect(await outcome(() => loginBody({ email: 'a\u0000@b.c', password: 'x' }))).toEqual([400, 'VALIDATION_ERROR']);
+    expect(await outcome(() => loginBody({ email: 'a\ud800@b.c', password: 'x' }))).toEqual([400, 'VALIDATION_ERROR']);
+  });
 });

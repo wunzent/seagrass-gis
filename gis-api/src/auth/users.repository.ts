@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Role, UserRecord } from './entities/user.entity';
 import { DATABASE, Database } from '../core/database/database.module';
+import { Queryable } from '../core/database/transaction';
 import { toDependencyError } from '../shared/errors/api-error';
 
 @Injectable()
@@ -18,11 +19,11 @@ export class UsersRepository {
     }
   }
 
-  async upsert(user: { id: string; email: string; role: Role; passwordHash: string }) {
-    await this.db.query(
-      `INSERT INTO users(id, email, password_hash, role) VALUES($1, $2, $3, $4)
-      ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash, role = EXCLUDED.role`,
-      [user.id, user.email, user.passwordHash, user.role],
-    );
+  /** Runs on `tx` when given, so callers can combine it with other writes in one transaction. */
+  async upsert(user: { id: string; email: string; role: Role; passwordHash: string }, tx?: Queryable) {
+    const sql = `INSERT INTO users(id, email, password_hash, role) VALUES($1, $2, $3, $4)
+      ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash, role = EXCLUDED.role`;
+    const params = [user.id, user.email, user.passwordHash, user.role];
+    await (tx ? tx.query(sql, params) : this.db.query(sql, params));
   }
 }

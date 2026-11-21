@@ -3,6 +3,7 @@ import { appModule, AppOptions } from '../src/app.module';
 import { hashPassword, signAccessToken } from '../src/auth/utils/crypto';
 import { readConfig } from '../src/core/config/config';
 import { createPool } from '../src/core/database/connection';
+import { seedDemoUsers } from '../src/core/database/seeders/demo-users';
 import { assertTestDatabase, migrate } from './helpers';
 
 const config = readConfig(process.env);
@@ -274,6 +275,61 @@ describe('auth (real PostGIS)', () => {
     } finally {
       await dead.close();
       await deadPool.end();
+    }
+  });
+
+  it('the demo-user seeder revokes active sessions only when it changes the password hash or role', async () => {
+    const cookie = cookieOf(await login('viewer@demo.local', 'viewer-pass'));
+    try {
+      expect(await seedDemoUsers(pool, { DEMO_VIEWER_PASSWORD: 'viewer-pass' })).toEqual([]); // unchanged: untouched
+      expect((await me(cookie)).status).toBe(200);
+      expect(await seedDemoUsers(pool, { DEMO_VIEWER_PASSWORD: 'viewer-pass-rotated' })).toEqual(['viewer@demo.local']);
+      expect((await me(cookie)).status).toBe(401); // old password's session no longer works
+      const rotated = cookieOf(await login('viewer@demo.local', 'viewer-pass-rotated'));
+      await pool.query(`UPDATE users SET role = 'editor' WHERE id = $1`, [USERS.viewer]);
+      expect(await seedDemoUsers(pool, { DEMO_VIEWER_PASSWORD: 'viewer-pass-rotated' })).toEqual(['viewer@demo.local']);
+      expect((await me(rotated)).status).toBe(401); // role reset by the seeder also revokes
+      const active = await pool.query(
+        'SELECT count(*)::int AS n FROM access_sessions WHERE user_id = $1 AND revoked_at IS NULL',
+        [USERS.viewer],
+      );
+      expect(active.rows[0].n).toBe(0);
+    } finally {
+      await pool.query(`UPDATE users SET password_hash = $2, role = 'viewer' WHERE id = $1`, [
+        USERS.viewer,
+        await hashPassword('viewer-pass'),
+      ]);
+    }
+  });
+
+  it('the demo-user seeder changes the hash and revokes sessions atomically', async () => {
+    const cookie = cookieOf(await login('viewer@demo.local', 'viewer-pass'));
+    // Same pool, but the session revoke fails inside any transaction client (and on the pool itself).
+    const revokeFails = (sql: string) => /UPDATE access_sessions/.test(sql);
+    const failing = {
+      query: (sql: string, params?: unknown[]) =>
+        revokeFails(sql) ? Promise.reject(new Error('revoke failed')) : pool.query(sql, params),
+      connect: async () => {
+        const client = await pool.connect();
+        // A wrapper, not a mutation: the pooled client is reused unchanged after release.
+        return {
+          query: (sql: string, params?: unknown[]) =>
+            revokeFails(sql) ? Promise.reject(new Error('revoke failed')) : client.query(sql, params),
+          release: (error?: Error) => client.release(error),
+        };
+      },
+    };
+    try {
+      await expect(seedDemoUsers(failing as any, { DEMO_VIEWER_PASSWORD: 'viewer-pass-rotated' })).rejects.toThrow();
+      expect((await login('viewer@demo.local', 'viewer-pass-rotated')).status).toBe(401); // hash change rolled back
+      expect((await me(cookie)).status).toBe(200);
+      expect(await seedDemoUsers(pool, { DEMO_VIEWER_PASSWORD: 'viewer-pass-rotated' })).toEqual(['viewer@demo.local']);
+      expect((await me(cookie)).status).toBe(401); // the retry still revokes
+    } finally {
+      await pool.query(`UPDATE users SET password_hash = $2, role = 'viewer' WHERE id = $1`, [
+        USERS.viewer,
+        await hashPassword('viewer-pass'),
+      ]);
     }
   });
 });

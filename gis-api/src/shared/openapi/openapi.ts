@@ -15,11 +15,22 @@ export function buildOpenApiDocument(app: INestApplication): OpenAPIObject {
   return SwaggerModule.createDocument(app, config);
 }
 
-/** Serves Swagger UI at /docs and the generated spec at /docs/openapi.json and /docs/openapi.yaml. */
+/**
+ * Serves Swagger UI at /docs and the generated spec at /docs/openapi.json and /docs/openapi.yaml.
+ * Try-it-out is same-origin, so the browser sends the gis_access cookie and its own Origin (API_DOCS_ORIGIN must equal
+ * the address in the address bar); the interceptor adds the CSRF header on unsafe methods. It is serialized into
+ * swagger-ui-init.js, so it must stay self-contained.
+ */
 export function setupDocs(app: INestApplication) {
   SwaggerModule.setup('docs', app, () => buildOpenApiDocument(app), {
     jsonDocumentUrl: 'docs/openapi.json',
     yamlDocumentUrl: 'docs/openapi.yaml',
+    swaggerOptions: {
+      requestInterceptor: (request: { method?: string; headers: Record<string, string> }) => {
+        if (!/^(GET|HEAD|OPTIONS)$/i.test(request.method || 'GET')) request.headers['X-CSRF-Protection'] = '1';
+        return request;
+      },
+    },
   });
 }
 
