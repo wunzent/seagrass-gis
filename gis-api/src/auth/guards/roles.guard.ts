@@ -16,10 +16,16 @@ export const unauthorized = () => new ApiError(401, 'UNAUTHORIZED', 'กรุ�
  */
 @Injectable()
 export class RolesGuard implements CanActivate {
-  constructor(private readonly reflector: Reflector, @Inject(AUTH_CONFIG) private readonly config: AuthConfig) {}
+  constructor(
+    private readonly reflector: Reflector,
+    @Inject(AUTH_CONFIG) private readonly config: AuthConfig,
+  ) {}
   canActivate(context: ExecutionContext) {
     // Handler metadata overrides class metadata; reading both keeps a class-level @Roles from failing open.
-    const roles = this.reflector.getAllAndOverride<Role[] | undefined>(ROLES_KEY, [context.getHandler(), context.getClass()]);
+    const roles = this.reflector.getAllAndOverride<Role[] | undefined>(ROLES_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
     if (!roles) return true;
     const request = context.switchToHttp().getRequest<HttpRequest>();
     if (!request.auth) throw unauthorized();

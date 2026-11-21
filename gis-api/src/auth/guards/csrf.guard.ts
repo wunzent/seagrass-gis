@@ -12,9 +12,11 @@ const header = (headers: Headers, name: string) => {
 /** Exact Origin match + custom header + Fetch Metadata. Never touches the session, so a CSRF failure is not a forced logout. */
 export function checkCsrf(headers: Headers, allowedOrigins: string[]) {
   const origin = header(headers, 'origin');
-  const ok = origin !== undefined && allowedOrigins.includes(origin)
-    && header(headers, 'x-csrf-protection') === '1'
-    && header(headers, 'sec-fetch-site') !== 'cross-site';
+  const ok =
+    origin !== undefined &&
+    allowedOrigins.includes(origin) &&
+    header(headers, 'x-csrf-protection') === '1' &&
+    header(headers, 'sec-fetch-site') !== 'cross-site';
   if (!ok) throw new ApiError(403, 'CSRF_REJECTED', 'คำขอถูกปฏิเสธเพื่อป้องกัน CSRF');
 }
 

@@ -17,7 +17,10 @@ export class SitesService {
   }
 
   async geojson(query: GeoJsonQuery): Promise<SiteFeatureCollectionResponseDto> {
-    return { type: 'FeatureCollection' as const, features: (await this.sites.geojson(query)).map(SiteFeatureResponseDto.fromRow) };
+    return {
+      type: 'FeatureCollection' as const,
+      features: (await this.sites.geojson(query)).map(SiteFeatureResponseDto.fromRow),
+    };
   }
 
   async detail(code: string): Promise<SiteFeatureResponseDto> {

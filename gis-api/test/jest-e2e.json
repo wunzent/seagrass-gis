@@ -2,9 +2,7 @@
   "rootDir": "..",
   "testRegex": "test/.*\\.e2e-spec\\.ts$",
   "testEnvironment": "node",
-  "extensionsToTreatAsEsm": [
-    ".ts"
-  ],
+  "extensionsToTreatAsEsm": [".ts"],
   "transform": {
     "^.+\\.ts$": [
       "ts-jest",
@@ -20,10 +18,7 @@
           "emitDecoratorMetadata": true,
           "skipLibCheck": true,
           "forceConsistentCasingInFileNames": true,
-          "types": [
-            "jest",
-            "node"
-          ]
+          "types": ["jest", "node"]
         }
       }
     ]

@@ -14,8 +14,16 @@ import { MeResponseDto } from './dto/me-response.dto';
 import { JsonBody } from '../shared/decorators/json-body.decorator';
 
 const CSRF_HEADERS: MethodDecorator = (target, key, descriptor) => {
-  ApiHeader({ name: 'X-CSRF-Protection', required: true, schema: { type: 'string', enum: ['1'] } })(target, key, descriptor);
-  ApiHeader({ name: 'Origin', required: true, description: 'ต้องตรงกับ PUBLIC_WEB_ORIGIN หรือ API_DOCS_ORIGIN' })(target, key, descriptor);
+  ApiHeader({ name: 'X-CSRF-Protection', required: true, schema: { type: 'string', enum: ['1'] } })(
+    target,
+    key,
+    descriptor,
+  );
+  ApiHeader({ name: 'Origin', required: true, description: 'ต้องตรงกับ PUBLIC_WEB_ORIGIN หรือ API_DOCS_ORIGIN' })(
+    target,
+    key,
+    descriptor,
+  );
   ApiErrorResponse(403, ['CSRF_REJECTED'])(target, key, descriptor);
 };
 
@@ -28,7 +36,15 @@ export class AuthController {
   @ApiOperation({ summary: 'เข้าสู่ระบบ: ตั้ง HttpOnly cookie gis_access (JWT 15 นาที) ไม่คืน token ใน JSON' })
   @CSRF_HEADERS
   @ApiBody({ type: LoginDto })
-  @ApiOkResponse({ type: LoginResponseDto, headers: { 'Set-Cookie': { schema: { type: 'string' }, description: 'gis_access=<JWT>; Max-Age=900; Path=/; HttpOnly; SameSite=Lax' } } })
+  @ApiOkResponse({
+    type: LoginResponseDto,
+    headers: {
+      'Set-Cookie': {
+        schema: { type: 'string' },
+        description: 'gis_access=<JWT>; Max-Age=900; Path=/; HttpOnly; SameSite=Lax',
+      },
+    },
+  })
   @ApiErrorResponse(400, ['VALIDATION_ERROR'])
   @ApiErrorResponse(401, ['INVALID_CREDENTIALS'])
   @ApiErrorResponse(429, ['AUTH_RATE_LIMITED'])
@@ -36,8 +52,17 @@ export class AuthController {
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
   @UseGuards(CsrfGuard)
-  async login(@Req() request: HttpRequest, @Res({ passthrough: true }) response: HttpResponse, @JsonBody() body: LoginDto): Promise<LoginResponseDto> {
-    const result = await this.auth.login(body.email, body.password, tokenOf(request), request.socket.remoteAddress ?? 'unknown');
+  async login(
+    @Req() request: HttpRequest,
+    @Res({ passthrough: true }) response: HttpResponse,
+    @JsonBody() body: LoginDto,
+  ): Promise<LoginResponseDto> {
+    const result = await this.auth.login(
+      body.email,
+      body.password,
+      tokenOf(request),
+      request.socket.remoteAddress ?? 'unknown',
+    );
     response.setHeader('Set-Cookie', accessCookie(result.token, ACCESS_TTL_SECONDS, this.auth.config.cookieSecure));
     return { user: result.user, expires_in: ACCESS_TTL_SECONDS, expires_at: result.expiresAt.toISOString() };
   }

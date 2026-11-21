@@ -23,6 +23,13 @@ export class SiteSummaryResponseDto {
 
   /** Explicit field list: the response never gains a column the repository happens to select. */
   static fromRow(r: SiteRow): SiteSummaryResponseDto {
-    return { code: r.code, name: r.name, province_code: r.province_code, area_rai: r.area_rai, status: r.status, version: r.version };
+    return {
+      code: r.code,
+      name: r.name,
+      province_code: r.province_code,
+      area_rai: r.area_rai,
+      status: r.status,
+      version: r.version,
+    };
   }
 }

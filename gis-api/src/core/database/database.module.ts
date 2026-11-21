@@ -17,7 +17,10 @@ export class DatabaseModule {
     const shutdown: OnApplicationShutdown = { onApplicationShutdown: onShutdown };
     return {
       module: DatabaseModule,
-      providers: [{ provide: DATABASE, useValue: database }, { provide: 'DATABASE_SHUTDOWN', useValue: shutdown }],
+      providers: [
+        { provide: DATABASE, useValue: database },
+        { provide: 'DATABASE_SHUTDOWN', useValue: shutdown },
+      ],
       exports: [DATABASE],
     };
   }

@@ -28,10 +28,12 @@ export class SiteFeatureResponseDto {
       type: 'Feature',
       geometry: r.geometry,
       properties: {
-        id: r.id, ...SiteSummaryResponseDto.fromRow(r),
-        latestSurvey: r.surveyed_on === null
-          ? null
-          : { surveyed_on: r.surveyed_on, average_cover_percent: r.average_cover_percent!, count: r.count! },
+        id: r.id,
+        ...SiteSummaryResponseDto.fromRow(r),
+        latestSurvey:
+          r.surveyed_on === null
+            ? null
+            : { surveyed_on: r.surveyed_on, average_cover_percent: r.average_cover_percent!, count: r.count! },
       },
     };
   }

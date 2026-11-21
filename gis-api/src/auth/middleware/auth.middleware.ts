@@ -20,6 +20,8 @@ export class AuthMiddleware implements NestMiddleware {
     try {
       request.auth = await this.auth.authenticate(tokenOf(request));
       next();
-    } catch (error) { next(error); }
+    } catch (error) {
+      next(error);
+    }
   }
 }

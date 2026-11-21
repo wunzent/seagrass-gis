@@ -8,7 +8,11 @@ const logger = new AppLogger();
 
 /** CLI: regenerate api-docs/ from the controllers. Needs no database. */
 async function main() {
-  const app = await createApp({ query: async () => { throw new Error('docs generation does not query the database'); } });
+  const app = await createApp({
+    query: async () => {
+      throw new Error('docs generation does not query the database');
+    },
+  });
   const files = renderApiDocs(buildOpenApiDocument(app));
   await app.close();
   const root = resolve(__dirname, '../api-docs');
@@ -19,4 +23,7 @@ async function main() {
   }
   logger.log(`api-docs: ${files.size} files written`);
 }
-void main().catch(error => { logger.error(error); process.exitCode = 1; });
+void main().catch((error) => {
+  logger.error(error);
+  process.exitCode = 1;
+});

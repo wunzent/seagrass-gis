@@ -1,0 +1,7 @@
+dist
+coverage
+node_modules
+api-docs
+migrations
+package-lock.json
+.gitlab-ci.yml

@@ -17,7 +17,9 @@
     "test:unit": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config test/jest-e2e.json --runInBand --testPathIgnorePatterns import\\.e2e-spec",
     "test:import:unit": "node --experimental-vm-modules node_modules/jest/bin/jest.js import",
-    "test:import:integration": "node --require ./test/import-required.cjs --experimental-vm-modules node_modules/jest/bin/jest.js --config test/jest-e2e.json --runInBand import"
+    "test:import:integration": "node --require ./test/import-required.cjs --experimental-vm-modules node_modules/jest/bin/jest.js --config test/jest-e2e.json --runInBand import",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@nestjs/common": "12.6.0",
@@ -38,6 +40,7 @@
     "@types/node": "22.18.0",
     "@types/pg": "8.15.5",
     "jest": "30.5.2",
+    "prettier": "3.9.10",
     "ts-jest": "29.4.15",
     "typescript": "5.9.3"
   },

@@ -11,7 +11,10 @@ import { LoginRateLimiter } from './utils/login-rate-limiter';
 import { SessionsRepository } from './sessions.repository';
 import { UsersRepository } from './users.repository';
 
-export interface AuthModuleOptions { config: AuthConfig; loginLimit?: { max: number; windowMs: number } }
+export interface AuthModuleOptions {
+  config: AuthConfig;
+  loginLimit?: { max: number; windowMs: number };
+}
 
 /**
  * Cookie-JWT sessions. Registers RolesGuard globally (no-op unless a handler or class has @Roles) and resolves
@@ -25,8 +28,14 @@ export class AuthModule implements NestModule {
       controllers: [AuthController],
       providers: [
         { provide: AUTH_CONFIG, useValue: options.config },
-        { provide: LOGIN_LIMITER, useValue: new LoginRateLimiter(options.loginLimit?.max, options.loginLimit?.windowMs) },
-        AuthService, UsersRepository, SessionsRepository, CsrfGuard,
+        {
+          provide: LOGIN_LIMITER,
+          useValue: new LoginRateLimiter(options.loginLimit?.max, options.loginLimit?.windowMs),
+        },
+        AuthService,
+        UsersRepository,
+        SessionsRepository,
+        CsrfGuard,
         { provide: APP_GUARD, useClass: RolesGuard },
       ],
       exports: [AuthService, AUTH_CONFIG],
@@ -36,9 +45,14 @@ export class AuthModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     // Excluded: /health (readiness must not depend on sessions), /docs, and login/logout, which read their own cookie
     // after the CSRF guard so a cross-site request never reaches the session table.
-    consumer.apply(AuthMiddleware)
-      .exclude({ path: 'health', method: RequestMethod.GET }, { path: 'docs{/*rest}', method: RequestMethod.ALL },
-        { path: 'auth/login', method: RequestMethod.POST }, { path: 'auth/logout', method: RequestMethod.POST })
+    consumer
+      .apply(AuthMiddleware)
+      .exclude(
+        { path: 'health', method: RequestMethod.GET },
+        { path: 'docs{/*rest}', method: RequestMethod.ALL },
+        { path: 'auth/login', method: RequestMethod.POST },
+        { path: 'auth/logout', method: RequestMethod.POST },
+      )
       .forRoutes({ path: '{*rest}', method: RequestMethod.ALL });
   }
 }

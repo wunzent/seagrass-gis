@@ -13,9 +13,20 @@ describe('config', () => {
   });
 
   it('auth config: loopback HTTP allowed without Secure, other HTTP rejected', () => {
-    const base = { JWT_SECRET: SECRET, PUBLIC_WEB_ORIGIN: 'http://localhost:3000', API_DOCS_ORIGIN: 'http://localhost:3001' };
-    expect(readAuthConfig(base)).toEqual({ jwtSecret: SECRET, allowedOrigins: ['http://localhost:3000', 'http://localhost:3001'], cookieSecure: false });
-    expect(readAuthConfig({ ...base, PUBLIC_WEB_ORIGIN: 'https://gis.example', API_DOCS_ORIGIN: 'https://api.gis.example' }).cookieSecure).toBe(true);
+    const base = {
+      JWT_SECRET: SECRET,
+      PUBLIC_WEB_ORIGIN: 'http://localhost:3000',
+      API_DOCS_ORIGIN: 'http://localhost:3001',
+    };
+    expect(readAuthConfig(base)).toEqual({
+      jwtSecret: SECRET,
+      allowedOrigins: ['http://localhost:3000', 'http://localhost:3001'],
+      cookieSecure: false,
+    });
+    expect(
+      readAuthConfig({ ...base, PUBLIC_WEB_ORIGIN: 'https://gis.example', API_DOCS_ORIGIN: 'https://api.gis.example' })
+        .cookieSecure,
+    ).toBe(true);
     expect(() => readAuthConfig({ ...base, PUBLIC_WEB_ORIGIN: 'http://gis.example' })).toThrow(/HTTPS/);
     expect(() => readAuthConfig({ ...base, JWT_SECRET: 'short' })).toThrow(/JWT_SECRET/);
     expect(() => readAuthConfig({ ...base, PUBLIC_WEB_ORIGIN: 'http://localhost:3000/path' })).toThrow(/origin/);

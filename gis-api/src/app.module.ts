@@ -20,7 +20,9 @@ export interface AppOptions {
 
 /** Tests may omit `auth`: a random per-process secret and the loopback origins are used. main.ts passes readAuthConfig(). */
 const localAuth = (): AuthConfig => ({
-  jwtSecret: randomBytes(32).toString('hex'), allowedOrigins: ['http://localhost:3000', 'http://localhost:3001'], cookieSecure: false,
+  jwtSecret: randomBytes(32).toString('hex'),
+  allowedOrigins: ['http://localhost:3000', 'http://localhost:3001'],
+  cookieSecure: false,
 });
 
 /** Root module, built per call so each app (and each test) gets its own database handle and auth config. */
@@ -32,7 +34,10 @@ export function appModule(database: Database, options: AppOptions = {}) {
       HealthModule,
       SitesModule,
     ],
-    providers: [{ provide: APP_FILTER, useClass: SafeErrorFilter }, { provide: APP_PIPE, useFactory: createValidationPipe }],
+    providers: [
+      { provide: APP_FILTER, useClass: SafeErrorFilter },
+      { provide: APP_PIPE, useFactory: createValidationPipe },
+    ],
   })
   class AppModule {}
   return AppModule;

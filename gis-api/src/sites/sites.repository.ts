@@ -4,7 +4,6 @@ import { DATABASE, Database } from '../core/database/database.module';
 import { toDependencyError } from '../shared/errors/api-error';
 import { GeoJsonQuery, ListQuery, SiteFilters } from './entities/site.entity';
 
-
 // BR-04: status uses the unrounded AVG of every survey on the site's latest survey day; computed on read, never cached.
 const SITE_VIEW = `
   SELECT s.id, s.code, s.name, s.province_code, round(s.area_rai, 2)::float8 AS area_rai, s.version, s.geom,
@@ -24,7 +23,10 @@ const escapeLike = (text: string) => text.replace(/[\\%_]/g, '\\$&');
 
 function where(filters: SiteFilters, params: unknown[]) {
   const clauses: string[] = [];
-  const add = (value: unknown) => { params.push(value); return `$${params.length}`; };
+  const add = (value: unknown) => {
+    params.push(value);
+    return `$${params.length}`;
+  };
   if (filters.province) clauses.push(`v.province_code = ${add(filters.province)}`);
   if (filters.status) clauses.push(`v.status = ${add(filters.status)}`);
   if (filters.q) {
@@ -39,7 +41,11 @@ export class SitesRepository {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
 
   private async run(sql: string, params: unknown[]) {
-    try { return (await this.db.query(sql, params)).rows; } catch (error) { throw toDependencyError(error); }
+    try {
+      return (await this.db.query(sql, params)).rows;
+    } catch (error) {
+      throw toDependencyError(error);
+    }
   }
 
   async list(query: ListQuery) {
@@ -50,7 +56,8 @@ export class SitesRepository {
     // Two statements without a shared snapshot: under a concurrent write total and items may briefly disagree (accepted, read-only list).
     const rows = await this.run(
       `SELECT v.code, v.name, v.province_code, v.area_rai, v.status, v.version FROM (${SITE_VIEW}) v ${filter} ORDER BY v.code COLLATE "C" ASC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
-      [...params, query.pageSize, (query.page - 1) * query.pageSize]);
+      [...params, query.pageSize, (query.page - 1) * query.pageSize],
+    );
     return { rows: rows as unknown as SiteRow[], total: countRow.total as number };
   }
 
@@ -58,12 +65,17 @@ export class SitesRepository {
     const params: unknown[] = [...query.bbox];
     const clauses = ['ST_Intersects(v.geom, ST_MakeEnvelope($1, $2, $3, $4, 4326))', ...where(query, params)];
     const rows = await this.run(
-      `SELECT v.*, ST_AsGeoJSON(v.geom)::json AS geometry FROM (${SITE_VIEW}) v WHERE ${clauses.join(' AND ')} ORDER BY v.code COLLATE "C" ASC`, params);
+      `SELECT v.*, ST_AsGeoJSON(v.geom)::json AS geometry FROM (${SITE_VIEW}) v WHERE ${clauses.join(' AND ')} ORDER BY v.code COLLATE "C" ASC`,
+      params,
+    );
     return rows as unknown as SiteRow[];
   }
 
   async byCode(code: string) {
-    const [row] = await this.run(`SELECT v.*, ST_AsGeoJSON(v.geom)::json AS geometry FROM (${SITE_VIEW}) v WHERE v.code = $1`, [code]);
+    const [row] = await this.run(
+      `SELECT v.*, ST_AsGeoJSON(v.geom)::json AS geometry FROM (${SITE_VIEW}) v WHERE v.code = $1`,
+      [code],
+    );
     return (row as unknown as SiteRow | undefined) ?? null;
   }
 }

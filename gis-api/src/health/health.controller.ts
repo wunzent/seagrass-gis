@@ -14,5 +14,7 @@ export class HealthController {
   @ApiOkResponse({ type: HealthResponseDto })
   @ApiErrorResponse(503, ['SERVICE_UNAVAILABLE'])
   @Header('Cache-Control', 'no-store')
-  health(): Promise<HealthResponseDto> { return this.healthService.check(); }
+  health(): Promise<HealthResponseDto> {
+    return this.healthService.check();
+  }
 }

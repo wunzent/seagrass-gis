@@ -29,8 +29,13 @@ export async function seedDemoUsers(db: DatabaseQuery, env: NodeJS.ProcessEnv) {
     if (!password) continue;
     if (password.length < 8) throw new Error(`${demo.env} must be at least 8 characters`);
     const existing = await users.findByEmail(demo.email);
-    if (existing && existing.role === demo.role && await verifyPassword(password, existing.password_hash)) continue;
-    await users.upsert({ id: randomUUID(), email: demo.email, role: demo.role, passwordHash: await hashPassword(password) });
+    if (existing && existing.role === demo.role && (await verifyPassword(password, existing.password_hash))) continue;
+    await users.upsert({
+      id: randomUUID(),
+      email: demo.email,
+      role: demo.role,
+      passwordHash: await hashPassword(password),
+    });
     seeded.push(demo.email);
   }
   return seeded;

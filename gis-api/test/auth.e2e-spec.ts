@@ -24,24 +24,33 @@ async function startApp(database: any, options: AppOptions) {
   return started;
 }
 const csrf = { Origin: WEB, 'X-CSRF-Protection': '1' };
-const login = (email: string, password: string, extra: Record<string, string> = {}) => fetch(`${base}/auth/login`, {
-  method: 'POST', headers: { 'Content-Type': 'application/json', ...csrf, ...extra }, body: JSON.stringify({ email, password }),
-});
+const login = (email: string, password: string, extra: Record<string, string> = {}) =>
+  fetch(`${base}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...csrf, ...extra },
+    body: JSON.stringify({ email, password }),
+  });
 const cookieOf = (response: Response) => (response.headers.get('set-cookie') ?? '').split(';')[0];
 const me = (cookie?: string) => fetch(`${base}/auth/me`, { headers: cookie ? { Cookie: cookie } : {} });
-const sessions = async () => (await pool.query('SELECT user_id, revoked_at FROM access_sessions ORDER BY created_at')).rows;
+const sessions = async () =>
+  (await pool.query('SELECT user_id, revoked_at FROM access_sessions ORDER BY created_at')).rows;
 const errorCode = async (response: Response) => ((await response.json()) as any).error.code;
 
 beforeAll(async () => {
   pool = createPool(config.databaseUrl);
   await migrate(pool);
   await pool.query('TRUNCATE survey_species, surveys, sites, access_sessions, users, species, provinces CASCADE');
-  await pool.query(`INSERT INTO users(id,email,password_hash,role) VALUES($1,'viewer@demo.local',$2,'viewer'),($3,'admin@demo.local',$4,'admin')`,
-    [USERS.viewer, await hashPassword('viewer-pass'), USERS.admin, await hashPassword('admin-pass')]);
+  await pool.query(
+    `INSERT INTO users(id,email,password_hash,role) VALUES($1,'viewer@demo.local',$2,'viewer'),($3,'admin@demo.local',$4,'admin')`,
+    [USERS.viewer, await hashPassword('viewer-pass'), USERS.admin, await hashPassword('admin-pass')],
+  );
   app = await startApp(pool, { auth, loginLimit: { max: 1000, windowMs: 60_000 } });
   base = await app.getUrl();
 });
-afterAll(async () => { if (app) await app.close(); if (pool) await pool.end(); });
+afterAll(async () => {
+  if (app) await app.close();
+  if (pool) await pool.end();
+});
 
 describe('auth (real PostGIS)', () => {
   it('login sets an HttpOnly host-only cookie and never returns the JWT in JSON', async () => {
@@ -65,7 +74,10 @@ describe('auth (real PostGIS)', () => {
 
   it('wrong credentials give one generic 401 and create no session', async () => {
     const countBefore = (await sessions()).length;
-    for (const [email, password] of [['viewer@demo.local', 'nope'], ['ghost@demo.local', 'viewer-pass']]) {
+    for (const [email, password] of [
+      ['viewer@demo.local', 'nope'],
+      ['ghost@demo.local', 'viewer-pass'],
+    ]) {
       const response = await login(email, password);
       expect(response.status).toBe(401);
       expect(await errorCode(response)).toBe('INVALID_CREDENTIALS');
@@ -76,13 +88,21 @@ describe('auth (real PostGIS)', () => {
 
   it('login and logout reject CSRF before touching credentials or sessions', async () => {
     const before = await sessions();
-    for (const headers of [{ Origin: 'http://evil.example' }, { 'X-CSRF-Protection': '0' }, { 'Sec-Fetch-Site': 'cross-site' }]) {
+    for (const headers of [
+      { Origin: 'http://evil.example' },
+      { 'X-CSRF-Protection': '0' },
+      { 'Sec-Fetch-Site': 'cross-site' },
+    ]) {
       const response = await login('viewer@demo.local', 'viewer-pass', headers);
       expect([response.status, await errorCode(response)]).toEqual([403, 'CSRF_REJECTED']);
     }
     const good = cookieOf(await login('admin@demo.local', 'admin-pass'));
     const count = (await sessions()).length;
-    for (const headers of [{ Origin: 'http://evil.example', 'X-CSRF-Protection': '1' }, { 'X-CSRF-Protection': '1' }, { ...csrf, 'Sec-Fetch-Site': 'cross-site' }]) {
+    for (const headers of [
+      { Origin: 'http://evil.example', 'X-CSRF-Protection': '1' },
+      { 'X-CSRF-Protection': '1' },
+      { ...csrf, 'Sec-Fetch-Site': 'cross-site' },
+    ]) {
       const blocked = await fetch(`${base}/auth/logout`, { method: 'POST', headers: { Cookie: good, ...headers } });
       expect([blocked.status, blocked.headers.get('set-cookie')]).toEqual([403, null]); // CSRF failure is not a forced logout
     }
@@ -92,8 +112,17 @@ describe('auth (real PostGIS)', () => {
   });
 
   it('login validates the JSON body strictly', async () => {
-    const send = (body: string, type = 'application/json') => fetch(`${base}/auth/login`, { method: 'POST', headers: { 'Content-Type': type, ...csrf }, body });
-    for (const body of ['{"email":"a@b.c"}', '{"email":"a@b.c","password":"x","role":"admin"}', '{"email":1,"password":"x"}', '{"email":"a@b.c","password":"x","__proto__":{"role":"admin"}}', '{"email":"a@b.c","password":"x","constructor":1}', '[]', '{bad json'])
+    const send = (body: string, type = 'application/json') =>
+      fetch(`${base}/auth/login`, { method: 'POST', headers: { 'Content-Type': type, ...csrf }, body });
+    for (const body of [
+      '{"email":"a@b.c"}',
+      '{"email":"a@b.c","password":"x","role":"admin"}',
+      '{"email":1,"password":"x"}',
+      '{"email":"a@b.c","password":"x","__proto__":{"role":"admin"}}',
+      '{"email":"a@b.c","password":"x","constructor":1}',
+      '[]',
+      '{bad json',
+    ])
       expect([body, (await send(body)).status]).toEqual([body, 400]);
     expect((await send('email=a&password=b', 'application/x-www-form-urlencoded')).status).toBe(400);
   });
@@ -127,9 +156,17 @@ describe('auth (real PostGIS)', () => {
     expect((await me()).status).toBe(401);
     expect((await me('gis_access=abc.def.ghi')).status).toBe(401);
     const now = Math.floor(Date.now() / 1000);
-    const expired = signAccessToken({ sub: USERS.viewer, sid: '00000000-0000-4000-8000-00000000dead' }, SECRET, now - 1000);
+    const expired = signAccessToken(
+      { sub: USERS.viewer, sid: '00000000-0000-4000-8000-00000000dead' },
+      SECRET,
+      now - 1000,
+    );
     expect((await me(`gis_access=${expired}`)).status).toBe(401);
-    const unknownSession = signAccessToken({ sub: USERS.viewer, sid: '00000000-0000-4000-8000-00000000dead' }, SECRET, now);
+    const unknownSession = signAccessToken(
+      { sub: USERS.viewer, sid: '00000000-0000-4000-8000-00000000dead' },
+      SECRET,
+      now,
+    );
     expect((await me(`gis_access=${unknownSession}`)).status).toBe(401);
     const res = await me('gis_access=abc.def.ghi');
     expect(res.headers.get('set-cookie') ?? '').toMatch(/^gis_access=; Max-Age=0/);
@@ -139,15 +176,20 @@ describe('auth (real PostGIS)', () => {
     const { sid } = JSON.parse(Buffer.from(payload, 'base64url').toString());
     const swapped = signAccessToken({ sub: USERS.admin, sid }, SECRET, now);
     expect((await me(`gis_access=${swapped}`)).status).toBe(401);
-    const bearer = await fetch(`${base}/auth/me`, { headers: { Authorization: `Bearer ${viewerCookie.split('=')[1]}` } });
+    const bearer = await fetch(`${base}/auth/me`, {
+      headers: { Authorization: `Bearer ${viewerCookie.split('=')[1]}` },
+    });
     expect(bearer.status).toBe(401); // no Bearer fallback
   });
 
   it('role changes in the database apply to the existing session', async () => {
     const cookie = cookieOf(await login('viewer@demo.local', 'viewer-pass'));
     await pool.query(`UPDATE users SET role = 'editor' WHERE id = $1`, [USERS.viewer]);
-    try { expect(((await (await me(cookie)).json()) as any).user.role).toBe('editor'); }
-    finally { await pool.query(`UPDATE users SET role = 'viewer' WHERE id = $1`, [USERS.viewer]); }
+    try {
+      expect(((await (await me(cookie)).json()) as any).user.role).toBe('editor');
+    } finally {
+      await pool.query(`UPDATE users SET role = 'viewer' WHERE id = $1`, [USERS.viewer]);
+    }
   });
 
   it('cross-site requests are rejected with 403 even when the database is down', async () => {
@@ -156,10 +198,22 @@ describe('auth (real PostGIS)', () => {
     const dead = await startApp(deadPool, { auth });
     try {
       for (const p of ['/auth/logout', '/auth/login']) {
-        const response = await fetch(`${await dead.getUrl()}${p}`, { method: 'POST', headers: { Cookie: cookie, 'Content-Type': 'application/json', Origin: 'http://evil.example', 'X-CSRF-Protection': '1' }, body: '{}' });
+        const response = await fetch(`${await dead.getUrl()}${p}`, {
+          method: 'POST',
+          headers: {
+            Cookie: cookie,
+            'Content-Type': 'application/json',
+            Origin: 'http://evil.example',
+            'X-CSRF-Protection': '1',
+          },
+          body: '{}',
+        });
         expect([p, response.status]).toEqual([p, 403]);
       }
-    } finally { await dead.close(); await deadPool.end(); }
+    } finally {
+      await dead.close();
+      await deadPool.end();
+    }
   });
 
   it('a validly signed cookie while the database is down gives 503 from the auth middleware', async () => {
@@ -168,14 +222,26 @@ describe('auth (real PostGIS)', () => {
     const dead = await startApp(deadPool, { auth });
     try {
       const response = await fetch(`${await dead.getUrl()}/auth/me`, { headers: { Cookie: cookie } });
-      expect([response.status, response.headers.get('cache-control'), await errorCode(response)]).toEqual([503, 'no-store', 'SERVICE_UNAVAILABLE']);
-    } finally { await dead.close(); await deadPool.end(); }
+      expect([response.status, response.headers.get('cache-control'), await errorCode(response)]).toEqual([
+        503,
+        'no-store',
+        'SERVICE_UNAVAILABLE',
+      ]);
+    } finally {
+      await dead.close();
+      await deadPool.end();
+    }
   });
 
   it('credential attempts are rate limited per client', async () => {
     const limited = await startApp(pool, { auth, loginLimit: { max: 3, windowMs: 60_000 } });
     const url = `${await limited.getUrl()}/auth/login`;
-    const post = (email: string, password: string) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...csrf }, body: JSON.stringify({ email, password }) });
+    const post = (email: string, password: string) =>
+      fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...csrf },
+        body: JSON.stringify({ email, password }),
+      });
     const attempt = () => post('viewer@demo.local', 'bad');
     try {
       const good = () => post('admin@demo.local', 'admin-pass');
@@ -184,10 +250,14 @@ describe('auth (real PostGIS)', () => {
       const blocked = await attempt();
       expect([blocked.status, await errorCode(blocked)]).toEqual([429, 'AUTH_RATE_LIMITED']);
       expect((await good()).status).toBe(200); // another account is not locked out by these failures
-      const parallel = await Promise.all(Array.from({ length: 8 }, () => post('parallel@demo.local', 'bad').then(r => r.status)));
-      expect([parallel.join(','), parallel.filter(s => s === 401).length]).toEqual([parallel.join(','), 3]); // concurrent attempts cannot exceed the limit
-      expect(parallel.filter(s => s === 429).length).toBeGreaterThanOrEqual(5);
-    } finally { await limited.close(); }
+      const parallel = await Promise.all(
+        Array.from({ length: 8 }, () => post('parallel@demo.local', 'bad').then((r) => r.status)),
+      );
+      expect([parallel.join(','), parallel.filter((s) => s === 401).length]).toEqual([parallel.join(','), 3]); // concurrent attempts cannot exceed the limit
+      expect(parallel.filter((s) => s === 429).length).toBeGreaterThanOrEqual(5);
+    } finally {
+      await limited.close();
+    }
   });
 
   it('logout keeps the cookie when the database cannot revoke', async () => {
@@ -195,9 +265,15 @@ describe('auth (real PostGIS)', () => {
     const deadPool = createPool('postgresql://nobody:never@127.0.0.1:1/none');
     const dead = await startApp(deadPool, { auth });
     try {
-      const response = await fetch(`${await dead.getUrl()}/auth/logout`, { method: 'POST', headers: { Cookie: cookie, ...csrf } });
+      const response = await fetch(`${await dead.getUrl()}/auth/logout`, {
+        method: 'POST',
+        headers: { Cookie: cookie, ...csrf },
+      });
       expect([response.status, response.headers.get('set-cookie')]).toEqual([503, null]);
       expect((await me(cookie)).status).toBe(200); // session not silently revoked
-    } finally { await dead.close(); await deadPool.end(); }
+    } finally {
+      await dead.close();
+      await deadPool.end();
+    }
   });
 });

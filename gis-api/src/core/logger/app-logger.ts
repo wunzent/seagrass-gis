@@ -8,7 +8,13 @@ import { format } from 'node:util';
  */
 @Injectable()
 export class AppLogger implements LoggerService {
-  log(message: unknown) { process.stdout.write(`${format(message)}\n`); }
-  error(message: unknown) { process.stderr.write(`${format(message)}\n`); }
-  warn(message: unknown) { process.stderr.write(`${format(message)}\n`); }
+  log(message: unknown) {
+    process.stdout.write(`${format(message)}\n`);
+  }
+  error(message: unknown) {
+    process.stderr.write(`${format(message)}\n`);
+  }
+  warn(message: unknown) {
+    process.stderr.write(`${format(message)}\n`);
+  }
 }

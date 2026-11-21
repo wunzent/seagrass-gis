@@ -6,7 +6,14 @@ import { AuthConfig } from '../core/config/config';
 import { AuthenticatedContext } from './entities/user.entity';
 import { SessionsRepository } from './sessions.repository';
 import { UsersRepository } from './users.repository';
-import { ACCESS_TTL_SECONDS, isVerifiableHash, signAccessToken, verifyAccessToken, verifyAgainstDummy, verifyPassword } from './utils/crypto';
+import {
+  ACCESS_TTL_SECONDS,
+  isVerifiableHash,
+  signAccessToken,
+  verifyAccessToken,
+  verifyAgainstDummy,
+  verifyPassword,
+} from './utils/crypto';
 import { ApiError } from '../shared/errors/api-error';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -42,14 +49,21 @@ export class AuthService {
     this.limiter.attempt(throttleKey);
     const user = await this.users.findByEmail(normalized);
     // Unknown and disabled (non-scrypt) accounts burn the same scrypt work as real ones, so timing reveals neither.
-    const ok = user && isVerifiableHash(user.password_hash) ? await verifyPassword(password, user.password_hash) : await verifyAgainstDummy(password);
+    const ok =
+      user && isVerifiableHash(user.password_hash)
+        ? await verifyPassword(password, user.password_hash)
+        : await verifyAgainstDummy(password);
     if (!user || !ok) throw invalidCredentials();
     const previous = this.claims(previousToken);
     const sid = randomUUID();
     const now = Math.floor(Date.now() / 1000);
     const token = signAccessToken({ sub: user.id, sid }, this.config.jwtSecret, now);
     const expiresAt = new Date((now + ACCESS_TTL_SECONDS) * 1000);
-    await this.sessions.replace(previous && { sid: previous.sid, userId: previous.sub }, { sid, userId: user.id, expiresAt });
+    await this.sessions.replace(previous && { sid: previous.sid, userId: previous.sub }, {
+      sid,
+      userId: user.id,
+      expiresAt,
+    });
     this.limiter.succeed(throttleKey);
     return { token, user: { id: user.id, email: user.email, role: user.role }, expiresAt };
   }

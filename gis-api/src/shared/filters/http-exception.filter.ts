@@ -28,7 +28,15 @@ export class SafeErrorFilter implements ExceptionFilter {
     if (!FALLBACK[status]) {
       // Operator diagnostics for UAT: error class and route only; never the body, cookies, JWT or the error message.
       const request = host.switchToHttp().getRequest();
-      this.logger.error(JSON.stringify({ level: 'error', code: 'INTERNAL_ERROR', error: (error as Error)?.constructor?.name ?? 'unknown', method: request?.method, path: request?.route?.path ?? 'unmatched' }));
+      this.logger.error(
+        JSON.stringify({
+          level: 'error',
+          code: 'INTERNAL_ERROR',
+          error: (error as Error)?.constructor?.name ?? 'unknown',
+          method: request?.method,
+          path: request?.route?.path ?? 'unmatched',
+        }),
+      );
     }
     response.status(FALLBACK[status] ? status : 500).json({ error: { code, message, details: {} } });
   }
