@@ -1,0 +1,9 @@
+.next
+node_modules
+coverage
+public/maplibre
+src/app/tailwind.css
+package-lock.json
+next-env.d.ts
+.gitlab-ci.yml
+tsconfig.tsbuildinfo

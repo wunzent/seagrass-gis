@@ -3,7 +3,10 @@ import { test } from 'node:test';
 import { filterState, listQuery, mapQuery, validBbox, latestRequest, debounce } from '../src/lib/map-state.ts';
 
 test('filter change resets pagination and gives list/map identical filter snapshot', () => {
-  const state = filterState({ filters: { province: '', status: '', q: '' }, page: 4 }, { province: '92', status: 'good', q: 'เกาะ & %' });
+  const state = filterState(
+    { filters: { province: '', status: '', q: '' }, page: 4 },
+    { province: '92', status: 'good', q: 'เกาะ & %' },
+  );
   assert.equal(state.page, 1);
   const list = new URLSearchParams(listQuery(state));
   const map = new URLSearchParams(mapQuery(state.filters, [98, 6, 101, 10]));
@@ -22,7 +25,15 @@ test('empty filters are omitted; invalid status/province/search are rejected', (
 
 test('bbox rejects nonfinite, reversed, wrapped and out-of-range coordinates', () => {
   assert.equal(validBbox([98, 6, 101, 10]), true);
-  for (const box of [[1,2,1,4], [180,0,-180,2], [0,-91,10,1], [0,0,181,1], [NaN,0,1,1], [0,0,1]]) assert.equal(validBbox(box), false);
+  for (const box of [
+    [1, 2, 1, 4],
+    [180, 0, -180, 2],
+    [0, -91, 10, 1],
+    [0, 0, 181, 1],
+    [NaN, 0, 1, 1],
+    [0, 0, 1],
+  ])
+    assert.equal(validBbox(box), false);
 });
 
 test('new request aborts old request and ignores late success/failure even if abort is ignored', () => {
@@ -40,7 +51,7 @@ test('new request aborts old request and ignores late success/failure even if ab
 test('debounce commits only latest snapshot at 300ms and cleanup cancels it', (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const values = [];
-  const action = debounce(value => values.push(value), 300);
+  const action = debounce((value) => values.push(value), 300);
   action.run('old');
   t.mock.timers.tick(200);
   action.run('new');
@@ -48,6 +59,8 @@ test('debounce commits only latest snapshot at 300ms and cleanup cancels it', (t
   assert.deepEqual(values, []);
   t.mock.timers.tick(1);
   assert.deepEqual(values, ['new']);
-  action.run('unmounted'); action.cancel(); t.mock.timers.tick(300);
+  action.run('unmounted');
+  action.cancel();
+  t.mock.timers.tick(300);
   assert.deepEqual(values, ['new']);
 });

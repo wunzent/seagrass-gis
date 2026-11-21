@@ -13,14 +13,25 @@ export function useResource<T>(url: string | null, retry: number) {
   const identity = useMemo(() => ({ url: readyUrl, retry, generation }), [readyUrl, retry, generation]);
   const [result, setResult] = useState<{ identity: typeof identity; data?: T; error?: Error }>();
   useEffect(() => {
-    if (!identity.url) { requests.cancel(); return; }
+    if (!identity.url) {
+      requests.cancel();
+      return;
+    }
     const request = requests.start();
     fetchJson<T>(identity.url, request.signal).then(
-      data => { if (request.current() && store.isCurrent(identity.generation)) setResult({ identity, data: session ? data : publicData(data) }); },
-      error => { if (request.current() && store.isCurrent(identity.generation)) {
-        if (session && error instanceof ApiError && error.status === 401) { store.unauthorized(); return; }
-        setResult({ identity, error: error instanceof Error ? error : new Error('โหลดข้อมูลไม่สำเร็จ') });
-      } },
+      (data) => {
+        if (request.current() && store.isCurrent(identity.generation))
+          setResult({ identity, data: session ? data : publicData(data) });
+      },
+      (error) => {
+        if (request.current() && store.isCurrent(identity.generation)) {
+          if (session && error instanceof ApiError && error.status === 401) {
+            store.unauthorized();
+            return;
+          }
+          setResult({ identity, error: error instanceof Error ? error : new Error('โหลดข้อมูลไม่สำเร็จ') });
+        }
+      },
     );
     return () => requests.cancel();
   }, [identity, requests, store, session]);

@@ -15,9 +15,12 @@ export const PAGE_SIZE = 20;
 
 export function filterState(state: ListState, change: Partial<Filters>): ListState {
   const filters = { ...state.filters, ...change };
-  if ((filters.status && !Object.hasOwn(statuses, filters.status)) ||
-      (filters.province && !/^\d{2}$/.test(filters.province)) ||
-      filters.q.length > 200 || /[\u0000\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(filters.q)) {
+  if (
+    (filters.status && !Object.hasOwn(statuses, filters.status)) ||
+    (filters.province && !/^\d{2}$/.test(filters.province)) ||
+    filters.q.length > 200 ||
+    /[\u0000\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(filters.q)
+  ) {
     throw new Error('กรุณาตรวจสอบตัวกรอง (คำค้นไม่เกิน 200 ตัวอักษร)');
   }
   return { filters, page: 1 };
@@ -34,7 +37,16 @@ export function listQuery(state: ListState) {
   return query.toString();
 }
 export function validBbox(box: number[]): box is Bbox {
-  return box.length === 4 && box.every(Number.isFinite) && box[0] >= -180 && box[2] <= 180 && box[1] >= -90 && box[3] <= 90 && box[0] < box[2] && box[1] < box[3];
+  return (
+    box.length === 4 &&
+    box.every(Number.isFinite) &&
+    box[0] >= -180 &&
+    box[2] <= 180 &&
+    box[1] >= -90 &&
+    box[3] <= 90 &&
+    box[0] < box[2] &&
+    box[1] < box[3]
+  );
 }
 export function mapQuery(filters: Filters, box: Bbox) {
   if (!validBbox(box)) throw new Error('ขอบเขตแผนที่ไม่ถูกต้อง');
@@ -53,13 +65,21 @@ export function latestRequest() {
       const signal = controller.signal;
       return { signal, current: () => requestId === id && !signal.aborted };
     },
-    cancel() { ++id; controller?.abort(); },
+    cancel() {
+      ++id;
+      controller?.abort();
+    },
   };
 }
 export function debounce<T>(callback: (value: T) => void, delay = 300) {
   let timer: ReturnType<typeof setTimeout> | undefined;
   return {
-    run(value: T) { clearTimeout(timer); timer = setTimeout(() => callback(value), delay); },
-    cancel() { clearTimeout(timer); },
+    run(value: T) {
+      clearTimeout(timer);
+      timer = setTimeout(() => callback(value), delay);
+    },
+    cancel() {
+      clearTimeout(timer);
+    },
   };
 }

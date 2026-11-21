@@ -8,10 +8,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [store] = useState(createSession);
   useEffect(() => {
     void store.restore();
-    const resume = () => { if (document.visibilityState === 'visible') void store.resume(); };
+    const resume = () => {
+      if (document.visibilityState === 'visible') void store.resume();
+    };
     window.addEventListener('focus', resume);
     document.addEventListener('visibilitychange', resume);
-    return () => { window.removeEventListener('focus', resume); document.removeEventListener('visibilitychange', resume); store.dispose(); };
+    return () => {
+      window.removeEventListener('focus', resume);
+      document.removeEventListener('visibilitychange', resume);
+      store.dispose();
+    };
   }, [store]);
   return <Context.Provider value={store}>{children}</Context.Provider>;
 }
