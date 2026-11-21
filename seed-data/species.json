@@ -1,0 +1,32 @@
+[
+ {
+  "code": "EA",
+  "name_th": "หญ้าคาทะเล",
+  "name_sci": "Enhalus acoroides"
+ },
+ {
+  "code": "TH",
+  "name_th": "หญ้าชะเงาเต่า",
+  "name_sci": "Thalassia hemprichii"
+ },
+ {
+  "code": "CR",
+  "name_th": "หญ้าชะเงาใบมน",
+  "name_sci": "Cymodocea rotundata"
+ },
+ {
+  "code": "CS",
+  "name_th": "หญ้าชะเงาใบฟันเลื่อย",
+  "name_sci": "Cymodocea serrulata"
+ },
+ {
+  "code": "HO",
+  "name_th": "หญ้าใบมะกรูด",
+  "name_sci": "Halophila ovalis"
+ },
+ {
+  "code": "HU",
+  "name_th": "หญ้ากุยช่ายทะเล",
+  "name_sci": "Halodule uninervis"
+ }
+]

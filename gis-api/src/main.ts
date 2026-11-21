@@ -1,12 +1,14 @@
 import { createApp } from './app';
 import { readConfig } from './config';
 import { createPool, migrate } from './database';
+import { importSeed } from './import/runner';
 
 async function main() {
   const config = readConfig(process.env);
   const pool = createPool(config.databaseUrl);
   try {
     await migrate(pool);
+    console.log(JSON.stringify({import:await importSeed(pool)}));
     const app = await createApp(pool, () => pool.end());
     app.enableShutdownHooks(['SIGTERM', 'SIGINT']);
     app.getHttpAdapter().getInstance().disable('x-powered-by');

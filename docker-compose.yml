@@ -28,8 +28,20 @@ services:
       PORT: 3001
       NODE_ENV: production
       TZ: Asia/Bangkok
+      SEED_DATA_DIR: /seed-data
+      IMPORT_REPORT_DIR: /reports
     ports:
       - "127.0.0.1:${API_PORT:-3001}:3001"
+    volumes:
+      - type: bind
+        source: ./seed-data
+        target: /seed-data
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./reports
+        target: /reports
     depends_on:
       db:
         condition: service_healthy
@@ -38,7 +50,7 @@ services:
       interval: 5s
       timeout: 4s
       retries: 20
-      start_period: 30s
+      start_period: 180s
     restart: unless-stopped
 
   web:

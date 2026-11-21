@@ -7,6 +7,9 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
     "migrate": "node dist/migrate.js",
+    "import": "node dist/import.js",
+    "test:import:unit": "npm run build && node --test test/import-unit.cjs",
+    "test:import:integration": "npm run build && node --test test/import-integration.cjs",
     "test:unit": "npm run build && node --test test/unit.test.cjs",
     "test:integration": "npm run build && node --test test/integration.test.cjs"
   },

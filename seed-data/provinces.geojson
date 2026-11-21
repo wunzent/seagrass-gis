@@ -1,0 +1,125 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "code": "82",
+    "name_th": "พังงา"
+   },
+   "geometry": {
+    "type": "MultiPolygon",
+    "coordinates": [
+     [
+      [
+       [
+        97.9,
+        8.45
+       ],
+       [
+        98.9,
+        8.45
+       ],
+       [
+        98.95,
+        8.8
+       ],
+       [
+        98.7,
+        9.1
+       ],
+       [
+        97.9,
+        9.1
+       ],
+       [
+        97.9,
+        8.45
+       ]
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "code": "81",
+    "name_th": "กระบี่"
+   },
+   "geometry": {
+    "type": "MultiPolygon",
+    "coordinates": [
+     [
+      [
+       [
+        98.4,
+        7.7
+       ],
+       [
+        99.3,
+        7.7
+       ],
+       [
+        99.35,
+        8.1
+       ],
+       [
+        99.0,
+        8.45
+       ],
+       [
+        98.4,
+        8.45
+       ],
+       [
+        98.4,
+        7.7
+       ]
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "code": "92",
+    "name_th": "ตรัง"
+   },
+   "geometry": {
+    "type": "MultiPolygon",
+    "coordinates": [
+     [
+      [
+       [
+        99.0,
+        6.9
+       ],
+       [
+        99.8,
+        6.9
+       ],
+       [
+        99.8,
+        7.4
+       ],
+       [
+        99.3,
+        7.7
+       ],
+       [
+        99.0,
+        7.7
+       ],
+       [
+        99.0,
+        6.9
+       ]
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}
