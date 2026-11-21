@@ -29,9 +29,10 @@ const SiteMap = dynamic(() => import('./site-map'), {
     </p>
   ),
 });
-// Matches the seeded provinces table (81, 82, 92); replace with GET /provinces.geojson once T008 lands.
-const provinces: Record<string, string> = { '81': 'กระบี่', '82': 'พังงา', '92': 'ตรัง' };
-const provinceName = (code: string) => provinces[code] ?? code;
+type ProvinceCollection = {
+  type: 'FeatureCollection';
+  features: { properties: { code: string; name_th: string } }[];
+};
 const number = new Intl.NumberFormat('th-TH', { maximumFractionDigits: 2 });
 
 function StatusLabel({ status }: { status: Status }) {
@@ -75,6 +76,15 @@ function MapContent() {
   );
   useEffect(() => () => commitFilters.cancel(), [commitFilters]);
   const pending = JSON.stringify(draft) !== JSON.stringify(state.filters) || Boolean(validation);
+  const provinceResource = useResource<ProvinceCollection>('/api/provinces.geojson', 0);
+  const provinces = useMemo(
+    () =>
+      new Map(
+        (provinceResource.data?.features ?? []).map((feature) => [feature.properties.code, feature.properties.name_th]),
+      ),
+    [provinceResource.data],
+  );
+  const provinceName = (code: string) => provinces.get(code) ?? code;
   const list = useResource<SiteList>(pending ? null : `/api/sites?${listQuery(state)}`, listRetry);
   const geojson = useResource<SitesGeoJSON>(
     !pending && bbox ? `/api/sites.geojson?${mapQuery(state.filters, bbox)}` : null,
@@ -130,11 +140,14 @@ function MapContent() {
           จังหวัด
           <select value={draft.province} onChange={(e) => change({ province: e.target.value })}>
             <option value="">ทุกจังหวัด</option>
-            {Object.entries(provinces).map(([value, label]) => (
+            {Array.from(provinces, ([value, label]) => (
               <option key={value} value={value}>
                 {label}
               </option>
             ))}
+            {draft.province && !provinces.has(draft.province) && (
+              <option value={draft.province}>{draft.province}</option>
+            )}
           </select>
         </label>
         <label>

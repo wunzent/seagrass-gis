@@ -282,3 +282,64 @@ test('map stale notice starts only after a collection and stays stable through v
   tree.find((node) => node.type === 'SiteMap').props.onDisplayChange?.(false);
   assert.equal(progress(render()).children, 'กำลังปรับขอบเขต / โหลดข้อมูล…');
 });
+
+function provinceWorkspace(provinces) {
+  const h = componentHarness('../src/components/map-workspace.tsx', {
+    'next/dynamic': { default: () => 'SiteMap', __esModule: true },
+    './ui/button': { Button: 'button' },
+    './session-controls': { SessionControls: 'controls' },
+    './session-provider': { useSession: () => ({ generation: 1 }) },
+    './use-resource': {
+      useResource: (url) => {
+        if (url === '/api/provinces.geojson') return provinces;
+        if (url?.startsWith('/api/sites?')) {
+          return {
+            data: {
+              items: [{ code: 'S1', name: 'แหล่ง', province_code: '81', area_rai: 1, status: 'no_data', version: 1 }],
+              total: 1,
+              page: 1,
+            },
+            loading: false,
+          };
+        }
+        return { loading: false };
+      },
+    },
+  });
+  const Content = h.render(() => h.exports.default()).type;
+  const render = () => nodes(h.render(() => Content()));
+  return { h, render, Content };
+}
+
+test('province select options and labels come from the provinces API, falling back to the code on failure', () => {
+  const feature = (code, name_th) => ({ type: 'Feature', geometry: null, properties: { code, name_th } });
+  const loaded = provinceWorkspace({
+    data: { type: 'FeatureCollection', features: [feature('81', 'กระบี่'), feature('92', 'ตรัง')] },
+    loading: false,
+  });
+  const provinceSelect = (tree) => tree.find((node) => node.type === 'select');
+  const options = (tree) =>
+    nodes(provinceSelect(tree))
+      .filter((node) => node.type === 'option')
+      .map((option) => [option.props.value, option.props.children]);
+  assert.deepEqual(options(loaded.render()), [
+    ['', 'ทุกจังหวัด'],
+    ['81', 'กระบี่'],
+    ['92', 'ตรัง'],
+  ]);
+  assert.equal(loaded.render().find((node) => node.props?.className === 'site-meta').props.children[0], 'กระบี่');
+
+  const failed = provinceWorkspace({ error: new Error('offline'), loading: false });
+  assert.deepEqual(options(failed.render()), [['', 'ทุกจังหวัด']]);
+  assert.equal(failed.render().find((node) => node.props?.className === 'site-meta').props.children[0], '81');
+
+  const loading = provinceWorkspace({ loading: true });
+  assert.deepEqual(options(loading.render()), [['', 'ทุกจังหวัด']]);
+  assert.equal(loading.render().find((node) => node.props?.className === 'site-meta').props.children[0], '81');
+
+  provinceSelect(failed.render()).props.onChange({ target: { value: '92' } });
+  assert.deepEqual(options(failed.render()), [
+    ['', 'ทุกจังหวัด'],
+    ['92', '92'],
+  ]);
+});
