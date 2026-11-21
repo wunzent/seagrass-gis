@@ -25,11 +25,17 @@ test:
   services:
     - name: postgis/postgis:16-3.5
       alias: db
+    # The import suite writes domain rows and needs a database the API suites have not touched.
+    - name: postgis/postgis:16-3.5
+      alias: db-import
+      variables:
+        POSTGRES_DB: gis_import_test
   variables:
     POSTGRES_DB: gis_test
     POSTGRES_USER: gis_test
     POSTGRES_PASSWORD: ci-only-ephemeral
     DATABASE_URL: postgresql://gis_test:ci-only-ephemeral@db:5432/gis_test
+    IMPORT_TEST_DATABASE_URL: postgresql://gis_test:ci-only-ephemeral@db-import:5432/gis_import_test
     NODE_ENV: test
     PORT: "3001"
     npm_config_cache: $CI_PROJECT_DIR/.npm
@@ -39,6 +45,8 @@ test:
     paths: [.npm/]
   script:
     - npm ci --ignore-scripts
+    - npm run format:check
+    - npm run build
     - npm run test:unit
     - npm run test:integration
     - npm run test:import:unit
