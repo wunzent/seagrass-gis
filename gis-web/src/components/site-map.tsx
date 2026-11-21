@@ -20,15 +20,16 @@ type Props = {
   selection?: SiteFeature;
   onSelect: (code: string) => void;
   onViewport: (box: Bbox | null) => void;
+  onDisplayChange?: (displayed: boolean) => void;
 };
 
-export default function SiteMap({ data, selection, onSelect, onViewport }: Props) {
+export default function SiteMap({ data, selection, onSelect, onViewport, onDisplayChange }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | null>(null);
   const camera = useRef<{ center: [number, number]; zoom: number }>({ center: [99.2, 8.1], zoom: 6.2 });
   const fittedSelection = useRef<SiteFeature | undefined>(undefined);
-  const callbacks = useRef({ onSelect, onViewport });
-  callbacks.current = { onSelect, onViewport };
+  const callbacks = useRef({ onSelect, onViewport, onDisplayChange });
+  callbacks.current = { onSelect, onViewport, onDisplayChange };
   const [ready, setReady] = useState(false);
   const [failure, setFailure] = useState('');
   const [generation, setGeneration] = useState(0);
@@ -37,6 +38,7 @@ export default function SiteMap({ data, selection, onSelect, onViewport }: Props
     if (!container.current) return;
     setReady(false);
     setFailure('');
+    callbacks.current.onDisplayChange?.(false);
     callbacks.current.onViewport(null);
     const updateViewport = debounce(() => {
       const bounds = map.current?.getBounds();
@@ -138,6 +140,10 @@ export default function SiteMap({ data, selection, onSelect, onViewport }: Props
         if (event.sourceId === 'basemap' && event.tile?.state === 'loaded') erroredTiles.delete(event.tile.tileID.key);
       });
       instance.on('idle', () => {
+        const covering = new Set(
+          instance.coveringTiles({ tileSize: 256, maxzoom: 19, roundZoom: true }).map((tile) => tile.key),
+        );
+        for (const key of erroredTiles) if (key !== 'unknown' && !covering.has(key)) erroredTiles.delete(key);
         if (!erroredTiles.size && instance.isSourceLoaded('basemap')) setFailure('');
       });
     } catch {
@@ -158,6 +164,7 @@ export default function SiteMap({ data, selection, onSelect, onViewport }: Props
   useEffect(() => {
     if (!ready || !data) return;
     (map.current?.getSource('sites') as GeoJSONSource | undefined)?.setData(data);
+    callbacks.current.onDisplayChange?.(true);
   }, [data, ready]);
   useEffect(() => {
     const instance = map.current;

@@ -104,11 +104,18 @@ test('invalid filters show validation without list skeleton or map loading statu
   assert.equal(invalid.find((node) => node.props?.className === 'map-progress').props.children, '');
 });
 
-function mapHarness(globals = {}) {
+function mapHarness(globals = {}, onDisplayChange) {
   let map;
   class FakeMap {
     events = new Map();
     values = [];
+    coveringKeys = ['a', 'b'];
+    coveringTiles(options) {
+      assert.equal(options.tileSize, 256);
+      assert.equal(options.maxzoom, 19);
+      assert.equal(options.roundZoom, true);
+      return this.coveringKeys.map((key) => ({ key }));
+    }
     constructor() {
       map = this;
     }
@@ -121,6 +128,13 @@ function mapHarness(globals = {}) {
     addControl() {}
     addSource() {}
     addLayer() {}
+    getCenter() {
+      return { toArray: () => [99.2, 8.1] };
+    }
+    getZoom() {
+      return 6.2;
+    }
+    remove() {}
     setFilter() {}
     isSourceLoaded() {
       return true;
@@ -141,16 +155,43 @@ function mapHarness(globals = {}) {
     {
       ResizeObserver: class {
         observe() {}
+        disconnect() {}
       },
       ...globals,
     },
   );
-  const render = (data) => h.render(() => h.exports.default({ data, onViewport() {}, onSelect() {} }));
+  const render = (data) => h.render(() => h.exports.default({ data, onViewport() {}, onSelect() {}, onDisplayChange }));
   render();
   map.emit('load');
   render();
-  return { render, map };
+  return {
+    render,
+    get map() {
+      return map;
+    },
+  };
 }
+
+test('map reports displayed data and resets the flag when the retry recreates the map', () => {
+  const displayed = [];
+  const h = mapHarness({}, (value) => displayed.push(value));
+  const data = { type: 'FeatureCollection', features: [] };
+  h.render(data);
+  assert.deepEqual(displayed, [false, true]);
+  h.map.emit('error', { sourceId: 'basemap', tile: { tileID: { key: 'a' } } });
+  const oldMap = h.map;
+  nodes(h.render())
+    .find((node) => node.type === 'button')
+    .props.onClick();
+  h.render();
+  assert.notEqual(h.map, oldMap);
+  assert.equal(displayed.at(-1), false);
+  h.map.emit('load');
+  h.render();
+  assert.equal(displayed.at(-1), false, 'no collection is displayed on the new map');
+  h.render(data);
+  assert.equal(displayed.at(-1), true);
+});
 test('map retains last polygons while viewport request is pending and replaces them on success', () => {
   const { render, map } = mapHarness();
   const data = { type: 'FeatureCollection', features: [{ properties: { code: 'a' } }] };
@@ -183,6 +224,18 @@ test('only basemap errors show tile warning and later successful idle clears it;
   assert.equal(canvas.props.role, 'region');
 });
 
+test('basemap idle prunes failed tiles outside the current viewport only', () => {
+  const { render, map } = mapHarness();
+  const warning = () => nodes(render()).find((node) => node.props?.className === 'map-warning');
+  for (const key of ['a', 'b']) map.emit('error', { sourceId: 'basemap', tile: { tileID: { key } } });
+  map.coveringKeys = ['b', 'c'];
+  map.emit('idle');
+  assert.ok(warning(), 'visible failed tile still needs recovery');
+  map.coveringKeys = ['c'];
+  map.emit('idle');
+  assert.equal(warning(), undefined, 'offscreen failures must not keep the warning');
+});
+
 test('non-basemap errors retain MapLibre console error reporting', () => {
   const logged = [];
   const { render, map } = mapHarness({ console: { error: (error) => logged.push(error) } });
@@ -213,7 +266,9 @@ test('map stale notice starts only after a collection and stays stable through v
   assert.equal(progress(tree)['aria-live'], 'polite');
   tree.find((node) => node.type === 'SiteMap').props.onViewport([98, 6, 101, 10]);
   resource = { data: { type: 'FeatureCollection', features: [] }, loading: false };
-  render();
+  render()
+    .find((node) => node.type === 'SiteMap')
+    .props.onDisplayChange(true);
   resource = { loading: true };
   tree = render();
   const text = progress(tree).children;
@@ -223,4 +278,7 @@ test('map stale notice starts only after a collection and stays stable through v
   assert.equal(progress(tree).children, text);
   tree.find((node) => node.type === 'SiteMap').props.onViewport([99, 7, 102, 11]);
   assert.equal(progress(render()).children, text);
+  // SiteMap reports a fresh map with no displayed collection after its retry button remounts it.
+  tree.find((node) => node.type === 'SiteMap').props.onDisplayChange?.(false);
+  assert.equal(progress(render()).children, 'กำลังปรับขอบเขต / โหลดข้อมูล…');
 });

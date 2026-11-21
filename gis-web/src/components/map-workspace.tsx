@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from './ui/button';
 import { useResource } from './use-resource';
 import { useSession } from './session-provider';
@@ -80,10 +80,7 @@ function MapContent() {
     !pending && bbox ? `/api/sites.geojson?${mapQuery(state.filters, bbox)}` : null,
     mapRetry,
   );
-  const displayedCollection = useRef(false);
-  useEffect(() => {
-    if (geojson.data) displayedCollection.current = true;
-  }, [geojson.data]);
+  const [displayedCollection, setDisplayedCollection] = useState(false);
   const detail = useResource<SiteFeature>(code ? `/api/sites/${encodeURIComponent(code)}` : null, detailRetry);
   const missing = detail.error instanceof ApiError && detail.error.status === 404;
   useEffect(() => {
@@ -116,7 +113,7 @@ function MapContent() {
   const loadingList = !validation && (pending || list.loading);
   const loadingMap = !validation && (pending || !bbox || geojson.loading);
   const selected = missing ? undefined : detail.data;
-  const staleNotice = displayedCollection.current ? 'พื้นที่เดิมอาจไม่ใช่ข้อมูลล่าสุด' : '';
+  const staleNotice = displayedCollection ? 'พื้นที่เดิมอาจไม่ใช่ข้อมูลล่าสุด' : '';
 
   return (
     <main className="workspace">
@@ -290,7 +287,13 @@ function MapContent() {
           </div>
           {geojson.error && <Failure error={geojson.error} retry={() => setMapRetry((n) => n + 1)} />}
           <div className="map-container">
-            <SiteMap data={geojson.data} selection={selected} onSelect={select} onViewport={onViewport} />
+            <SiteMap
+              data={geojson.data}
+              selection={selected}
+              onSelect={select}
+              onViewport={onViewport}
+              onDisplayChange={setDisplayedCollection}
+            />
           </div>
           <ul className="legend" aria-label="คำอธิบายสถานะแหล่ง">
             {Object.keys(statuses).map((status) => (

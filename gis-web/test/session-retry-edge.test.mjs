@@ -2,6 +2,47 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createSession } from '../src/lib/session.ts';
 
+test('a logout 429 retry firing 1 ms early does not strand pending logout', async () => {
+  let now = 1000,
+    calls = 0;
+  const jobs = new Map();
+  let id = 0;
+  const store = createSession({
+    now: () => now,
+    schedule: (fn, ms) => {
+      jobs.set(++id, { fn, at: now + ms });
+      return id;
+    },
+    cancel: (key) => jobs.delete(key),
+    fetcher: async (url) =>
+      url.endsWith('/me')
+        ? Response.json({
+            user: { id: 'a', email: 'a@demo.local', role: 'viewer' },
+            expires_at: new Date(200000).toISOString(),
+          })
+        : new Response(null, { status: ++calls === 1 ? 429 : 204, headers: { 'Retry-After': '90' } }),
+  });
+  await store.restore();
+  await store.logout();
+  const [key, job] = [...jobs][0];
+  now = job.at - 1;
+  jobs.delete(key);
+  job.fn();
+  await new Promise((resolve) => setImmediate(resolve));
+  // A timer may retry internally or re-arm the remaining millisecond, but must not disappear.
+  assert.ok(calls === 2 || jobs.size > 0, 'early timer must retry or reschedule');
+  for (const [nextKey, next] of [...jobs]) {
+    now = next.at;
+    jobs.delete(nextKey);
+    next.fn();
+  }
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(calls, 2);
+  assert.equal(store.getSnapshot().logoutPending, false);
+  assert.equal(store.getSnapshot().rateLimitedUntil, 0);
+  store.dispose();
+});
+
 test('a pending logout retry receiving 403 remains private but releases at original expiry', async () => {
   let now = 1000,
     calls = 0,

@@ -179,7 +179,18 @@ export function createSession(options: Options = {}) {
   }
   async function logout() {
     if (state.busy) return;
-    if (state.logoutPending && now() < Math.min(state.rateLimitedUntil, logoutDeadline!)) return;
+    if (state.logoutPending && now() < Math.min(state.rateLimitedUntil, logoutDeadline!)) {
+      // Timers can fire early or observe a clock adjustment; keep the remaining wait scheduled.
+      if (retry === undefined)
+        retry = schedule(
+          () => {
+            retry = undefined;
+            void logout();
+          },
+          Math.min(state.rateLimitedUntil, logoutDeadline!) - now(),
+        );
+      return;
+    }
     cancel(retry);
     retry = undefined;
     if (!state.logoutPending) {
