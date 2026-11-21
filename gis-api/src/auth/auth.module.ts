@@ -1,13 +1,13 @@
 import { DynamicModule, MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { AuthConfig } from '../config/config';
+import { AuthConfig } from '../core/config/config';
 import { AUTH_CONFIG, LOGIN_LIMITER } from './auth.constants';
 import { AuthController } from './auth.controller';
-import { AuthMiddleware } from './auth.middleware';
+import { AuthMiddleware } from './middleware/auth.middleware';
 import { AuthService } from './auth.service';
 import { CsrfGuard } from './guards/csrf.guard';
 import { RolesGuard } from './guards/roles.guard';
-import { LoginRateLimiter } from './login-rate-limiter';
+import { LoginRateLimiter } from './utils/login-rate-limiter';
 import { SessionsRepository } from './sessions.repository';
 import { UsersRepository } from './users.repository';
 

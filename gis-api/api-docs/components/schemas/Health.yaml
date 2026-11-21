@@ -1,7 +1,4 @@
 type: object
-required:
-  - db
-  - postgis
 properties:
   db:
     type: string
@@ -10,3 +7,6 @@ properties:
   postgis:
     type: string
     example: '3.5'
+required:
+  - db
+  - postgis

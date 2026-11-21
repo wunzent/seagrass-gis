@@ -1,7 +1,10 @@
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { createApp } from './app.module';
-import { buildOpenApiDocument, renderApiDocs } from './common/openapi';
+import { AppLogger } from './core/logger/app-logger';
+import { buildOpenApiDocument, renderApiDocs } from './shared/openapi/openapi';
+
+const logger = new AppLogger();
 
 /** CLI: regenerate api-docs/ from the controllers. Needs no database. */
 async function main() {
@@ -14,6 +17,6 @@ async function main() {
     await mkdir(dirname(resolve(root, file)), { recursive: true });
     await writeFile(resolve(root, file), content, 'utf8');
   }
-  console.log(`api-docs: ${files.size} files written`);
+  logger.log(`api-docs: ${files.size} files written`);
 }
-void main().catch(error => { console.error(error); process.exitCode = 1; });
+void main().catch(error => { logger.error(error); process.exitCode = 1; });

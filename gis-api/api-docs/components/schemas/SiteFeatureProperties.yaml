@@ -1,0 +1,42 @@
+type: object
+properties:
+  code:
+    type: string
+    maxLength: 64
+    example: KBI-001
+  name:
+    type: string
+  province_code:
+    type: string
+    example: '81'
+  area_rai:
+    type: number
+    description: ไร่ ปัด 2 ตำแหน่ง
+  status:
+    type: string
+    enum:
+      - very_good
+      - good
+      - fair
+      - poor
+      - no_data
+  version:
+    type: integer
+    minimum: 1
+  id:
+    type: string
+    format: uuid
+  latestSurvey:
+    nullable: true
+    type: object
+    allOf:
+      - $ref: ./LatestSurvey.yaml
+required:
+  - code
+  - name
+  - province_code
+  - area_rai
+  - status
+  - version
+  - id
+  - latestSurvey

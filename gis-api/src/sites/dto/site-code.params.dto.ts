@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, Matches } from 'class-validator';
-import { Utf16Length } from '../../common/validation';
+import { Utf16Length } from '../../shared/validators/utf16-length.validator';
 
 /** Path code: 1–64 chars, not whitespace-only, no control characters (importer stores trimmed codes). */
 export class SiteCodeParamsDto {

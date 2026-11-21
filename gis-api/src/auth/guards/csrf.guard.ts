@@ -1,6 +1,6 @@
 import { CanActivate, ExecutionContext, Inject, Injectable } from '@nestjs/common';
-import { AuthConfig } from '../../config/config';
-import { ApiError } from '../../common/errors';
+import { AuthConfig } from '../../core/config/config';
+import { ApiError } from '../../shared/errors/api-error';
 import { AUTH_CONFIG } from '../auth.constants';
 type Headers = Record<string, string | string[] | undefined>;
 

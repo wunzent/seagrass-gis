@@ -1,8 +1,4 @@
 type: object
-required:
-  - items
-  - total
-  - page
 properties:
   items:
     type: array
@@ -12,3 +8,7 @@ properties:
     type: integer
   page:
     type: integer
+required:
+  - items
+  - total
+  - page

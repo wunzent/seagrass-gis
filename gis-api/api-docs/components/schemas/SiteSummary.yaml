@@ -1,11 +1,4 @@
 type: object
-required:
-  - code
-  - name
-  - province_code
-  - area_rai
-  - status
-  - version
 properties:
   code:
     type: string
@@ -30,3 +23,10 @@ properties:
   version:
     type: integer
     minimum: 1
+required:
+  - code
+  - name
+  - province_code
+  - area_rai
+  - status
+  - version

@@ -13,13 +13,12 @@ get:
       content:
         application/json:
           schema:
-            allOf:
-              - $ref: ../components/schemas/ErrorBody.yaml
-            example:
-              error:
-                code: SERVICE_UNAVAILABLE
-                message: ...
-                details: {}
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: SERVICE_UNAVAILABLE
+              message: ...
+              details: {}
   summary: ความพร้อมของ API และ PostGIS (query ฐานข้อมูลจริง)
   tags:
     - health

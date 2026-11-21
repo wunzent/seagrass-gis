@@ -1,6 +1,7 @@
 import { Controller, Get, Header } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { errorResponse, ref } from '../common/openapi-schemas';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiErrorResponse } from '../shared/decorators/api-error-response.decorator';
+import { HealthResponseDto } from './dto/health-response.dto';
 import { HealthService } from './health.service';
 
 @ApiTags('health')
@@ -10,8 +11,8 @@ export class HealthController {
 
   @Get('health')
   @ApiOperation({ summary: 'ความพร้อมของ API และ PostGIS (query ฐานข้อมูลจริง)' })
-  @ApiResponse({ status: 200, schema: ref('Health') })
-  @ApiResponse(errorResponse(503, ['SERVICE_UNAVAILABLE']))
+  @ApiOkResponse({ type: HealthResponseDto })
+  @ApiErrorResponse(503, ['SERVICE_UNAVAILABLE'])
   @Header('Cache-Control', 'no-store')
-  health() { return this.healthService.check(); }
+  health(): Promise<HealthResponseDto> { return this.healthService.check(); }
 }

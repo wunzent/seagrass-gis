@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { ApiError } from '../common/errors';
+import { ApiError } from '../shared/errors/api-error';
+import { HealthResponseDto } from './dto/health-response.dto';
 import { HealthRepository } from './health.repository';
 
 @Injectable()
@@ -7,7 +8,7 @@ export class HealthService {
   constructor(private readonly health: HealthRepository) {}
 
   /** Real DB round trip; any failure or non-3.x PostGIS is reported as 503 without details. */
-  async check() {
+  async check(): Promise<HealthResponseDto> {
     try {
       const status = await this.health.readStatus();
       const version = status.postgis.match(/^(3\.\d+)(?:\.|$)/);

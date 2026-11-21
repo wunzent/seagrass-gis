@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { DATABASE, Database } from '../database/database.module';
+import { DATABASE, Database } from '../core/database/database.module';
 
 @Injectable()
 export class HealthRepository {

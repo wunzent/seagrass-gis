@@ -1,13 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { AUTH_CONFIG, LOGIN_LIMITER } from './auth.constants';
-import { LoginRateLimiter } from './login-rate-limiter';
-import { AuthConfig } from '../config/config';
+import { LoginRateLimiter } from './utils/login-rate-limiter';
+import { AuthConfig } from '../core/config/config';
 import { AuthenticatedContext } from './entities/user.entity';
 import { SessionsRepository } from './sessions.repository';
 import { UsersRepository } from './users.repository';
-import { ACCESS_TTL_SECONDS, isVerifiableHash, signAccessToken, verifyAccessToken, verifyAgainstDummy, verifyPassword } from './crypto';
-import { ApiError } from '../common/errors';
+import { ACCESS_TTL_SECONDS, isVerifiableHash, signAccessToken, verifyAccessToken, verifyAgainstDummy, verifyPassword } from './utils/crypto';
+import { ApiError } from '../shared/errors/api-error';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const invalidCredentials = () => new ApiError(401, 'INVALID_CREDENTIALS', 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');

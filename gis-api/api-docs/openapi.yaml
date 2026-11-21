@@ -29,8 +29,16 @@ components:
       in: cookie
       name: gis_access
   schemas:
+    LoginDto:
+      $ref: ./components/schemas/LoginDto.yaml
+    User:
+      $ref: ./components/schemas/User.yaml
+    LoginResponse:
+      $ref: ./components/schemas/LoginResponse.yaml
     ErrorBody:
       $ref: ./components/schemas/ErrorBody.yaml
+    MeResponse:
+      $ref: ./components/schemas/MeResponse.yaml
     Health:
       $ref: ./components/schemas/Health.yaml
     SiteSummary:
@@ -39,15 +47,9 @@ components:
       $ref: ./components/schemas/SitesPage.yaml
     LatestSurvey:
       $ref: ./components/schemas/LatestSurvey.yaml
+    SiteFeatureProperties:
+      $ref: ./components/schemas/SiteFeatureProperties.yaml
     SiteFeature:
       $ref: ./components/schemas/SiteFeature.yaml
     SiteFeatureCollection:
       $ref: ./components/schemas/SiteFeatureCollection.yaml
-    User:
-      $ref: ./components/schemas/User.yaml
-    LoginResponse:
-      $ref: ./components/schemas/LoginResponse.yaml
-    MeResponse:
-      $ref: ./components/schemas/MeResponse.yaml
-    LoginDto:
-      $ref: ./components/schemas/LoginDto.yaml

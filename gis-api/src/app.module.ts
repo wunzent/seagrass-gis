@@ -3,12 +3,13 @@ import { randomBytes } from 'node:crypto';
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_PIPE, NestFactory } from '@nestjs/core';
 import { AuthModule } from './auth/auth.module';
-import { SafeErrorFilter } from './common/error.filter';
-import { setupDocs } from './common/openapi';
-import { createValidationPipe } from './common/validation';
-import { AuthConfig } from './config/config';
-import { Database, DatabaseModule } from './database/database.module';
+import { CoreModule } from './core/core.module';
+import { AuthConfig } from './core/config/config';
+import { Database } from './core/database/database.module';
 import { HealthModule } from './health/health.module';
+import { SafeErrorFilter } from './shared/filters/http-exception.filter';
+import { setupDocs } from './shared/openapi/openapi';
+import { createValidationPipe } from './shared/pipes/strict-validation.pipe';
 import { SitesModule } from './sites/sites.module';
 
 export interface AppOptions {
@@ -26,7 +27,7 @@ const localAuth = (): AuthConfig => ({
 export function appModule(database: Database, options: AppOptions = {}) {
   @Module({
     imports: [
-      DatabaseModule.forRoot(database, options.onShutdown),
+      CoreModule.forRoot(database, options.onShutdown),
       AuthModule.forRoot({ config: options.auth ?? localAuth(), loginLimit: options.loginLimit }),
       HealthModule,
       SitesModule,

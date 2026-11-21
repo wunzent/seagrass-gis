@@ -1,8 +1,8 @@
 import { Test } from '@nestjs/testing';
 import { appModule, AppOptions } from '../src/app.module';
-import { hashPassword, signAccessToken } from '../src/auth/crypto';
-import { readConfig } from '../src/config/config';
-import { createPool } from '../src/database/connection';
+import { hashPassword, signAccessToken } from '../src/auth/utils/crypto';
+import { readConfig } from '../src/core/config/config';
+import { createPool } from '../src/core/database/connection';
 import { assertTestDatabase, migrate } from './helpers';
 
 const config = readConfig(process.env);

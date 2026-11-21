@@ -1,6 +1,6 @@
 import * as path from 'node:path';
-import { createPool } from '../src/database/connection';
-import { applyMigrations, loadMigrations } from '../src/database/migrator';
+import { createPool } from '../src/core/database/connection';
+import { applyMigrations, loadMigrations } from '../src/core/database/migrator';
 
 /** Database names accepted for suites that truncate tables: `test` must be a whole word, e.g. gis_api_test, gis-test, test. */
 const TEST_DATABASE = /(^|[_-])test($|[_-])/i;

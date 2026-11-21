@@ -22,25 +22,23 @@ post:
       content:
         application/json:
           schema:
-            allOf:
-              - $ref: ../components/schemas/ErrorBody.yaml
-            example:
-              error:
-                code: CSRF_REJECTED
-                message: ...
-                details: {}
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: CSRF_REJECTED
+              message: ...
+              details: {}
     '503':
       description: SERVICE_UNAVAILABLE
       content:
         application/json:
           schema:
-            allOf:
-              - $ref: ../components/schemas/ErrorBody.yaml
-            example:
-              error:
-                code: SERVICE_UNAVAILABLE
-                message: ...
-                details: {}
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: SERVICE_UNAVAILABLE
+              message: ...
+              details: {}
   security:
     - gis_access: []
   summary: 'ออกจากระบบ: เพิกถอน session และล้าง cookie (idempotent)'

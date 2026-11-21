@@ -1,15 +1,12 @@
-import { CanActivate, ExecutionContext, Inject, Injectable, SetMetadata } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Inject, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { AuthConfig } from '../../config/config';
+import { AuthConfig } from '../../core/config/config';
 import { Role } from '../entities/user.entity';
-import { ApiError } from '../../common/errors';
-import type { HttpRequest } from '../../common/http-types';
+import { ApiError } from '../../shared/errors/api-error';
+import type { HttpRequest } from '../../shared/types/http.types';
 import { AUTH_CONFIG } from '../auth.constants';
+import { ROLES_KEY } from '../decorators/roles.decorator';
 import { checkCsrf } from './csrf.guard';
-
-const ROLES = 'gis:roles';
-/** Marks a protected write and the roles allowed to call it. */
-export const Roles = (...roles: Role[]) => SetMetadata(ROLES, roles);
 
 export const unauthorized = () => new ApiError(401, 'UNAUTHORIZED', 'กรุณาเข้าสู่ระบบ');
 
@@ -22,7 +19,7 @@ export class RolesGuard implements CanActivate {
   constructor(private readonly reflector: Reflector, @Inject(AUTH_CONFIG) private readonly config: AuthConfig) {}
   canActivate(context: ExecutionContext) {
     // Handler metadata overrides class metadata; reading both keeps a class-level @Roles from failing open.
-    const roles = this.reflector.getAllAndOverride<Role[] | undefined>(ROLES, [context.getHandler(), context.getClass()]);
+    const roles = this.reflector.getAllAndOverride<Role[] | undefined>(ROLES_KEY, [context.getHandler(), context.getClass()]);
     if (!roles) return true;
     const request = context.switchToHttp().getRequest<HttpRequest>();
     if (!request.auth) throw unauthorized();

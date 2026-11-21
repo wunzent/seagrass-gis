@@ -1,4 +1,4 @@
-import { Database } from '../database/database.module';
+import { Database } from '../core/database/database.module';
 import { HealthRepository } from './health.repository';
 import { HealthService } from './health.service';
 

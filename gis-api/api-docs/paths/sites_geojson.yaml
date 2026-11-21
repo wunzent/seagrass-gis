@@ -45,25 +45,23 @@ get:
       content:
         application/json:
           schema:
-            allOf:
-              - $ref: ../components/schemas/ErrorBody.yaml
-            example:
-              error:
-                code: INVALID_BBOX
-                message: ...
-                details: {}
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: INVALID_BBOX
+              message: ...
+              details: {}
     '503':
       description: SERVICE_UNAVAILABLE
       content:
         application/json:
           schema:
-            allOf:
-              - $ref: ../components/schemas/ErrorBody.yaml
-            example:
-              error:
-                code: SERVICE_UNAVAILABLE
-                message: ...
-                details: {}
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: SERVICE_UNAVAILABLE
+              message: ...
+              details: {}
   summary: แหล่งที่ตัดกับ bbox ของแผนที่ (ไม่มี paging)
   tags:
     - sites

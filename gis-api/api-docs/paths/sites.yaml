@@ -53,25 +53,23 @@ get:
       content:
         application/json:
           schema:
-            allOf:
-              - $ref: ../components/schemas/ErrorBody.yaml
-            example:
-              error:
-                code: VALIDATION_ERROR
-                message: ...
-                details: {}
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: ...
+              details: {}
     '503':
       description: SERVICE_UNAVAILABLE
       content:
         application/json:
           schema:
-            allOf:
-              - $ref: ../components/schemas/ErrorBody.yaml
-            example:
-              error:
-                code: SERVICE_UNAVAILABLE
-                message: ...
-                details: {}
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: SERVICE_UNAVAILABLE
+              message: ...
+              details: {}
   summary: รายการแหล่งหญ้าทะเลที่ใช้งาน (ไม่มี geometry) เรียง code
   tags:
     - sites

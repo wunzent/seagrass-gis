@@ -1,9 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { Role } from './entities/user.entity';
-import { DATABASE, Database } from '../database/database.module';
-import { toDependencyError } from '../common/errors';
-
-export interface UserRecord { id: string; email: string; role: Role; password_hash: string }
+import { Role, UserRecord } from './entities/user.entity';
+import { DATABASE, Database } from '../core/database/database.module';
+import { toDependencyError } from '../shared/errors/api-error';
 
 @Injectable()
 export class UsersRepository {

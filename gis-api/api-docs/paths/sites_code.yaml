@@ -20,37 +20,34 @@ get:
       content:
         application/json:
           schema:
-            allOf:
-              - $ref: ../components/schemas/ErrorBody.yaml
-            example:
-              error:
-                code: VALIDATION_ERROR
-                message: ...
-                details: {}
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: ...
+              details: {}
     '404':
       description: SITE_NOT_FOUND
       content:
         application/json:
           schema:
-            allOf:
-              - $ref: ../components/schemas/ErrorBody.yaml
-            example:
-              error:
-                code: SITE_NOT_FOUND
-                message: ...
-                details: {}
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: SITE_NOT_FOUND
+              message: ...
+              details: {}
     '503':
       description: SERVICE_UNAVAILABLE
       content:
         application/json:
           schema:
-            allOf:
-              - $ref: ../components/schemas/ErrorBody.yaml
-            example:
-              error:
-                code: SERVICE_UNAVAILABLE
-                message: ...
-                details: {}
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: SERVICE_UNAVAILABLE
+              message: ...
+              details: {}
   summary: รายละเอียดแหล่งพร้อมสรุปวันสำรวจล่าสุด
   tags:
     - sites

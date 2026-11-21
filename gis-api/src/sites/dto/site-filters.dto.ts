@@ -1,6 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsIn, IsOptional, IsString, Matches } from 'class-validator';
-import { IsStorableText, Utf16Length } from '../../common/validation';
+import { IsStorableText } from '../../shared/validators/storable-text.validator';
+import { Utf16Length } from '../../shared/validators/utf16-length.validator';
 import { SITE_STATUSES, SiteFilters, SiteStatus } from '../entities/site.entity';
 
 /** Filters shared by GET /sites and GET /sites.geojson (one snapshot for table and map). */

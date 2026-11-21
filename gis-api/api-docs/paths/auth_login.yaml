@@ -37,61 +37,56 @@ post:
       content:
         application/json:
           schema:
-            allOf:
-              - $ref: ../components/schemas/ErrorBody.yaml
-            example:
-              error:
-                code: VALIDATION_ERROR
-                message: ...
-                details: {}
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: ...
+              details: {}
     '401':
       description: INVALID_CREDENTIALS
       content:
         application/json:
           schema:
-            allOf:
-              - $ref: ../components/schemas/ErrorBody.yaml
-            example:
-              error:
-                code: INVALID_CREDENTIALS
-                message: ...
-                details: {}
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: INVALID_CREDENTIALS
+              message: ...
+              details: {}
     '403':
       description: CSRF_REJECTED
       content:
         application/json:
           schema:
-            allOf:
-              - $ref: ../components/schemas/ErrorBody.yaml
-            example:
-              error:
-                code: CSRF_REJECTED
-                message: ...
-                details: {}
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: CSRF_REJECTED
+              message: ...
+              details: {}
     '429':
       description: AUTH_RATE_LIMITED
       content:
         application/json:
           schema:
-            allOf:
-              - $ref: ../components/schemas/ErrorBody.yaml
-            example:
-              error:
-                code: AUTH_RATE_LIMITED
-                message: ...
-                details: {}
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: AUTH_RATE_LIMITED
+              message: ...
+              details: {}
     '503':
       description: SERVICE_UNAVAILABLE
       content:
         application/json:
           schema:
-            allOf:
-              - $ref: ../components/schemas/ErrorBody.yaml
-            example:
-              error:
-                code: SERVICE_UNAVAILABLE
-                message: ...
-                details: {}
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: SERVICE_UNAVAILABLE
+              message: ...
+              details: {}
   summary: 'เข้าสู่ระบบ: ตั้ง HttpOnly cookie gis_access (JWT 15 นาที) ไม่คืน token ใน JSON'
   tags:
     - auth

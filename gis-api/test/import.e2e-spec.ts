@@ -1,9 +1,9 @@
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { createPool } from '../src/database/connection';
+import { createPool } from '../src/core/database/connection';
 import { migrate } from './helpers';
-import { importSeed } from '../src/database/seeders/seed-import';
+import { importSeed } from '../src/core/database/seeders/seed-import';
 
 // Import fixtures write domain rows, so only the isolated import test database is accepted.
 const ALLOWED = /^\/(?:gis_import_test(?:_[a-z0-9_]+)?|gis_test)$/;

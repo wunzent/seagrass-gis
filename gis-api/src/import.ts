@@ -1,10 +1,13 @@
-import {readConfig} from './config/config';
-import {createPool,migrate} from './database/connection';
-import {importSeed} from './database/seeders/seed-import';
+import {readConfig} from './core/config/config';
+import {createPool,migrate} from './core/database/connection';
+import {importSeed} from './core/database/seeders/seed-import';
+import {AppLogger} from './core/logger/app-logger';
+
+const logger=new AppLogger();
 
 async function main() {
   const pool=createPool(readConfig(process.env).databaseUrl);
-  try {await migrate(pool);console.log(JSON.stringify(await importSeed(pool)));}
+  try {await migrate(pool);logger.log(JSON.stringify(await importSeed(pool)));}
   finally {await pool.end();}
 }
-void main().catch(()=>{console.error('Seed import failed; check source files, database and report directory');process.exitCode=1;});
+void main().catch(()=>{logger.error('Seed import failed; check source files, database and report directory');process.exitCode=1;});

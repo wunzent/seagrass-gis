@@ -1,8 +1,4 @@
 type: object
-required:
-  - id
-  - email
-  - role
 properties:
   id:
     type: string
@@ -16,3 +12,7 @@ properties:
       - viewer
       - editor
       - admin
+required:
+  - id
+  - email
+  - role

@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { SiteRow } from './entities/site.entity';
-import { DATABASE, Database } from '../database/database.module';
-import { toDependencyError } from '../common/errors';
+import { DATABASE, Database } from '../core/database/database.module';
+import { toDependencyError } from '../shared/errors/api-error';
 import { GeoJsonQuery, ListQuery, SiteFilters } from './entities/site.entity';
 
 

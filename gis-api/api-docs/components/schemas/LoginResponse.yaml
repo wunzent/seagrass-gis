@@ -1,8 +1,4 @@
 type: object
-required:
-  - user
-  - expires_in
-  - expires_at
 properties:
   user:
     $ref: ./User.yaml
@@ -13,3 +9,7 @@ properties:
   expires_at:
     type: string
     format: date-time
+required:
+  - user
+  - expires_in
+  - expires_at
