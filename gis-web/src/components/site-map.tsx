@@ -29,15 +29,26 @@ type Props = {
   onSelect: (code: string) => void;
   onViewport: (box: Bbox | null) => void;
   onDisplayChange?: (displayed: boolean, layer?: 'sites' | 'surveys') => void;
+  onAvailabilityChange?: (available: boolean) => void;
 };
 
-export default function SiteMap({ data, provinces, surveys, selection, onSelect, onViewport, onDisplayChange }: Props) {
+export default function SiteMap({
+  data,
+  provinces,
+  surveys,
+  selection,
+  onSelect,
+  onViewport,
+  onDisplayChange,
+  onAvailabilityChange,
+}: Props) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | null>(null);
   const camera = useRef<{ center: [number, number]; zoom: number }>({ center: [99.2, 8.1], zoom: 6.2 });
   const fittedSelection = useRef<SiteFeature | undefined>(undefined);
-  const callbacks = useRef({ onSelect, onViewport, onDisplayChange });
-  callbacks.current = { onSelect, onViewport, onDisplayChange };
+  const pendingFit = useRef<() => void>(() => {});
+  const callbacks = useRef({ onSelect, onViewport, onDisplayChange, onAvailabilityChange });
+  callbacks.current = { onSelect, onViewport, onDisplayChange, onAvailabilityChange };
   const [ready, setReady] = useState(false);
   const [failure, setFailure] = useState('');
   const [generation, setGeneration] = useState(0);
@@ -47,6 +58,7 @@ export default function SiteMap({ data, provinces, surveys, selection, onSelect,
     setReady(false);
     setFailure('');
     callbacks.current.onDisplayChange?.(false);
+    callbacks.current.onAvailabilityChange?.(true);
     callbacks.current.onViewport(null);
     const updateViewport = debounce(() => {
       const bounds = map.current?.getBounds();
@@ -179,8 +191,12 @@ export default function SiteMap({ data, provinces, surveys, selection, onSelect,
     } catch {
       setFailure('อุปกรณ์นี้เปิดแผนที่ไม่ได้ ยังใช้ตารางและรายละเอียดได้');
       callbacks.current.onViewport(null);
+      callbacks.current.onAvailabilityChange?.(false);
     }
-    const observer = new ResizeObserver(() => map.current?.resize());
+    const observer = new ResizeObserver(() => {
+      map.current?.resize();
+      pendingFit.current();
+    });
     observer.observe(container.current);
     return () => {
       observer.disconnect();
@@ -209,7 +225,12 @@ export default function SiteMap({ data, provinces, surveys, selection, onSelect,
     const instance = map.current;
     if (!instance || !ready) return;
     instance.setFilter('selected', ['==', ['get', 'code'], selection?.properties.code ?? '']);
-    if (selection && fittedSelection.current !== selection) {
+    if (!selection) fittedSelection.current = undefined;
+    const fit = () => {
+      if (!selection || fittedSelection.current === selection || map.current !== instance) return;
+      // A hidden map (mobile list tab) has a zero-size canvas and MapLibre skips the camera move; retry on resize.
+      const box = instance.getContainer();
+      if (!box.clientWidth || !box.clientHeight) return;
       fittedSelection.current = selection;
       const bounds = geometryBounds(selection);
       if (validBbox(bounds))
@@ -220,8 +241,9 @@ export default function SiteMap({ data, provinces, surveys, selection, onSelect,
           ],
           { padding: 48, maxZoom: 14, duration: 500 },
         );
-    }
-    if (!selection) fittedSelection.current = undefined;
+    };
+    pendingFit.current = fit;
+    fit();
   }, [selection, ready]);
 
   return (

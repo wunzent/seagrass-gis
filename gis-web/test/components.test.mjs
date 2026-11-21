@@ -154,6 +154,15 @@ function mapHarness(globals = {}, onDisplayChange, onSelect = () => {}) {
     }
     remove() {}
     setFilter() {}
+    fits = [];
+    fitBounds(bounds) {
+      this.fits.push(bounds);
+    }
+    container = { clientWidth: 800, clientHeight: 600 };
+    getContainer() {
+      return this.container;
+    }
+    resize() {}
     isSourceLoaded() {
       return true;
     }
@@ -760,4 +769,141 @@ test('history 404 before detail resolves does not flash a retry banner', () => {
     w.render().some((node) => typeof node.type === 'function' && node.props?.error),
     false,
   );
+});
+
+const square = {
+  type: 'Feature',
+  properties: { code: 'S1' },
+  geometry: {
+    type: 'Polygon',
+    coordinates: [
+      [
+        [98, 7],
+        [99, 7],
+        [99, 8],
+        [98, 7],
+      ],
+    ],
+  },
+};
+test('selection made while the map is hidden (zero size) fits once the map is resized visible', () => {
+  let resized;
+  const h = mapHarness({
+    ResizeObserver: class {
+      constructor(callback) {
+        resized = callback;
+      }
+      observe() {}
+      disconnect() {}
+    },
+  });
+  h.map.container = { clientWidth: 0, clientHeight: 0 };
+  resized();
+  h.render(undefined, { selection: square });
+  assert.equal(h.map.fits.length, 0, 'zero-size canvas cannot fit');
+  h.map.container = { clientWidth: 375, clientHeight: 300 };
+  resized();
+  assert.deepEqual(JSON.parse(JSON.stringify(h.map.fits)), [
+    [
+      [98, 7],
+      [99, 8],
+    ],
+  ]);
+  resized();
+  h.render(undefined, { selection: square });
+  assert.equal(h.map.fits.length, 1, 'an already fitted selection is not refitted');
+});
+
+test('map reports unavailable when MapLibre cannot start and available again on retry', () => {
+  const reports = [];
+  let fail = true;
+  const h = componentHarness(
+    '../src/components/site-map.tsx',
+    {
+      'maplibre-gl': {
+        Map: class {
+          constructor() {
+            if (fail) throw new Error('no WebGL');
+          }
+          addControl() {}
+          on() {}
+          remove() {}
+          getCenter() {
+            return { toArray: () => [99.2, 8.1] };
+          }
+          getZoom() {
+            return 6.2;
+          }
+        },
+        NavigationControl: class {},
+        setWorkerUrl() {},
+      },
+      '../lib/map-state': { ...mapState, debounce: (fn) => ({ run: fn, cancel() {} }) },
+    },
+    {
+      ResizeObserver: class {
+        observe() {}
+        disconnect() {}
+      },
+    },
+  );
+  const render = () =>
+    h.render(() =>
+      h.exports.default({ onViewport() {}, onSelect() {}, onAvailabilityChange: (value) => reports.push(value) }),
+    );
+  render();
+  assert.equal(reports.at(-1), false);
+  fail = false;
+  nodes(render())
+    .find((node) => node.type === 'button')
+    .props.onClick();
+  render();
+  assert.equal(reports.at(-1), true);
+});
+
+test('unavailable map drops the loading text and aria-busy from the map panel', () => {
+  const w = historyWorkspace();
+  const panel = (tree) => tree.find((node) => node.props?.['aria-labelledby'] === 'map-heading');
+  assert.equal(panel(w.render())['props']['aria-busy'], true);
+  mapNode(w.render()).props.onAvailabilityChange?.(false);
+  const tree = w.render();
+  assert.equal(panel(tree).props['aria-busy'], false);
+  assert.equal(tree.find((node) => node.props?.className === 'map-progress').props.children, '');
+});
+
+test('closing details returns focus to the selected row, or a visible heading when the row is hidden', () => {
+  for (const [rowVisible, headingVisible] of [
+    [true, true],
+    [false, true],
+    [false, false],
+  ]) {
+    const w = historyWorkspace();
+    w.setResource('/api/sites?', {
+      data: {
+        items: [{ code: 'S1', name: 'Site', province_code: '81', area_rai: 1, status: 'good' }],
+        total: 1,
+        page: 1,
+      },
+      loading: false,
+    });
+    let tree = w.render();
+    const row = () => tree.find((node) => node.props?.className === 'site-button');
+    row().props.onClick();
+    tree = w.render();
+    const rowHost = w.host(row());
+    const sitesHeading = w.host(tree.find((node) => node.props?.id === 'sites-heading'));
+    const detailHeading = w.host(tree.find((node) => node.props?.id === 'detail-heading'));
+    rowHost.getClientRects = () => (rowVisible ? [{}] : []);
+    sitesHeading.getClientRects = () => (headingVisible ? [{}] : []);
+    detailHeading.getClientRects = () => [{}];
+    const close = tree.find((node) => node.type === 'button' && node.props.children === 'ปิดรายละเอียด');
+    w.host(close).focus();
+    close.props.onClick();
+    tree = w.render();
+    assert.equal(
+      tree.some((node) => node.props?.children === 'ปิดรายละเอียด'),
+      false,
+    );
+    assert.equal(w.document.activeElement, rowVisible ? rowHost : headingVisible ? sitesHeading : detailHeading);
+  }
 });

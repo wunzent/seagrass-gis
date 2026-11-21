@@ -101,6 +101,10 @@ function MapContent() {
   const [bbox, setBbox] = useState<Bbox | null>(null);
   const [code, setCode] = useState<string | null>(null);
   const [tab, setTab] = useState<'map' | 'table'>('map');
+  const [mapAvailable, setMapAvailable] = useState(true);
+  const selectedRow = useRef<HTMLButtonElement>(null);
+  const sitesHeading = useRef<HTMLHeadingElement>(null);
+  const detailHeading = useRef<HTMLHeadingElement>(null);
   const [listRetry, setListRetry] = useState(0);
   const [mapRetry, setMapRetry] = useState(0);
   const [surveysRetry, setSurveysRetry] = useState(0);
@@ -184,7 +188,7 @@ function MapContent() {
   const listInert = loadingList || Boolean(validation);
   const listFocus = usePaginationFocus(loadingList, state.page, listPages?.total);
   const historyFocus = usePaginationFocus(history.loading, historyPage, historyPages?.total);
-  const loadingMap = !validation && (pending || !bbox || geojson.loading || surveys.loading);
+  const loadingMap = mapAvailable && !validation && (pending || !bbox || geojson.loading || surveys.loading);
   const selected = missing ? undefined : detail.data;
   const staleNotice = [
     displayedLayers.sites && (pending || !bbox || geojson.loading || geojson.error || validation)
@@ -275,7 +279,9 @@ function MapContent() {
           aria-busy={loadingList}
         >
           <div className="panel-heading">
-            <h2 id="sites-heading">แหล่งหญ้าทะเล</h2>
+            <h2 id="sites-heading" ref={sitesHeading} tabIndex={-1}>
+              แหล่งหญ้าทะเล
+            </h2>
             <span aria-live="polite">{list.data ? `${number.format(list.data.total)} แหล่ง` : '—'}</span>
           </div>
           {loadingList && (
@@ -311,6 +317,7 @@ function MapContent() {
                         <tr key={site.code} className={code === site.code ? 'selected-row' : ''}>
                           <td>
                             <button
+                              ref={code === site.code ? selectedRow : undefined}
                               className="site-button"
                               onClick={() => select(site.code)}
                               aria-pressed={code === site.code}
@@ -406,6 +413,7 @@ function MapContent() {
               onSelect={select}
               onViewport={onViewport}
               onDisplayChange={onDisplayChange}
+              onAvailabilityChange={setMapAvailable}
             />
           </div>
           <ul className="legend" aria-label="คำอธิบายแผนที่">
@@ -425,9 +433,21 @@ function MapContent() {
       </div>
       <section className="detail-panel" aria-labelledby="detail-heading" aria-busy={detail.loading}>
         <div className="panel-heading">
-          <h2 id="detail-heading">รายละเอียดแหล่ง</h2>
+          <h2 id="detail-heading" ref={detailHeading} tabIndex={-1}>
+            รายละเอียดแหล่ง
+          </h2>
           {code && (
-            <Button variant="outline" onClick={() => setCode(null)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                // The button unmounts on close; move focus to the selected row, else the nearest visible heading.
+                const target = [selectedRow.current, sitesHeading.current, detailHeading.current].find(
+                  (element) => element?.getClientRects().length,
+                );
+                setCode(null);
+                target?.focus();
+              }}
+            >
               ปิดรายละเอียด
             </Button>
           )}
