@@ -1,6 +1,3 @@
-# Preserve immutable migration checksums across Windows and Linux checkouts.
-GIS-api/migrations/*.sql text eol=lf
-
 # Keep owner-provided seed inputs byte-for-byte across checkouts.
 seed-data/** -text
 seed-data.zip -text

@@ -2,16 +2,16 @@
   "name": "gis-api",
   "version": "0.1.0",
   "private": true,
-  "engines": { "node": ">=22 <23" },
+  "engines": { "node": ">=22.18.0 <23" },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/main.js",
-    "migrate": "node dist/migrate.js",
-    "import": "node dist/import.js",
+    "start": "node --env-file-if-exists=.env dist/main.js",
+    "migrate": "node --env-file-if-exists=.env dist/migrate.js",
+    "import": "node --env-file-if-exists=.env dist/import.js",
     "test:import:unit": "npm run build && node --test test/import-unit.cjs",
     "test:import:integration": "npm run build && node --test test/import-integration.cjs",
-    "test:unit": "npm run build && node --test test/unit.test.cjs",
-    "test:integration": "npm run build && node --test test/integration.test.cjs"
+    "test:unit": "npm run build && node --test test/unit.test.cjs test/sites-unit.cjs",
+    "test:integration": "npm run build && node --test --test-concurrency=1 test/integration.test.cjs test/sites-integration.cjs"
   },
   "dependencies": {
     "@nestjs/common": "12.6.0",

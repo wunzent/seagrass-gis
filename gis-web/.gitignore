@@ -1,0 +1,23 @@
+# Local secrets (commit .env.example only)
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# Dependencies and generated build/test output
+node_modules/
+.next/
+dist/
+coverage/
+playwright-report/
+test-results/
+*.log
+*.tsbuildinfo
+
+# Local agent workflow records, not delivery artifacts
+.honeyguide/
+
+# Local runtime data and temporary files
+tmp/
+.DS_Store
+Thumbs.db
