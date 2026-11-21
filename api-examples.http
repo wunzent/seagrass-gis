@@ -1,0 +1,290 @@
+# Seagrass GIS API — ตัวอย่างคำขอ (VS Code REST Client; JetBrains HTTP Client ใช้ได้ยกเว้นตัวแปร response ดูหมายเหตุ)
+#
+# ใช้กับ Docker Compose บนเครื่อง local เท่านั้น บัญชีและรหัสผ่านเป็นค่า demo-only จาก docker-compose.yml
+# รันจากบนลงล่างตามลำดับ: client เก็บ cookie gis_access (HttpOnly) จาก login เองและส่งต่อในคำขอถัดไป
+# คำขอเขียนทุกตัว (POST/PATCH/DELETE รวม login/logout) ต้องมี Origin ที่อนุญาตและ X-CSRF-Protection: 1
+# ชุดนี้สร้าง site DOC-EX-001 และ survey หนึ่งรายการ แล้วลบเองตอนท้าย
+# (survey ถูกลบจริง ส่วน site เป็น soft delete คงแถว deleted_at ไว้ใน DB; รันซ้ำได้เพราะ code ต้องไม่ซ้ำเฉพาะ site ที่ยัง active)
+# ตัวเลข version (1 → 2 → 3) สมมติว่าเริ่มจาก DOC-EX-001 ใหม่ตามลำดับไฟล์นี้
+# JetBrains: แทน {{createSurvey.response.body.$.id}} ด้วย id จาก response ของ createSurvey
+# บรรทัด "# expect:" คือ status ที่ได้จากการรันจริงกับ API ใน Compose เมื่อ 2026-11-22
+
+@api = http://localhost:3001
+@origin = http://localhost:3000
+@code = DOC-EX-001
+
+### Health: API + PostGIS
+# expect: 200
+GET {{api}}/health
+
+### Sites list หน้าแรก
+# expect: 200
+GET {{api}}/sites
+
+### Sites search (literal substring ใน code/name ไม่สนตัวพิมพ์)
+# expect: 200
+GET {{api}}/sites?q=kbi
+
+### Sites filter จังหวัดและสถานะ
+# expect: 200
+GET {{api}}/sites?province=82&status=good
+
+### Sites pagination
+# expect: 200
+GET {{api}}/sites?page=2&pageSize=10
+
+### 400 VALIDATION_ERROR: pageSize เกิน 100
+# expect: 400
+GET {{api}}/sites?pageSize=101
+
+### Sites GeoJSON ตาม bbox (minLon,minLat,maxLon,maxLat)
+# expect: 200
+GET {{api}}/sites.geojson?bbox=98,7,100,9
+
+### 400 INVALID_BBOX: ไม่ส่ง bbox
+# expect: 400
+GET {{api}}/sites.geojson
+
+### Site detail
+# expect: 200
+GET {{api}}/sites/KBI-001
+
+### 404 SITE_NOT_FOUND
+# expect: 404
+GET {{api}}/sites/NOPE-999
+
+### Site survey history (anonymous ไม่เห็น created_by)
+# expect: 200
+GET {{api}}/sites/KBI-001/surveys?page=1&pageSize=5
+
+### Province outlines
+# expect: 200
+GET {{api}}/provinces.geojson
+
+### Species lookup
+# expect: 200
+GET {{api}}/species
+
+### Survey points ตาม bbox
+# expect: 200
+GET {{api}}/surveys.geojson?bbox=98,7,100,9
+
+### 401 UNAUTHENTICATED: เขียนโดยไม่มี cookie
+# expect: 401
+POST {{api}}/sites
+Origin: {{origin}}
+X-CSRF-Protection: 1
+Content-Type: application/json
+
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[98.640,8.124],[98.645,8.124],[98.645,8.128],[98.640,8.128],[98.640,8.124]]]},"properties":{"code":"{{code}}","name":"ตัวอย่างเอกสาร"}}
+
+### 403 CSRF_REJECTED: login โดยไม่มี X-CSRF-Protection
+# expect: 403
+POST {{api}}/auth/login
+Origin: {{origin}}
+Content-Type: application/json
+
+{"email":"admin@demo.local","password":"admin-demo-only"}
+
+### Login admin (ตั้ง cookie gis_access; JSON ไม่มี token)
+# expect: 200
+POST {{api}}/auth/login
+Origin: {{origin}}
+X-CSRF-Protection: 1
+Content-Type: application/json
+
+{"email":"admin@demo.local","password":"admin-demo-only"}
+
+### Current user
+# expect: 200
+GET {{api}}/auth/me
+
+### Create site (admin)
+# expect: 201
+POST {{api}}/sites
+Origin: {{origin}}
+X-CSRF-Protection: 1
+Content-Type: application/json
+
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[98.640,8.124],[98.645,8.124],[98.645,8.128],[98.640,8.128],[98.640,8.124]]]},"properties":{"code":"{{code}}","name":"ตัวอย่างเอกสาร"}}
+
+### 409 DUPLICATE_CODE: code ซ้ำกับ site ที่ active
+# expect: 409
+POST {{api}}/sites
+Origin: {{origin}}
+X-CSRF-Protection: 1
+Content-Type: application/json
+
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[98.640,8.124],[98.645,8.124],[98.645,8.128],[98.640,8.128],[98.640,8.124]]]},"properties":{"code":"{{code}}","name":"ตัวอย่างเอกสาร"}}
+
+### 400 INVALID_GEOMETRY: polygon ตัดกันเอง (bowtie) ไม่ซ่อมให้
+# expect: 400
+POST {{api}}/sites
+Origin: {{origin}}
+X-CSRF-Protection: 1
+Content-Type: application/json
+
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[98.640,8.124],[98.645,8.128],[98.645,8.124],[98.640,8.128],[98.640,8.124]]]},"properties":{"code":"DOC-EX-BAD","name":"geometry ผิด"}}
+
+### 422 OUTSIDE_COVERAGE: polygon ไม่ทับจังหวัดใดเลย
+# expect: 422
+POST {{api}}/sites
+Origin: {{origin}}
+X-CSRF-Protection: 1
+Content-Type: application/json
+
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[0.0,0.0],[0.01,0.0],[0.01,0.01],[0.0,0.01],[0.0,0.0]]]},"properties":{"code":"DOC-EX-OUT","name":"นอกพื้นที่"}}
+
+### Update geometry (admin เท่านั้น) version 1 → 2
+# expect: 200
+PATCH {{api}}/sites/{{code}}
+Origin: {{origin}}
+X-CSRF-Protection: 1
+Content-Type: application/json
+
+{"version":1,"geometry":{"type":"Polygon","coordinates":[[[98.641,8.124],[98.646,8.124],[98.646,8.128],[98.641,8.128],[98.641,8.124]]]}}
+
+### Logout admin (revoke session ฝั่ง server)
+# expect: 204
+POST {{api}}/auth/logout
+Origin: {{origin}}
+X-CSRF-Protection: 1
+
+### 401 หลัง logout
+# expect: 401
+GET {{api}}/auth/me
+
+### Login editor
+# expect: 200
+POST {{api}}/auth/login
+Origin: {{origin}}
+X-CSRF-Protection: 1
+Content-Type: application/json
+
+{"email":"editor@demo.local","password":"editor-demo-only"}
+
+### Update name (editor) version 2 → 3
+# expect: 200
+PATCH {{api}}/sites/{{code}}
+Origin: {{origin}}
+X-CSRF-Protection: 1
+Content-Type: application/json
+
+{"version":2,"name":"ตัวอย่างเอกสาร (แก้ชื่อ)"}
+
+### 409 VERSION_CONFLICT: ส่ง version เก่า (details.current คือข้อมูลล่าสุด)
+# expect: 409
+PATCH {{api}}/sites/{{code}}
+Origin: {{origin}}
+X-CSRF-Protection: 1
+Content-Type: application/json
+
+{"version":2,"name":"ชื่อจากหน้าจอเก่า"}
+
+### 403 FORBIDDEN: editor แก้ geometry ไม่ได้
+# expect: 403
+PATCH {{api}}/sites/{{code}}
+Origin: {{origin}}
+X-CSRF-Protection: 1
+Content-Type: application/json
+
+{"version":3,"geometry":{"type":"Polygon","coordinates":[[[98.640,8.124],[98.645,8.124],[98.645,8.128],[98.640,8.128],[98.640,8.124]]]}}
+
+### 403 FORBIDDEN: editor สร้าง site ไม่ได้
+# expect: 403
+POST {{api}}/sites
+Origin: {{origin}}
+X-CSRF-Protection: 1
+Content-Type: application/json
+
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[98.640,8.124],[98.645,8.124],[98.645,8.128],[98.640,8.128],[98.640,8.124]]]},"properties":{"code":"DOC-EX-ED","name":"editor"}}
+
+### Create survey (editor) จุดต้องอยู่ห่าง site ไม่เกิน 50 m
+# @name createSurvey
+# expect: 201
+POST {{api}}/sites/{{code}}/surveys
+Origin: {{origin}}
+X-CSRF-Protection: 1
+Content-Type: application/json
+
+{"lon":98.643,"lat":8.126,"surveyed_on":"2026-10-01","cover_percent":45.5,"species":["EA","HO"],"note":"ตัวอย่างเอกสาร"}
+
+### 422 OUTSIDE_SITE: จุดห่าง site เกิน 50 m
+# expect: 422
+POST {{api}}/sites/{{code}}/surveys
+Origin: {{origin}}
+X-CSRF-Protection: 1
+Content-Type: application/json
+
+{"lon":98.70,"lat":8.20,"surveyed_on":"2026-10-01","cover_percent":10,"species":["EA"]}
+
+### 400 VALIDATION_ERROR: field ที่ไม่รู้จัก
+# expect: 400
+POST {{api}}/sites/{{code}}/surveys
+Origin: {{origin}}
+X-CSRF-Protection: 1
+Content-Type: application/json
+
+{"lon":98.643,"lat":8.126,"surveyed_on":"2026-10-01","cover_percent":10,"species":["EA"],"created_by":"x"}
+
+### Update survey (editor)
+# expect: 200
+PATCH {{api}}/surveys/{{createSurvey.response.body.$.id}}
+Origin: {{origin}}
+X-CSRF-Protection: 1
+Content-Type: application/json
+
+{"cover_percent":60,"note":null}
+
+### History หลัง login (มี created_by)
+# expect: 200
+GET {{api}}/sites/{{code}}/surveys
+
+### 403 FORBIDDEN: editor ลบ site ไม่ได้
+# expect: 403
+DELETE {{api}}/sites/{{code}}
+Origin: {{origin}}
+X-CSRF-Protection: 1
+
+### Logout editor
+# expect: 204
+POST {{api}}/auth/logout
+Origin: {{origin}}
+X-CSRF-Protection: 1
+
+### Login admin เพื่อเก็บกวาด
+# expect: 200
+POST {{api}}/auth/login
+Origin: {{origin}}
+X-CSRF-Protection: 1
+Content-Type: application/json
+
+{"email":"admin@demo.local","password":"admin-demo-only"}
+
+### 409 SITE_HAS_SURVEYS: ลบ site ที่ยังมี survey
+# expect: 409
+DELETE {{api}}/sites/{{code}}
+Origin: {{origin}}
+X-CSRF-Protection: 1
+
+### Delete survey (editor หรือ admin; ลบจริง)
+# expect: 204
+DELETE {{api}}/surveys/{{createSurvey.response.body.$.id}}
+Origin: {{origin}}
+X-CSRF-Protection: 1
+
+### Delete site (admin; soft delete)
+# expect: 204
+DELETE {{api}}/sites/{{code}}
+Origin: {{origin}}
+X-CSRF-Protection: 1
+
+### site ที่ลบแล้วไม่แสดง
+# expect: 404
+GET {{api}}/sites/{{code}}
+
+### Logout admin
+# expect: 204
+POST {{api}}/auth/logout
+Origin: {{origin}}
+X-CSRF-Protection: 1
