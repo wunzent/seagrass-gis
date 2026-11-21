@@ -1,0 +1,2 @@
+# Preserve immutable migration checksums across Windows and Linux checkouts.
+GIS-api/migrations/*.sql text eol=lf

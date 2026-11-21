@@ -1,0 +1,26 @@
+{
+  "name": "gis-api",
+  "version": "0.1.0",
+  "private": true,
+  "engines": { "node": ">=22 <23" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js",
+    "migrate": "node dist/migrate.js",
+    "test:unit": "npm run build && node --test test/unit.test.cjs",
+    "test:integration": "npm run build && node --test test/integration.test.cjs"
+  },
+  "dependencies": {
+    "@nestjs/common": "12.6.0",
+    "@nestjs/core": "12.6.0",
+    "@nestjs/platform-express": "12.6.0",
+    "pg": "8.23.1",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "22.18.0",
+    "@types/pg": "8.15.5",
+    "typescript": "5.9.3"
+  }
+}
