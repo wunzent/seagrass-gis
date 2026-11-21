@@ -3,23 +3,31 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22.18.0" },
+  "engines": {
+    "node": ">=22.18.0"
+  },
   "scripts": {
-    "dev": "node scripts/next-env.mjs dev --hostname 0.0.0.0",
-    "build": "next build",
+    "styles": "tailwindcss -i ./src/app/globals.css -o ./src/app/tailwind.css --content \"./src/**/*.{ts,tsx}\" --minify",
+    "dev": "npm run styles && node scripts/copy-maplibre-worker.mjs && node scripts/next-env.mjs dev --hostname 0.0.0.0",
+    "build": "npm run styles && node scripts/copy-maplibre-worker.mjs && next build",
     "start": "node scripts/next-env.mjs start --hostname 0.0.0.0",
     "typecheck": "tsc --noEmit",
-    "test:unit": "node --experimental-strip-types --test test/health.test.mjs"
+    "test:unit": "node --experimental-strip-types --test test/*.test.mjs"
   },
   "dependencies": {
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
+    "maplibre-gl": "6.19.0",
     "next": "16.4.6",
     "react": "19.3.1",
-    "react-dom": "19.3.1"
+    "react-dom": "19.3.1",
+    "tailwind-merge": "2.6.0"
   },
   "devDependencies": {
-    "typescript": "5.9.3",
     "@types/node": "22.18.0",
     "@types/react": "19.2.2",
-    "@types/react-dom": "19.2.2"
+    "@types/react-dom": "19.2.2",
+    "tailwindcss": "3.4.19",
+    "typescript": "5.9.3"
   }
 }
