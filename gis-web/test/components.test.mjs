@@ -104,11 +104,13 @@ test('invalid filters show validation without list skeleton or map loading statu
   assert.equal(invalid.find((node) => node.props?.className === 'map-progress').props.children, '');
 });
 
-function mapHarness(globals = {}, onDisplayChange) {
+function mapHarness(globals = {}, onDisplayChange, onSelect = () => {}) {
   let map;
   class FakeMap {
     events = new Map();
     values = [];
+    sources = new Map();
+    layers = [];
     coveringKeys = ['a', 'b'];
     coveringTiles(options) {
       assert.equal(options.tileSize, 256);
@@ -120,14 +122,30 @@ function mapHarness(globals = {}, onDisplayChange) {
       map = this;
     }
     on(name, ...args) {
-      this.events.set(name, args.at(-1));
+      this.events.set(args.length > 1 ? `${name}:${args[0]}` : name, args.at(-1));
     }
     emit(name, event = {}) {
       this.events.get(name)?.(event);
     }
     addControl() {}
-    addSource() {}
-    addLayer() {}
+    addSource(id, source) {
+      this.sources.set(id, {
+        ...source,
+        setData(data) {
+          this.data = data;
+        },
+      });
+    }
+    addLayer(layer) {
+      this.layers.push(layer);
+    }
+    getCanvas() {
+      return (this.canvas ??= { style: {} });
+    }
+    queryRenderedFeatures(point, options) {
+      assert.deepEqual(Array.from(options.layers), ['surveys-circle', 'sites-fill']);
+      return this.clickedFeatures ?? [];
+    }
     getCenter() {
       return { toArray: () => [99.2, 8.1] };
     }
@@ -139,7 +157,8 @@ function mapHarness(globals = {}, onDisplayChange) {
     isSourceLoaded() {
       return true;
     }
-    getSource() {
+    getSource(id) {
+      if (id !== 'sites') return this.sources.get(id);
       return { setData: (data) => this.values.push(data) };
     }
     getBounds() {
@@ -160,7 +179,8 @@ function mapHarness(globals = {}, onDisplayChange) {
       ...globals,
     },
   );
-  const render = (data) => h.render(() => h.exports.default({ data, onViewport() {}, onSelect() {}, onDisplayChange }));
+  const render = (data, extra = {}) =>
+    h.render(() => h.exports.default({ data, onViewport() {}, onSelect, onDisplayChange, ...extra }));
   render();
   map.emit('load');
   render();
@@ -342,4 +362,402 @@ test('province select options and labels come from the provinces API, falling ba
     ['', 'ทุกจังหวัด'],
     ['92', '92'],
   ]);
+});
+
+test('province outlines stay below sites and points remain above sites through empty and pending updates', () => {
+  const selected = [];
+  const { render, map } = mapHarness({}, undefined, (code) => selected.push(code));
+  const provinces = { type: 'FeatureCollection', features: [{ properties: { code: '81' } }] };
+  const surveys = { type: 'FeatureCollection', features: [{ properties: { site_code: 'S1' } }] };
+  const empty = { type: 'FeatureCollection', features: [] };
+  render(empty, { provinces, surveys });
+  const ids = map.layers.map((layer) => layer.id);
+  assert.equal(ids.filter((id) => id === 'provinces-line').length, 1);
+  assert.ok(ids.indexOf('provinces-line') < ids.indexOf('sites-fill'));
+  assert.ok(ids.indexOf('surveys-circle') > ids.indexOf('sites-fill'));
+  assert.equal(map.sources.get('provinces').data, provinces);
+  assert.equal(map.sources.get('surveys').data, surveys);
+  render(undefined);
+  assert.equal(map.sources.get('surveys').data, surveys);
+  render(empty, { surveys: empty });
+  assert.equal(map.sources.get('provinces').data, provinces);
+  assert.equal(map.sources.get('surveys').data, empty);
+  map.clickedFeatures = [{ properties: { site_code: 'S1' } }, { properties: { code: 'S2' } }];
+  map.emit('click', { point: {} });
+  assert.deepEqual(selected, ['S1']);
+  map.clickedFeatures = [{ properties: { code: 'S2' } }];
+  map.emit('click', { point: {} });
+  assert.deepEqual(selected, ['S1', 'S2']);
+});
+
+function historyWorkspace() {
+  const document = { body: {} };
+  document.activeElement = document.body;
+  let history = { data: { items: [], total: 0, page: 1 }, loading: false };
+  const resources = new Map();
+  const calls = [];
+  const provinces = { type: 'FeatureCollection', features: [] };
+  const h = componentHarness(
+    '../src/components/map-workspace.tsx',
+    {
+      'next/dynamic': { default: () => 'SiteMap', __esModule: true },
+      './ui/button': { Button: 'button' },
+      './session-controls': { SessionControls: 'controls' },
+      './session-provider': { useSession: () => ({ generation: 1 }) },
+      '../lib/map-state': { ...mapState, debounce: (fn) => ({ run: fn, cancel() {} }) },
+      './use-resource': {
+        useResource: (url, retry) => {
+          calls.push({ url, retry });
+          for (const [prefix, resource] of resources) if (url?.startsWith(prefix)) return resource;
+          if (url === '/api/provinces.geojson') return { data: provinces };
+          if (url?.includes('/surveys?')) return history;
+          if (/^\/api\/sites\/[^?]+$/.test(url ?? ''))
+            return {
+              data: {
+                properties: {
+                  code: url.split('/').at(-1),
+                  name: 'Site',
+                  province_code: '81',
+                  area_rai: 1,
+                  status: 'good',
+                },
+              },
+            };
+          return { loading: false };
+        },
+      },
+    },
+    { document },
+  );
+  const Content = h.render(() => h.exports.default()).type;
+  const render = () => {
+    calls.length = 0;
+    return nodes(h.render(() => Content()));
+  };
+  return {
+    render,
+    document,
+    host: h.host,
+    calls,
+    provinces,
+    setResource(prefix, value) {
+      resources.set(prefix, value);
+    },
+    setHistory(value) {
+      history = value;
+    },
+  };
+}
+const mapNode = (tree) => tree.find((node) => node.type === 'SiteMap');
+const historyNav = (tree) => tree.find((node) => node.props?.['aria-label'] === 'หน้าประวัติการสำรวจ');
+const textOf = (tree) =>
+  nodes(tree)
+    .flatMap((node) => [node.props?.children])
+    .flat(Infinity)
+    .filter((value) => typeof value === 'string')
+    .join(' ');
+
+test('workspace shares province resource and exact bounded filters with survey points', () => {
+  const w = historyWorkspace();
+  let tree = w.render();
+  assert.equal(mapNode(tree).props.provinces, w.provinces);
+  mapNode(tree).props.onViewport([98, 6, 101, 10]);
+  tree.find((node) => node.type === 'select').props.onChange({ target: { value: '81' } });
+  tree = w.render();
+  tree.filter((node) => node.type === 'select')[1].props.onChange({ target: { value: 'good' } });
+  tree = w.render();
+  tree.find((node) => node.type === 'input').props.onChange({ target: { value: 'reef' } });
+  tree = w.render();
+  const sites = w.calls.find(({ url }) => url?.startsWith('/api/sites.geojson?')).url;
+  const points = w.calls.find(({ url }) => url?.startsWith('/api/surveys.geojson?')).url;
+  assert.equal(points.split('?')[1], sites.split('?')[1]);
+  assert.match(points, /province=81&status=good&q=reef&bbox=/);
+  assert.equal(w.calls.filter(({ url }) => url === '/api/provinces.geojson').length, 1);
+  assert.match(textOf(tree), /จุดสำรวจ/);
+  mapNode(tree).props.onViewport(null);
+  w.render();
+  assert.equal(
+    w.calls.some(({ url }) => url?.startsWith('/api/surveys.geojson?')),
+    false,
+  );
+});
+
+test('history displays fields, pages explicitly and resets when selection changes', () => {
+  const w = historyWorkspace();
+  mapNode(w.render()).props.onSelect('S1');
+  const survey = {
+    id: 'a',
+    surveyed_on: '2026-11-21',
+    cover_percent: 42,
+    species: ['EA', 'TH'],
+    note: 'field note',
+    created_by: { id: 'u', email: 'recorder@example.test' },
+  };
+  w.setHistory({ data: { items: [survey], total: 6, page: 1 }, loading: false });
+  let tree = w.render();
+  assert.ok(w.calls.some(({ url }) => url === '/api/sites/S1/surveys?page=1&pageSize=5'));
+  for (const value of [
+    '2026-11-21',
+    '42',
+    'EA',
+    'TH',
+    'field note',
+    'recorder@example.test',
+    'วันที่สำรวจ',
+    'ผู้บันทึก',
+  ])
+    assert.ok(textOf(tree).includes(value), value);
+  let buttons = nodes(historyNav(tree)).filter((node) => node.type === 'button');
+  assert.equal(buttons[0].props.disabled, true);
+  buttons[1].props.onClick();
+  w.setHistory({ data: { items: [{ ...survey, created_by: undefined }], total: 6, page: 2 }, loading: false });
+  tree = w.render();
+  assert.ok(w.calls.some(({ url }) => url === '/api/sites/S1/surveys?page=2&pageSize=5'));
+  assert.equal(textOf(tree).includes('ผู้บันทึก'), false);
+  assert.equal(textOf(tree).includes('recorder@example.test'), false);
+  buttons = nodes(historyNav(tree)).filter((node) => node.type === 'button');
+  assert.equal(buttons[1].props.disabled, true);
+  buttons[0].props.onClick();
+  w.render();
+  assert.ok(w.calls.some(({ url }) => url === '/api/sites/S1/surveys?page=1&pageSize=5'));
+  buttons[1].props.onClick();
+  mapNode(w.render()).props.onSelect('S2');
+  w.render();
+  assert.ok(w.calls.some(({ url }) => url === '/api/sites/S2/surveys?page=1&pageSize=5'));
+});
+
+test('history has loading, empty, error and retry states', () => {
+  const w = historyWorkspace();
+  mapNode(w.render()).props.onSelect('S1');
+  assert.match(textOf(w.render()), /ยังไม่มีข้อมูลการสำรวจ/);
+  w.setHistory({ loading: true });
+  assert.match(textOf(w.render()), /กำลังโหลดประวัติการสำรวจ/);
+  w.setHistory({ error: new Error('offline'), loading: false });
+  let tree = w.render();
+  const failure = tree.find((node) => typeof node.type === 'function' && node.props?.error?.message === 'offline');
+  assert.ok(failure);
+  const before = w.calls.find(({ url }) => url?.includes('/surveys?')).retry;
+  failure.props.retry();
+  w.render();
+  assert.equal(w.calls.find(({ url }) => url?.includes('/surveys?')).retry, before + 1);
+});
+
+test('history resource drops old pages, selections and creator data across identity changes', async () => {
+  let generation = 1;
+  let session = { user: { id: 'u' } };
+  const pending = [];
+  const store = { isCurrent: (value) => value === generation };
+  const h = componentHarness('../src/components/use-resource.ts', {
+    './session-provider': { useSession: () => ({ session, phase: 'ready', generation, busy: null, store }) },
+    '../lib/sites': {
+      ApiError,
+      fetchJson: (url, signal) => new Promise((resolve) => pending.push({ url, signal, resolve })),
+    },
+  });
+  const render = (url) => h.render(() => h.exports.useResource(url, 0));
+  const page1 = '/api/sites/S1/surveys?page=1&pageSize=5';
+  const page2 = '/api/sites/S1/surveys?page=2&pageSize=5';
+  const other = '/api/sites/S2/surveys?page=1&pageSize=5';
+  const privateData = { items: [{ id: 'a', created_by: { email: 'private@example.test' } }], total: 1, page: 1 };
+  render(page1);
+  pending[0].resolve(privateData);
+  await flush();
+  assert.equal(render(page1).data.items[0].created_by.email, 'private@example.test');
+  assert.equal(render(page2).data, undefined);
+  assert.equal(pending[0].signal.aborted, true);
+  assert.equal(render(other).data, undefined);
+  pending[1].resolve(privateData);
+  await flush();
+  assert.equal(render(other).data, undefined, 'late old-page response must not show');
+  generation = 2;
+  session = null;
+  assert.equal(render(other).data, undefined);
+  pending[2].resolve(privateData);
+  await flush();
+  assert.equal(render(other).data, undefined, 'late signed-in response must not show');
+  pending[3].resolve(privateData);
+  await flush();
+  assert.equal(render(other).data.items[0].created_by, undefined);
+});
+
+for (const kind of ['history', 'list']) {
+  test(`${kind} pagination preserves host instances and keyboard focus through loading and boundaries`, () => {
+    const w = historyWorkspace();
+    const label = kind === 'history' ? 'หน้าประวัติการสำรวจ' : 'หน้ารายการแหล่ง';
+    if (kind === 'history') mapNode(w.render()).props.onSelect('S1');
+    const set = (value) => (kind === 'history' ? w.setHistory(value) : w.setResource('/api/sites?', value));
+    const pageSize = kind === 'history' ? 5 : mapState.PAGE_SIZE;
+    const total = pageSize * 3;
+    set({ data: { items: [], total, page: 1 }, loading: false });
+    w.render(); // commit pagination metadata
+    let tree = w.render();
+    const getNav = () => tree.find((node) => node.props?.['aria-label'] === label);
+    const getButtons = () => nodes(getNav()).filter((node) => node.type === 'button');
+    const navHost = w.host(getNav());
+    const buttonHosts = getButtons().map(w.host);
+    assert.equal(getButtons()[0].props.disabled, true);
+    assert.equal(getButtons()[1].props.disabled, false);
+    const focused = getButtons()[1];
+    buttonHosts[1].focus();
+    focused.props.onClick();
+    set({ loading: true });
+    tree = w.render();
+    const loadingNav = getNav();
+    assert.ok(loadingNav, 'pagination must stay mounted');
+    const buttons = nodes(loadingNav).filter((node) => node.type === 'button');
+    assert.equal(w.host(loadingNav), navHost);
+    buttons.forEach((button, i) => assert.equal(w.host(button), buttonHosts[i]));
+    assert.ok(
+      buttons.every((button) => !button.props.disabled),
+      'loading must not natively disable buttons',
+    );
+    assert.ok(buttons.every((button) => button.props['aria-disabled'] === true));
+    assert.equal(w.document.activeElement, buttonHosts[1]);
+    const pageLabel = nodes(loadingNav).find((node) => node.type === 'span').props.children;
+    assert.deepEqual(Array.from(pageLabel), ['หน้า ', 1, ' / ', 3]);
+    for (const button of buttons) {
+      button.props.onClick();
+      tree = w.render();
+      assert.ok(
+        w.calls.some(({ url }) => url?.includes(kind === 'history' ? '/surveys?page=2&' : '/api/sites?page=2&')),
+      );
+    }
+    set({ data: { items: [], total, page: 2 }, loading: false });
+    tree = w.render();
+    assert.equal(w.host(getNav()), navHost);
+    assert.equal(w.host(getButtons()[1]), buttonHosts[1]);
+    assert.equal(w.document.activeElement, buttonHosts[1]);
+    getButtons()[1].props.onClick();
+    set({ loading: true });
+    tree = w.render();
+    assert.equal(w.document.activeElement, buttonHosts[1]);
+    set({ data: { items: [], total, page: 3 }, loading: false });
+    tree = w.render();
+    assert.equal(w.host(getButtons()[1]), buttonHosts[1]);
+    assert.equal(getButtons()[1].props.disabled, true);
+    assert.equal(w.document.activeElement, buttonHosts[0], 'last page transfers focus to Previous');
+    getButtons()[0].props.onClick();
+    set({ loading: true });
+    tree = w.render();
+    set({ data: { items: [], total, page: 2 }, loading: false });
+    tree = w.render();
+    getButtons()[0].props.onClick();
+    set({ loading: true });
+    tree = w.render();
+    set({ data: { items: [], total, page: 1 }, loading: false });
+    tree = w.render();
+    assert.equal(getButtons()[0].props.disabled, true);
+    assert.equal(w.document.activeElement, buttonHosts[1], 'first page transfers focus to Next');
+    getButtons()[1].props.onClick();
+    set({ loading: true });
+    tree = w.render();
+    // Leaving the nav while waiting must not steal focus back on completion.
+    const outside = w.host(tree.find((node) => node.type === 'input'));
+    outside.focus();
+    set({ data: { items: [], total: pageSize + 1, page: 2 }, loading: false });
+    tree = w.render();
+    assert.equal(w.document.activeElement, outside);
+    // A changed total can leave neither direction enabled: focus the status.
+    buttonHosts[0].focus();
+    getButtons()[0].props.onClick();
+    set({ loading: true });
+    tree = w.render();
+    set({ data: { items: [], total: 0, page: 1 }, loading: false });
+    tree = w.render();
+    assert.equal(w.document.activeElement, w.host(nodes(getNav()).find((node) => node.type === 'span')));
+  });
+}
+
+test('survey-only data reports a displayed collection', () => {
+  const displayed = [];
+  const h = mapHarness({}, (value, layer) => displayed.push([value, layer]));
+  h.render(undefined, { surveys: { type: 'FeatureCollection', features: [] } });
+  assert.deepEqual(displayed, [
+    [false, undefined],
+    [true, 'surveys'],
+  ]);
+});
+
+test('list pagination ignores clicks and is aria-disabled while a filter validation error exists', () => {
+  const w = historyWorkspace();
+  const total = mapState.PAGE_SIZE * 3;
+  w.setResource('/api/sites?', { data: { items: [], total, page: 1 }, loading: false });
+  let tree = w.render();
+  const getNav = () => tree.find((node) => node.props?.['aria-label'] === 'หน้ารายการแหล่ง');
+  const getButtons = () => nodes(getNav()).filter((node) => node.type === 'button');
+  assert.equal(getButtons()[1].props.disabled, false);
+  tree.find((node) => node.type === 'input').props.onChange({ target: { value: '\0' } });
+  tree = w.render();
+  assert.ok(tree.some((node) => node.props?.className === 'filter-error'));
+  assert.ok(getButtons().every((button) => button.props['aria-disabled'] === true));
+  w.calls.length = 0;
+  getButtons()[1].props.onClick();
+  tree = w.render();
+  assert.equal(
+    w.calls.some(({ url }) => url?.includes('/api/sites?page=2&')),
+    false,
+    'validation error must block list pagination clicks',
+  );
+});
+
+test('cursor stays a pointer moving from a survey point to a polygon, and clears over water', () => {
+  const { map } = mapHarness();
+  for (const properties of [{ site_code: 'S1' }, { code: 'S2' }]) {
+    map.clickedFeatures = [{ properties }];
+    map.emit('mousemove', { point: {} });
+    assert.equal(map.getCanvas().style.cursor, 'pointer');
+  }
+  map.clickedFeatures = [];
+  map.emit('mousemove', { point: {} });
+  assert.equal(map.getCanvas().style.cursor, '');
+});
+
+test('layer failures share one named banner and retry only failing layers with accurate stale copy', () => {
+  const w = historyWorkspace();
+  mapNode(w.render()).props.onViewport([98, 6, 101, 10]);
+  const pointsUrl = '/api/surveys.geojson?';
+  const sitesUrl = '/api/sites.geojson?';
+  const failure = (tree) => tree.filter((node) => typeof node.type === 'function' && node.props?.error);
+  const retries = () =>
+    [sitesUrl, pointsUrl].map((prefix) => w.calls.find((call) => call.url?.startsWith(prefix)).retry);
+  mapNode(w.render()).props.onDisplayChange(true, 'sites');
+  mapNode(w.render()).props.onDisplayChange(true, 'surveys');
+  w.setResource(sitesUrl, { data: { type: 'FeatureCollection', features: [] }, loading: false });
+  w.setResource(pointsUrl, { error: new Error('offline'), loading: false });
+  let tree = w.render();
+  assert.equal(failure(tree).length, 1);
+  assert.equal(failure(tree)[0].props.error.message, 'โหลดจุดสำรวจไม่สำเร็จ');
+  const progress = tree.find((node) => node.props?.className === 'map-progress').props.children;
+  assert.match(progress, /จุดสำรวจเดิม/);
+  assert.doesNotMatch(progress, /พื้นที่เดิม/);
+  const before = retries();
+  failure(tree)[0].props.retry();
+  w.render();
+  assert.deepEqual(retries(), [before[0], before[1] + 1]);
+  w.setResource(sitesUrl, { error: new Error('offline'), loading: false });
+  tree = w.render();
+  assert.equal(failure(tree).length, 1);
+  assert.equal(failure(tree)[0].props.error.message, 'โหลดพื้นที่และจุดสำรวจไม่สำเร็จ');
+  const bothBefore = retries();
+  failure(tree)[0].props.retry();
+  w.render();
+  assert.deepEqual(
+    retries(),
+    bothBefore.map((value) => value + 1),
+  );
+  const legend = tree.find((node) => node.props?.['aria-label'] === 'คำอธิบายแผนที่');
+  assert.ok(legend);
+  const entries = nodes(legend).filter((node) => node.type === 'li');
+  assert.ok(entries.every((entry) => entry.props.children.props));
+});
+
+test('history 404 before detail resolves does not flash a retry banner', () => {
+  const w = historyWorkspace();
+  mapNode(w.render()).props.onSelect('missing');
+  w.setResource('/api/sites/missing', { loading: true });
+  w.setHistory({ error: new ApiError(404), loading: false });
+  assert.equal(
+    w.render().some((node) => typeof node.type === 'function' && node.props?.error),
+    false,
+  );
 });

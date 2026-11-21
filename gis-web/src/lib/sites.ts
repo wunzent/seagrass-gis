@@ -1,4 +1,4 @@
-import type { Feature, FeatureCollection, MultiPolygon, Polygon } from 'geojson';
+import type { Feature, FeatureCollection, MultiPolygon, Point, Polygon } from 'geojson';
 import type { Status } from './map-state';
 
 export type Site = {
@@ -15,6 +15,19 @@ export type SiteProperties = Site & {
 export type SiteFeature = Feature<Polygon | MultiPolygon, SiteProperties>;
 export type SitesGeoJSON = FeatureCollection<Polygon | MultiPolygon, SiteProperties>;
 export type SiteList = { items: Site[]; total: number; page: number };
+export type ProvinceCollection = FeatureCollection<Polygon | MultiPolygon, { code: string; name_th: string }>;
+export type Survey = {
+  id: string;
+  lon: number;
+  lat: number;
+  surveyed_on: string;
+  cover_percent: number;
+  species: string[];
+  note: string | null;
+  created_by?: { id: string; email: string };
+};
+export type SurveysGeoJSON = FeatureCollection<Point, Survey & { site_code: string }>;
+export type SurveyList = { items: Survey[]; total: number; page: number };
 
 export class ApiError extends Error {
   status: number;

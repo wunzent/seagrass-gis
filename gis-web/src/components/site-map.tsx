@@ -8,8 +8,14 @@ import {
   type GeoJSONSource,
   type ExpressionSpecification,
 } from 'maplibre-gl';
-import { debounce, statuses, validBbox, type Bbox } from '../lib/map-state';
-import { geometryBounds, type SiteFeature, type SitesGeoJSON } from '../lib/sites';
+import { debounce, statuses, SURVEY_POINT_COLOR, validBbox, type Bbox } from '../lib/map-state';
+import {
+  geometryBounds,
+  type ProvinceCollection,
+  type SurveysGeoJSON,
+  type SiteFeature,
+  type SitesGeoJSON,
+} from '../lib/sites';
 
 // Served from public/ by scripts/copy-maplibre-worker.mjs; the default URL is relative to the bundled chunk and 404s.
 setWorkerUrl('/maplibre/maplibre-gl-worker.mjs');
@@ -17,13 +23,15 @@ setWorkerUrl('/maplibre/maplibre-gl-worker.mjs');
 const empty: SitesGeoJSON = { type: 'FeatureCollection', features: [] };
 type Props = {
   data?: SitesGeoJSON;
+  provinces?: ProvinceCollection;
+  surveys?: SurveysGeoJSON;
   selection?: SiteFeature;
   onSelect: (code: string) => void;
   onViewport: (box: Bbox | null) => void;
-  onDisplayChange?: (displayed: boolean) => void;
+  onDisplayChange?: (displayed: boolean, layer?: 'sites' | 'surveys') => void;
 };
 
-export default function SiteMap({ data, selection, onSelect, onViewport, onDisplayChange }: Props) {
+export default function SiteMap({ data, provinces, surveys, selection, onSelect, onViewport, onDisplayChange }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | null>(null);
   const camera = useRef<{ center: [number, number]; zoom: number }>({ center: [99.2, 8.1], zoom: 6.2 });
@@ -75,6 +83,13 @@ export default function SiteMap({ data, selection, onSelect, onViewport, onDispl
           attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         });
         instance.addLayer({ id: 'basemap', type: 'raster', source: 'basemap' });
+        instance.addSource('provinces', { type: 'geojson', data: empty });
+        instance.addLayer({
+          id: 'provinces-line',
+          type: 'line',
+          source: 'provinces',
+          paint: { 'line-color': '#64748b', 'line-width': 1.5 },
+        });
         instance.addSource('sites', { type: 'geojson', data: empty });
         const colors: ExpressionSpecification = [
           'match',
@@ -108,15 +123,30 @@ export default function SiteMap({ data, selection, onSelect, onViewport, onDispl
           filter: ['==', ['get', 'code'], ''],
           paint: { 'line-color': '#081c22', 'line-width': 4 },
         });
-        instance.on('click', 'sites-fill', (event) => {
-          const code = event.features?.[0]?.properties?.code;
+        instance.addSource('surveys', { type: 'geojson', data: empty });
+        instance.addLayer({
+          id: 'surveys-circle',
+          type: 'circle',
+          source: 'surveys',
+          paint: {
+            'circle-color': SURVEY_POINT_COLOR,
+            'circle-radius': 5,
+            'circle-stroke-color': '#ffffff',
+            'circle-stroke-width': 1.5,
+          },
+        });
+        // Resolve the topmost feature once so a point over another site's polygon wins.
+        instance.on('click', (event) => {
+          const feature = instance.queryRenderedFeatures(event.point, { layers: ['surveys-circle', 'sites-fill'] })[0];
+          const code = feature?.properties?.site_code ?? feature?.properties?.code;
           if (typeof code === 'string') callbacks.current.onSelect(code);
         });
-        instance.on('mouseenter', 'sites-fill', () => {
-          instance.getCanvas().style.cursor = 'pointer';
-        });
-        instance.on('mouseleave', 'sites-fill', () => {
-          instance.getCanvas().style.cursor = '';
+        instance.on('mousemove', (event) => {
+          instance.getCanvas().style.cursor = instance.queryRenderedFeatures(event.point, {
+            layers: ['surveys-circle', 'sites-fill'],
+          }).length
+            ? 'pointer'
+            : '';
         });
         setReady(true);
         updateViewport.run(undefined);
@@ -164,8 +194,17 @@ export default function SiteMap({ data, selection, onSelect, onViewport, onDispl
   useEffect(() => {
     if (!ready || !data) return;
     (map.current?.getSource('sites') as GeoJSONSource | undefined)?.setData(data);
-    callbacks.current.onDisplayChange?.(true);
+    callbacks.current.onDisplayChange?.(true, 'sites');
   }, [data, ready]);
+  useEffect(() => {
+    if (!ready || !provinces) return;
+    (map.current?.getSource('provinces') as GeoJSONSource | undefined)?.setData(provinces);
+  }, [provinces, ready]);
+  useEffect(() => {
+    if (!ready || !surveys) return;
+    (map.current?.getSource('surveys') as GeoJSONSource | undefined)?.setData(surveys);
+    callbacks.current.onDisplayChange?.(true, 'surveys');
+  }, [surveys, ready]);
   useEffect(() => {
     const instance = map.current;
     if (!instance || !ready) return;

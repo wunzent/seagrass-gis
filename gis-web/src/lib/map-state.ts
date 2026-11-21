@@ -1,3 +1,5 @@
+export const SURVEY_POINT_COLOR = '#075985';
+
 export const statuses = {
   very_good: { label: 'ดีมาก', color: '#166534' },
   good: { label: 'ดี', color: '#22a447' },

@@ -39,10 +39,53 @@ export function componentHarness(path, mocks = {}, globals = {}) {
       }
     },
   };
+  react.useLayoutEffect = react.useEffect;
   const file = new URL(path, import.meta.url);
   const require = createRequire(file);
   const exports = {};
-  const jsx = (type, props) => ({ type, props });
+  const hosts = new WeakMap();
+  let mounted;
+  // Optional host simulation: preserve identity by React type/key/child position,
+  // including fragments, and model native disabling dropping keyboard focus.
+  const reconcile = (value, previous, parent) => {
+    const type = Array.isArray(value) ? 'array' : value?.type;
+    if (!type) return;
+    const key = value.key;
+    const current = previous?.type === type && previous.key === key ? previous : { type, key };
+    current.parent = parent;
+    current.props = value.props;
+    if (typeof type === 'string' && type !== 'fragment' && type !== 'array') {
+      current.host ??= {
+        tagName: type.toUpperCase(),
+        focus() {
+          const old = globals.document.activeElement;
+          globals.document.activeElement = this;
+          old?.dispatch?.('onBlurCapture', { target: old, relatedTarget: this });
+          this.dispatch('onFocusCapture', { target: this });
+        },
+        dispatch(name, event) {
+          for (let ancestor = current; ancestor; ancestor = ancestor.parent) ancestor.props?.[name]?.(event);
+        },
+        querySelector(selector) {
+          const descendants = (node) => (node ? [node, ...(node.children ?? []).flatMap(descendants)] : []);
+          return descendants(current).find((node) =>
+            selector === 'button:not(:disabled)' ? node.type === 'button' && !node.host.disabled : node.type === 'span',
+          )?.host;
+        },
+      };
+      current.host.disabled = Boolean(value.props.disabled);
+      if (current.host.disabled && globals.document.activeElement === current.host) {
+        globals.document.activeElement = globals.document.body;
+        current.host.dispatch('onBlurCapture', { target: current.host, relatedTarget: null });
+      }
+      hosts.set(value, current.host);
+      if (value.props.ref) value.props.ref.current = current.host;
+    }
+    const children = Array.isArray(value) ? value : [value.props?.children];
+    current.children = children.map((child, i) => reconcile(child, current.children?.[i], current));
+    return current;
+  };
+  const jsx = (type, props, key) => ({ type, props, key });
   const code = ts.transpileModule(readFileSync(file, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 },
   }).outputText;
@@ -55,11 +98,13 @@ export function componentHarness(path, mocks = {}, globals = {}) {
   runInNewContext(code, { exports, require: load, console, Error, ...globals });
   return {
     exports,
+    host: (node) => hosts.get(node),
     render(fn) {
       cursor = 0;
       effects = [];
       const tree = fn();
-      for (const node of nodes(tree)) if (node.props?.ref) node.props.ref.current = {};
+      if (globals.document) mounted = reconcile(tree, mounted);
+      else for (const node of nodes(tree)) if (node.props?.ref) node.props.ref.current = {};
       effects.forEach((effect) => effect());
       return tree;
     },

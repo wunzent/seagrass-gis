@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FocusEvent } from 'react';
 import { Button } from './ui/button';
 import { useResource } from './use-resource';
 import { useSession } from './session-provider';
@@ -13,13 +13,22 @@ import {
   listQuery,
   mapQuery,
   PAGE_SIZE,
+  SURVEY_POINT_COLOR,
   statuses,
   type Bbox,
   type Filters,
   type ListState,
   type Status,
 } from '../lib/map-state';
-import { ApiError, type SiteFeature, type SiteList, type SitesGeoJSON } from '../lib/sites';
+import {
+  ApiError,
+  type ProvinceCollection,
+  type SurveyList,
+  type SurveysGeoJSON,
+  type SiteFeature,
+  type SiteList,
+  type SitesGeoJSON,
+} from '../lib/sites';
 
 const SiteMap = dynamic(() => import('./site-map'), {
   ssr: false,
@@ -29,11 +38,36 @@ const SiteMap = dynamic(() => import('./site-map'), {
     </p>
   ),
 });
-type ProvinceCollection = {
-  type: 'FeatureCollection';
-  features: { properties: { code: string; name_th: string } }[];
-};
+const HISTORY_PAGE_SIZE = 5;
 const number = new Intl.NumberFormat('th-TH', { maximumFractionDigits: 2 });
+
+function usePaginationFocus(loading: boolean, page: number, total: number | undefined) {
+  const ref = useRef<HTMLElement>(null);
+  const focused = useRef<HTMLButtonElement | null>(null);
+  useLayoutEffect(() => {
+    const button = focused.current;
+    // Native disabling can already have sent focus to body during this commit.
+    if (
+      !loading &&
+      button?.disabled &&
+      (document.activeElement === button || document.activeElement === document.body)
+    ) {
+      const target =
+        ref.current?.querySelector<HTMLElement>('button:not(:disabled)') ??
+        ref.current?.querySelector<HTMLElement>('span');
+      target?.focus();
+    }
+  }, [loading, page, total]);
+  return {
+    ref,
+    onFocusCapture(event: FocusEvent<HTMLElement>) {
+      focused.current = event.target.tagName === 'BUTTON' ? (event.target as HTMLButtonElement) : null;
+    },
+    onBlurCapture(event: FocusEvent<HTMLElement>) {
+      if (event.relatedTarget || !(event.target as HTMLButtonElement).disabled) focused.current = null;
+    },
+  };
+}
 
 function StatusLabel({ status }: { status: Status }) {
   const value = statuses[status] ?? statuses.no_data;
@@ -69,7 +103,12 @@ function MapContent() {
   const [tab, setTab] = useState<'map' | 'table'>('map');
   const [listRetry, setListRetry] = useState(0);
   const [mapRetry, setMapRetry] = useState(0);
+  const [surveysRetry, setSurveysRetry] = useState(0);
   const [detailRetry, setDetailRetry] = useState(0);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyRetry, setHistoryRetry] = useState(0);
+  const [listPagination, setListPagination] = useState<{ total: number; page: number }>();
+  const [historyPagination, setHistoryPagination] = useState<{ code: string | null; total: number; page: number }>();
   const commitFilters = useMemo(
     () => debounce<Filters>((filters) => setState((previous) => filterState(previous, filters))),
     [],
@@ -90,8 +129,28 @@ function MapContent() {
     !pending && bbox ? `/api/sites.geojson?${mapQuery(state.filters, bbox)}` : null,
     mapRetry,
   );
-  const [displayedCollection, setDisplayedCollection] = useState(false);
+  const surveys = useResource<SurveysGeoJSON>(
+    !pending && bbox ? `/api/surveys.geojson?${mapQuery(state.filters, bbox)}` : null,
+    surveysRetry,
+  );
+  const [displayedLayers, setDisplayedLayers] = useState({ sites: false, surveys: false });
+  const onDisplayChange = useCallback((displayed: boolean, layer: 'sites' | 'surveys' = 'sites') => {
+    setDisplayedLayers((previous) => (displayed ? { ...previous, [layer]: true } : { sites: false, surveys: false }));
+  }, []);
   const detail = useResource<SiteFeature>(code ? `/api/sites/${encodeURIComponent(code)}` : null, detailRetry);
+  const history = useResource<SurveyList>(
+    code ? `/api/sites/${encodeURIComponent(code)}/surveys?page=${historyPage}&pageSize=${HISTORY_PAGE_SIZE}` : null,
+    historyRetry,
+  );
+  useEffect(() => {
+    if (list.data) setListPagination({ total: list.data.total, page: list.data.page });
+  }, [list.data]);
+  useEffect(() => {
+    if (history.data) setHistoryPagination({ code, total: history.data.total, page: history.data.page });
+  }, [history.data, code]);
+  const listPages = list.data ?? listPagination;
+  const historyPages = history.data ?? (historyPagination?.code === code ? historyPagination : undefined);
+  const historyMissing = history.error instanceof ApiError && history.error.status === 404;
   const missing = detail.error instanceof ApiError && detail.error.status === 404;
   useEffect(() => {
     if (missing) {
@@ -103,6 +162,7 @@ function MapContent() {
   const select = useCallback((value: string) => {
     setSelectionNotice('');
     setCode(value);
+    setHistoryPage(1);
     setDetailRetry((n) => n + 1);
   }, []);
 
@@ -121,9 +181,21 @@ function MapContent() {
     setSelectionNotice('');
   }
   const loadingList = !validation && (pending || list.loading);
-  const loadingMap = !validation && (pending || !bbox || geojson.loading);
+  const listInert = loadingList || Boolean(validation);
+  const listFocus = usePaginationFocus(loadingList, state.page, listPages?.total);
+  const historyFocus = usePaginationFocus(history.loading, historyPage, historyPages?.total);
+  const loadingMap = !validation && (pending || !bbox || geojson.loading || surveys.loading);
   const selected = missing ? undefined : detail.data;
-  const staleNotice = displayedCollection ? 'พื้นที่เดิมอาจไม่ใช่ข้อมูลล่าสุด' : '';
+  const staleNotice = [
+    displayedLayers.sites && (pending || !bbox || geojson.loading || geojson.error || validation)
+      ? 'พื้นที่เดิมอาจไม่ใช่ข้อมูลล่าสุด'
+      : '',
+    displayedLayers.surveys && (pending || !bbox || surveys.loading || surveys.error || validation)
+      ? 'จุดสำรวจเดิมอาจไม่ใช่ข้อมูลล่าสุด'
+      : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <main className="workspace">
@@ -259,26 +331,36 @@ function MapContent() {
                   </table>
                 </div>
               )}
-              <nav className="pagination" aria-label="หน้ารายการแหล่ง">
-                <Button
-                  variant="outline"
-                  disabled={state.page <= 1}
-                  onClick={() => setState((previous) => ({ ...previous, page: previous.page - 1 }))}
-                >
-                  ก่อนหน้า
-                </Button>
-                <span>
-                  หน้า {state.page} / {Math.max(1, Math.ceil(list.data.total / PAGE_SIZE))}
-                </span>
-                <Button
-                  variant="outline"
-                  disabled={state.page * PAGE_SIZE >= list.data.total}
-                  onClick={() => setState((previous) => ({ ...previous, page: previous.page + 1 }))}
-                >
-                  ถัดไป
-                </Button>
-              </nav>
             </>
+          )}
+          {listPages && (
+            <nav key="list-pagination" className="pagination" aria-label="หน้ารายการแหล่ง" {...listFocus}>
+              <Button
+                variant="outline"
+                disabled={!loadingList && state.page <= 1}
+                aria-disabled={listInert || state.page <= 1}
+                onClick={() => {
+                  if (listInert || state.page <= 1) return;
+                  setState((previous) => ({ ...previous, page: previous.page - 1 }));
+                }}
+              >
+                ก่อนหน้า
+              </Button>
+              <span tabIndex={-1}>
+                หน้า {listPages.page} / {Math.max(1, Math.ceil(listPages.total / PAGE_SIZE))}
+              </span>
+              <Button
+                variant="outline"
+                disabled={!loadingList && state.page * PAGE_SIZE >= listPages.total}
+                aria-disabled={listInert || state.page * PAGE_SIZE >= listPages.total}
+                onClick={() => {
+                  if (listInert || state.page * PAGE_SIZE >= listPages.total) return;
+                  setState((previous) => ({ ...previous, page: previous.page + 1 }));
+                }}
+              >
+                ถัดไป
+              </Button>
+            </nav>
           )}
         </section>
         <section
@@ -291,24 +373,48 @@ function MapContent() {
             <span className="map-progress" aria-live="polite" aria-atomic="true">
               {loadingMap
                 ? `กำลังปรับขอบเขต / โหลดข้อมูล…${staleNotice ? ` ${staleNotice}` : ''}`
-                : geojson.error || validation
+                : geojson.error || surveys.error || validation
                   ? staleNotice
                   : geojson.data
                     ? `${geojson.data.features.length} แหล่งในมุมมอง`
                     : ''}
             </span>
           </div>
-          {geojson.error && <Failure error={geojson.error} retry={() => setMapRetry((n) => n + 1)} />}
+          {(geojson.error || surveys.error) && (
+            <Failure
+              error={
+                new Error(
+                  geojson.error && surveys.error
+                    ? 'โหลดพื้นที่และจุดสำรวจไม่สำเร็จ'
+                    : geojson.error
+                      ? 'โหลดพื้นที่ไม่สำเร็จ'
+                      : 'โหลดจุดสำรวจไม่สำเร็จ',
+                )
+              }
+              retry={() => {
+                if (geojson.error) setMapRetry((n) => n + 1);
+                if (surveys.error) setSurveysRetry((n) => n + 1);
+              }}
+            />
+          )}
           <div className="map-container">
             <SiteMap
               data={geojson.data}
+              provinces={provinceResource.data}
+              surveys={surveys.data}
               selection={selected}
               onSelect={select}
               onViewport={onViewport}
-              onDisplayChange={setDisplayedCollection}
+              onDisplayChange={onDisplayChange}
             />
           </div>
-          <ul className="legend" aria-label="คำอธิบายสถานะแหล่ง">
+          <ul className="legend" aria-label="คำอธิบายแผนที่">
+            <li>
+              <span className="status-label">
+                <span className="status-dot" style={{ backgroundColor: SURVEY_POINT_COLOR }} aria-hidden="true" />
+                จุดสำรวจ
+              </span>
+            </li>
             {Object.keys(statuses).map((status) => (
               <li key={status}>
                 <StatusLabel status={status as Status} />
@@ -374,8 +480,82 @@ function MapContent() {
                 </dd>
               </div>
             </dl>
-            <p className="history-note">ประวัติการสำรวจ: ยังไม่พร้อมให้บริการ</p>
           </div>
+        )}
+        {code && !missing && (
+          <section className="survey-history" aria-labelledby="history-heading" aria-busy={history.loading}>
+            <h3 id="history-heading">ประวัติการสำรวจ</h3>
+            {history.loading && <p role="status">กำลังโหลดประวัติการสำรวจ…</p>}
+            {history.error && !historyMissing && (
+              <Failure error={history.error} retry={() => setHistoryRetry((n) => n + 1)} />
+            )}
+            {history.data && (
+              <>
+                {!history.data.items.length ? (
+                  <p>ยังไม่มีข้อมูลการสำรวจ</p>
+                ) : (
+                  <ul className="history-list">
+                    {history.data.items.map((survey) => (
+                      <li key={survey.id}>
+                        <h4>
+                          วันที่สำรวจ <time dateTime={survey.surveyed_on}>{survey.surveyed_on}</time>
+                        </h4>
+                        <dl>
+                          <div>
+                            <dt>% ความครอบคลุม</dt>
+                            <dd>{number.format(survey.cover_percent)}%</dd>
+                          </div>
+                          <div>
+                            <dt>ชนิดหญ้าทะเล</dt>
+                            <dd>{survey.species.join(', ') || '—'}</dd>
+                          </div>
+                          <div>
+                            <dt>หมายเหตุ</dt>
+                            <dd>{survey.note || '—'}</dd>
+                          </div>
+                          {survey.created_by && (
+                            <div>
+                              <dt>ผู้บันทึก</dt>
+                              <dd>{survey.created_by.email}</dd>
+                            </div>
+                          )}
+                        </dl>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            )}
+            {historyPages && !historyMissing && (
+              <nav key="history-pagination" className="pagination" aria-label="หน้าประวัติการสำรวจ" {...historyFocus}>
+                <Button
+                  variant="outline"
+                  disabled={!history.loading && historyPage <= 1}
+                  aria-disabled={history.loading || historyPage <= 1}
+                  onClick={() => {
+                    if (history.loading || historyPage <= 1) return;
+                    setHistoryPage((page) => page - 1);
+                  }}
+                >
+                  ก่อนหน้า
+                </Button>
+                <span tabIndex={-1}>
+                  หน้า {historyPages.page} / {Math.max(1, Math.ceil(historyPages.total / HISTORY_PAGE_SIZE))}
+                </span>
+                <Button
+                  variant="outline"
+                  disabled={!history.loading && historyPage * HISTORY_PAGE_SIZE >= historyPages.total}
+                  aria-disabled={history.loading || historyPage * HISTORY_PAGE_SIZE >= historyPages.total}
+                  onClick={() => {
+                    if (history.loading || historyPage * HISTORY_PAGE_SIZE >= historyPages.total) return;
+                    setHistoryPage((page) => page + 1);
+                  }}
+                >
+                  ถัดไป
+                </Button>
+              </nav>
+            )}
+          </section>
         )}
       </section>
       <footer className="page-footer">

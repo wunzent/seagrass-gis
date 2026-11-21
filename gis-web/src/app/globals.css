@@ -304,12 +304,38 @@
     margin: 0;
     font-size: 0.9rem;
   }
-  .history-note {
-    grid-column: 1 / -1;
+  .survey-history {
+    min-width: 0;
     border-top: 1px solid #dfe7eb;
-    padding-top: 14px;
-    color: #4c6470;
-    font-size: 0.8rem;
+    padding: 16px;
+    overflow-wrap: anywhere;
+  }
+  .history-list {
+    list-style: none;
+    padding: 0;
+    margin: 12px 0;
+  }
+  .history-list li {
+    padding: 14px 0;
+    border-bottom: 1px solid #dfe7eb;
+  }
+  .history-list h4 {
+    margin: 0 0 8px;
+    font-weight: 700;
+    font-size: 0.85rem;
+  }
+  .history-list dl {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+    gap: 12px;
+    margin: 0;
+  }
+  .history-list dl > div {
+    min-width: 0;
+  }
+  .survey-history .pagination {
+    flex-wrap: wrap;
+    padding: 12px 0;
   }
   .page-footer {
     margin-top: 20px;
