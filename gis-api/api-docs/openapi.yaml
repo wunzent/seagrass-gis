@@ -15,6 +15,16 @@ paths:
     $ref: ./paths/sites_geojson.yaml
   /sites/{code}:
     $ref: ./paths/sites_code.yaml
+  /sites/{code}/surveys:
+    $ref: ./paths/sites_code_surveys.yaml
+  /surveys.geojson:
+    $ref: ./paths/surveys_geojson.yaml
+  /surveys/{id}:
+    $ref: ./paths/surveys_id.yaml
+  /provinces.geojson:
+    $ref: ./paths/provinces_geojson.yaml
+  /species:
+    $ref: ./paths/species.yaml
 info:
   title: Seagrass GIS API
   description: 'API ติดตามแหล่งหญ้าทะเล; write endpoints ใช้ HttpOnly cookie gis_access + Origin + X-CSRF-Protection: 1'
@@ -59,3 +69,31 @@ components:
       $ref: ./components/schemas/CreateSite.yaml
     UpdateSite:
       $ref: ./components/schemas/UpdateSite.yaml
+    SurveyCreator:
+      $ref: ./components/schemas/SurveyCreator.yaml
+    Survey:
+      $ref: ./components/schemas/Survey.yaml
+    SurveysPage:
+      $ref: ./components/schemas/SurveysPage.yaml
+    SurveyFeatureProperties:
+      $ref: ./components/schemas/SurveyFeatureProperties.yaml
+    SurveyFeature:
+      $ref: ./components/schemas/SurveyFeature.yaml
+    SurveyFeatureCollection:
+      $ref: ./components/schemas/SurveyFeatureCollection.yaml
+    CreateSurvey:
+      $ref: ./components/schemas/CreateSurvey.yaml
+    CreatedSurvey:
+      $ref: ./components/schemas/CreatedSurvey.yaml
+    UpdateSurvey:
+      $ref: ./components/schemas/UpdateSurvey.yaml
+    ProvinceProperties:
+      $ref: ./components/schemas/ProvinceProperties.yaml
+    ProvinceFeature:
+      $ref: ./components/schemas/ProvinceFeature.yaml
+    ProvinceFeatureCollection:
+      $ref: ./components/schemas/ProvinceFeatureCollection.yaml
+    Species:
+      $ref: ./components/schemas/Species.yaml
+    SpeciesList:
+      $ref: ./components/schemas/SpeciesList.yaml

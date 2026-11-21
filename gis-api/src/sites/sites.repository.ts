@@ -9,7 +9,7 @@ import { GeoJsonQuery, ListQuery, SiteFilters } from './entities/site.entity';
 const INPUT_GEOM = 'ST_SetSRID(ST_GeomFromGeoJSON($1), 4326)';
 
 // BR-04: status uses the unrounded AVG of every survey on the site's latest survey day; computed on read, never cached.
-const SITE_VIEW = `
+export const SITE_VIEW = `
   SELECT s.id, s.code, s.name, s.province_code, round(s.area_rai, 2)::float8 AS area_rai, s.version, s.geom,
     l.surveyed_on, round(l.average, 2)::float8 AS average_cover_percent, l.count,
     CASE WHEN l.average IS NULL THEN 'no_data' WHEN l.average >= 75 THEN 'very_good' WHEN l.average >= 50 THEN 'good'
@@ -25,7 +25,8 @@ const SITE_VIEW = `
 
 const escapeLike = (text: string) => text.replace(/[\\%_]/g, '\\$&');
 
-function where(filters: SiteFilters, params: unknown[]) {
+/** Site filter clauses on a SITE_VIEW aliased `v`; values are appended to `params` as placeholders. */
+export function siteFilterClauses(filters: SiteFilters, params: unknown[]) {
   const clauses: string[] = [];
   const add = (value: unknown) => {
     params.push(value);
@@ -54,7 +55,7 @@ export class SitesRepository {
 
   async list(query: ListQuery) {
     const params: unknown[] = [];
-    const clauses = where(query, params);
+    const clauses = siteFilterClauses(query, params);
     const filter = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
     const [countRow] = await this.run(`SELECT count(*)::int AS total FROM (${SITE_VIEW}) v ${filter}`, params);
     // Two statements without a shared snapshot: under a concurrent write total and items may briefly disagree (accepted, read-only list).
@@ -67,7 +68,10 @@ export class SitesRepository {
 
   async geojson(query: GeoJsonQuery) {
     const params: unknown[] = [...query.bbox];
-    const clauses = ['ST_Intersects(v.geom, ST_MakeEnvelope($1, $2, $3, $4, 4326))', ...where(query, params)];
+    const clauses = [
+      'ST_Intersects(v.geom, ST_MakeEnvelope($1, $2, $3, $4, 4326))',
+      ...siteFilterClauses(query, params),
+    ];
     const rows = await this.run(
       `SELECT v.*, ST_AsGeoJSON(v.geom)::json AS geometry FROM (${SITE_VIEW}) v WHERE ${clauses.join(' AND ')} ORDER BY v.code COLLATE "C" ASC`,
       params,
@@ -140,6 +144,22 @@ export class SitesRepository {
       code,
     ]);
     return (rows[0] as { id: string; version: number } | undefined) ?? null;
+  }
+
+  /** Survey writes: FOR SHARE conflicts with lockActive's FOR UPDATE (site delete/patch), so no survey lands on a deleted
+   * site and the 50 m check sees committed geometry; survey writes on one site do not block each other. */
+  async shareLockActive(tx: Queryable, key: { code: string } | { id: string }): Promise<{ id: string } | null> {
+    const [column, value] = 'code' in key ? ['code', key.code] : ['id', key.id];
+    const { rows } = await tx.query(`SELECT id FROM sites WHERE ${column} = $1 AND deleted_at IS NULL FOR SHARE`, [
+      value,
+    ]);
+    return (rows[0] as { id: string } | undefined) ?? null;
+  }
+
+  /** Read-only lookup of an active site id (public survey history). */
+  async activeIdByCode(code: string): Promise<string | null> {
+    const [row] = await this.run('SELECT id FROM sites WHERE code = $1 AND deleted_at IS NULL', [code]);
+    return (row?.id as string | undefined) ?? null;
   }
 
   async featureById(tx: Queryable, id: string): Promise<SiteRow> {

@@ -1,0 +1,67 @@
+get:
+  operationId: SurveysController_points
+  parameters:
+    - name: province
+      required: false
+      in: query
+      schema:
+        pattern: ^[0-9A-Za-z]{1,2}$
+        example: '81'
+        type: string
+    - name: status
+      required: false
+      in: query
+      schema:
+        type: string
+        enum:
+          - very_good
+          - good
+          - fair
+          - poor
+          - no_data
+    - name: q
+      required: false
+      in: query
+      description: ค้นหา code/name แบบ literal substring ไม่สนตัวพิมพ์
+      schema:
+        maxLength: 100
+        type: string
+    - name: bbox
+      required: true
+      in: query
+      description: minLon,minLat,maxLon,maxLat
+      schema:
+        example: 99,7,100,8
+        type: string
+  responses:
+    '200':
+      description: ''
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/SurveyFeatureCollection.yaml
+    '400':
+      description: INVALID_BBOX | VALIDATION_ERROR
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: INVALID_BBOX
+              message: ...
+              details: {}
+    '503':
+      description: SERVICE_UNAVAILABLE
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: SERVICE_UNAVAILABLE
+              message: ...
+              details: {}
+  summary: จุดสำรวจใน bbox ของแหล่งที่ใช้งาน กรองแบบเดียวกับ /sites.geojson (ใหม่สุดก่อน สูงสุด 5000 จุด)
+  tags:
+    - surveys

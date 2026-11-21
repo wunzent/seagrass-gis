@@ -1,0 +1,15 @@
+type: object
+properties:
+  type:
+    type: string
+    enum:
+      - Feature
+  geometry:
+    type: object
+    description: GeoJSON Point, SRID 4326, [lon,lat]
+  properties:
+    $ref: ./SurveyFeatureProperties.yaml
+required:
+  - type
+  - geometry
+  - properties

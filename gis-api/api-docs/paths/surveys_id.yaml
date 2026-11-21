@@ -1,0 +1,193 @@
+patch:
+  operationId: SurveysController_update
+  parameters:
+    - name: id
+      required: true
+      in: path
+      schema:
+        minimum: 1
+        example: 1
+        type: integer
+    - name: X-CSRF-Protection
+      in: header
+      required: true
+      schema:
+        type: string
+        enum:
+          - '1'
+    - name: Origin
+      in: header
+      description: ต้องตรงกับ PUBLIC_WEB_ORIGIN หรือ API_DOCS_ORIGIN
+      required: true
+      schema:
+        type: string
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/UpdateSurvey.yaml
+  responses:
+    '200':
+      description: ''
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Survey.yaml
+    '400':
+      description: VALIDATION_ERROR
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: ...
+              details: {}
+    '401':
+      description: UNAUTHORIZED
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: UNAUTHORIZED
+              message: ...
+              details: {}
+    '403':
+      description: FORBIDDEN | CSRF_REJECTED
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: FORBIDDEN
+              message: ...
+              details: {}
+    '404':
+      description: SURVEY_NOT_FOUND
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: SURVEY_NOT_FOUND
+              message: ...
+              details: {}
+    '422':
+      description: OUTSIDE_SITE
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: OUTSIDE_SITE
+              message: ...
+              details: {}
+    '503':
+      description: SERVICE_UNAVAILABLE
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: SERVICE_UNAVAILABLE
+              message: ...
+              details: {}
+  security:
+    - gis_access: []
+  summary: แก้ไขการสำรวจบางส่วน (editor/admin); ตรวจ record หลัง merge รวมระยะ 50 m
+  tags:
+    - surveys
+delete:
+  operationId: SurveysController_remove
+  parameters:
+    - name: id
+      required: true
+      in: path
+      schema:
+        minimum: 1
+        example: 1
+        type: integer
+    - name: X-CSRF-Protection
+      in: header
+      required: true
+      schema:
+        type: string
+        enum:
+          - '1'
+    - name: Origin
+      in: header
+      description: ต้องตรงกับ PUBLIC_WEB_ORIGIN หรือ API_DOCS_ORIGIN
+      required: true
+      schema:
+        type: string
+  responses:
+    '204':
+      description: No content
+    '400':
+      description: VALIDATION_ERROR
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: ...
+              details: {}
+    '401':
+      description: UNAUTHORIZED
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: UNAUTHORIZED
+              message: ...
+              details: {}
+    '403':
+      description: FORBIDDEN | CSRF_REJECTED
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: FORBIDDEN
+              message: ...
+              details: {}
+    '404':
+      description: SURVEY_NOT_FOUND
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: SURVEY_NOT_FOUND
+              message: ...
+              details: {}
+    '503':
+      description: SERVICE_UNAVAILABLE
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: SERVICE_UNAVAILABLE
+              message: ...
+              details: {}
+  security:
+    - gis_access: []
+  summary: ลบการสำรวจถาวร (editor/admin); status ของแหล่งคำนวณใหม่ตอนอ่านครั้งถัดไป
+  tags:
+    - surveys

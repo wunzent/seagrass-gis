@@ -1,0 +1,14 @@
+type: object
+properties:
+  code:
+    type: string
+    maxLength: 16
+    example: EA
+  name_th:
+    type: string
+  name_sci:
+    type: string
+required:
+  - code
+  - name_th
+  - name_sci

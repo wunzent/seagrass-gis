@@ -1,0 +1,175 @@
+get:
+  operationId: SurveysController_history
+  parameters:
+    - name: code
+      required: true
+      in: path
+      schema:
+        maxLength: 64
+        example: KBI-001
+        type: string
+    - name: page
+      required: false
+      in: query
+      schema:
+        minimum: 1
+        default: 1
+        type: integer
+    - name: pageSize
+      required: false
+      in: query
+      schema:
+        minimum: 1
+        maximum: 100
+        default: 20
+        type: integer
+  responses:
+    '200':
+      description: ''
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/SurveysPage.yaml
+    '400':
+      description: VALIDATION_ERROR
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: ...
+              details: {}
+    '404':
+      description: SITE_NOT_FOUND
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: SITE_NOT_FOUND
+              message: ...
+              details: {}
+    '503':
+      description: SERVICE_UNAVAILABLE
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: SERVICE_UNAVAILABLE
+              message: ...
+              details: {}
+  summary: ประวัติการสำรวจของแหล่ง เรียง surveyed_on DESC, id DESC (created_by เฉพาะผู้ login)
+  tags:
+    - surveys
+post:
+  operationId: SurveysController_create
+  parameters:
+    - name: code
+      required: true
+      in: path
+      schema:
+        maxLength: 64
+        example: KBI-001
+        type: string
+    - name: X-CSRF-Protection
+      in: header
+      required: true
+      schema:
+        type: string
+        enum:
+          - '1'
+    - name: Origin
+      in: header
+      description: ต้องตรงกับ PUBLIC_WEB_ORIGIN หรือ API_DOCS_ORIGIN
+      required: true
+      schema:
+        type: string
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/CreateSurvey.yaml
+  responses:
+    '201':
+      description: ''
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/CreatedSurvey.yaml
+    '400':
+      description: VALIDATION_ERROR
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: ...
+              details: {}
+    '401':
+      description: UNAUTHORIZED
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: UNAUTHORIZED
+              message: ...
+              details: {}
+    '403':
+      description: FORBIDDEN | CSRF_REJECTED
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: FORBIDDEN
+              message: ...
+              details: {}
+    '404':
+      description: SITE_NOT_FOUND
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: SITE_NOT_FOUND
+              message: ...
+              details: {}
+    '422':
+      description: OUTSIDE_SITE
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: OUTSIDE_SITE
+              message: ...
+              details: {}
+    '503':
+      description: SERVICE_UNAVAILABLE
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: SERVICE_UNAVAILABLE
+              message: ...
+              details: {}
+  security:
+    - gis_access: []
+  summary: 'บันทึกการสำรวจ (editor/admin): จุดต้องห่างแหล่งไม่เกิน 50 m; ตอบ status ของแหล่งหลังบันทึก'
+  tags:
+    - surveys

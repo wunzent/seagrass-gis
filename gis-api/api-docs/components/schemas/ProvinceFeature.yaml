@@ -1,0 +1,15 @@
+type: object
+properties:
+  type:
+    type: string
+    enum:
+      - Feature
+  geometry:
+    type: object
+    description: GeoJSON MultiPolygon, SRID 4326, [lon,lat] (ขอบเขตจำลองจาก seed)
+  properties:
+    $ref: ./ProvinceProperties.yaml
+required:
+  - type
+  - geometry
+  - properties

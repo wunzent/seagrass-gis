@@ -66,15 +66,20 @@ export function bangkokToday(now = new Date()): string {
     day: '2-digit',
   }).format(now);
 }
+/** BR-05 date (importer and API): YYYY-MM-DD, a real calendar date (no year 0000), not later than `today`. */
+export function isSurveyDate(date: unknown, today = bangkokToday()): date is string {
+  return (
+    typeof date === 'string' &&
+    /^\d{4}-\d{2}-\d{2}$/.test(date) &&
+    !date.startsWith('0000-') &&
+    Number.isFinite(Date.parse(`${date}T00:00:00Z`)) &&
+    new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) === date &&
+    date <= today
+  );
+}
 export function validateSurvey(row: Record<string, string>, known: Set<string>, today = bangkokToday()) {
   const date = row.surveyed_on;
-  if (
-    !/^\d{4}-\d{2}-\d{2}$/.test(date ?? '') ||
-    date.startsWith('0000-') ||
-    !Number.isFinite(Date.parse(`${date}T00:00:00Z`)) ||
-    new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date ||
-    date > today
-  )
+  if (!isSurveyDate(date, today))
     reject('INVALID_DATE', 'Survey date must be a real calendar date not later than today in Asia/Bangkok');
   function numeric(value: string, field: string) {
     if (typeof value !== 'string' || !value.trim() || !Number.isFinite(Number(value)))

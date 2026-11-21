@@ -1,0 +1,35 @@
+get:
+  operationId: LookupsController_provinces
+  parameters: []
+  responses:
+    '200':
+      description: ''
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ProvinceFeatureCollection.yaml
+    '400':
+      description: VALIDATION_ERROR
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: ...
+              details: {}
+    '503':
+      description: SERVICE_UNAVAILABLE
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: SERVICE_UNAVAILABLE
+              message: ...
+              details: {}
+  summary: ขอบเขตจังหวัด (ข้อมูลจำลองจาก seed) เรียง code
+  tags:
+    - lookups

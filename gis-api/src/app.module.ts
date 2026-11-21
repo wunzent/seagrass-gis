@@ -10,7 +10,9 @@ import { HealthModule } from './health/health.module';
 import { SafeErrorFilter } from './shared/filters/http-exception.filter';
 import { setupDocs } from './shared/openapi/openapi';
 import { createValidationPipe } from './shared/pipes/strict-validation.pipe';
+import { LookupsModule } from './lookups/lookups.module';
 import { SitesModule } from './sites/sites.module';
+import { SurveysModule } from './surveys/surveys.module';
 
 export interface AppOptions {
   auth?: AuthConfig;
@@ -33,6 +35,8 @@ export function appModule(database: Database, options: AppOptions = {}) {
       AuthModule.forRoot({ config: options.auth ?? localAuth(), loginLimit: options.loginLimit }),
       HealthModule,
       SitesModule,
+      SurveysModule,
+      LookupsModule,
     ],
     providers: [
       { provide: APP_FILTER, useClass: SafeErrorFilter },

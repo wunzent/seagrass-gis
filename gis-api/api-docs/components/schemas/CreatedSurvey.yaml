@@ -1,0 +1,46 @@
+type: object
+properties:
+  id:
+    type: integer
+    minimum: 1
+  lon:
+    type: number
+  lat:
+    type: number
+  surveyed_on:
+    type: string
+    format: date
+  cover_percent:
+    type: number
+    minimum: 0
+    maximum: 100
+  species:
+    description: รหัสชนิด เรียงตาม code
+    type: array
+    items:
+      type: string
+  note:
+    type: string
+    nullable: true
+  created_by:
+    description: มีเฉพาะผู้เรียกที่ login แล้ว (viewer/editor/admin); anonymous ไม่มี field นี้
+    allOf:
+      - $ref: ./SurveyCreator.yaml
+  siteStatus:
+    type: string
+    enum:
+      - very_good
+      - good
+      - fair
+      - poor
+      - no_data
+    description: status ของแหล่งหลังบันทึก (BR-04)
+required:
+  - id
+  - lon
+  - lat
+  - surveyed_on
+  - cover_percent
+  - species
+  - note
+  - siteStatus

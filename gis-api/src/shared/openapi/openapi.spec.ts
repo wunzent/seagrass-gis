@@ -42,15 +42,22 @@ describe('api docs', () => {
       );
       expect(operations.map(([k]) => k).sort()).toEqual([
         'DELETE /sites/{code}',
+        'DELETE /surveys/{id}',
         'GET /auth/me',
         'GET /health',
+        'GET /provinces.geojson',
         'GET /sites',
         'GET /sites.geojson',
         'GET /sites/{code}',
+        'GET /sites/{code}/surveys',
+        'GET /species',
+        'GET /surveys.geojson',
         'PATCH /sites/{code}',
+        'PATCH /surveys/{id}',
         'POST /auth/login',
         'POST /auth/logout',
         'POST /sites',
+        'POST /sites/{code}/surveys',
       ]);
       for (const [key, op] of operations) {
         expect([key, Boolean(op.summary)]).toEqual([key, true]);

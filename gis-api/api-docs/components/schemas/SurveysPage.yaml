@@ -1,0 +1,14 @@
+type: object
+properties:
+  items:
+    type: array
+    items:
+      $ref: ./Survey.yaml
+  total:
+    type: integer
+  page:
+    type: integer
+required:
+  - items
+  - total
+  - page
