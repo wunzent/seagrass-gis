@@ -36,7 +36,7 @@ test:
     - npm run build
     - npm run typecheck
 
-image:
+docker-image:
   stage: build
   image: docker:27.5.1
   timeout: 20m
