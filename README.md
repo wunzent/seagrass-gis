@@ -31,9 +31,9 @@ seagrass-gis/
 | 4 Surveys | CRUD survey, history, `/surveys.geojson`, `/provinces.geojson`, `/species` | real PostGIS e2e |
 | 5 Auth | login/me/logout, HttpOnly cookie JWT 15 นาที, session revocation, CSRF, roles viewer/editor/admin | e2e + Docker smoke |
 | 6 Web | แผนที่ MapLibre (polygons ตาม bbox, province outlines, survey points), ตัวกรอง/ค้นหา/ตาราง/รายละเอียด/ประวัติ, login | unit + browser บน Docker (desktop และ 375px) |
-| 9.5 CI | `.gitlab-ci.yml` ใน gis-api/gis-web: `test` → `docker-image` → `secret_detection` | จำลอง job ใน Docker ผ่าน; **ผล hosted GitLab pipeline ยังไม่ได้ตรวจ (Unverified)** |
+| 9.5 CI | `.gitlab-ci.yml` ใน gis-api/gis-web: `test` → `docker-image` → `secret_detection` | hosted GitLab pipeline ผ่านทั้ง 3 repo (owner-reported 2026-11-22) |
 
-ผลคำสั่งและตัวเลขจริงอยู่ที่ [WORK-STATUS](docs/WORK-STATUS.md); แผนและ spec ที่ [SWC](docs/swc/README.md); ขั้นตอนรับงานที่ [UAT](docs/swc/UAT.md); งานที่เลื่อนออกที่ [DEFERRED](docs/swc/DEFERRED.md)
+ผลคำสั่งและตัวเลขจริงอยู่ที่ [WORK-STATUS](docs/WORK-STATUS.md); แผนและ spec ที่ [SWC](docs/swc/README.md); ขั้นตอนรับงานที่ [UAT](docs/swc/UAT.md) และชุดส่งมอบ [UAT Package](docs/swc/UAT-PACKAGE.md); งานที่เลื่อนออกที่ [DEFERRED](docs/swc/DEFERRED.md)
 
 ## Run
 
@@ -73,7 +73,7 @@ API สร้างบัญชีสาธิตตอน start จาก `DEMO
 - Login ตั้ง HttpOnly cookie `gis_access` (JWT 15 นาที) ไม่คืน token ใน JSON; logout revoke session ฝั่ง server; ไม่มี refresh token ต้อง login ใหม่เมื่อหมดอายุ
 - คำขอ POST/PATCH/DELETE (รวม login/logout) ต้องส่ง `Origin` ที่อนุญาต (`http://localhost:3000` หรือ `http://localhost:3001`) และ `X-CSRF-Protection: 1`
 - [api-examples.http](api-examples.http): ตัวอย่างทุก endpoint (VS Code REST Client) รันตามลำดับจะสร้างและลบ site `DOC-EX-001` เอง; status ในไฟล์ได้จากการรันจริง
-- Swagger UI: login ผ่าน `POST /auth/login` ในหน้า `/docs` ก่อนใช้ write; ทุกคำขอเขียนต้องเลือก `X-CSRF-Protection` = `1` และกรอกช่อง `Origin` เป็น `http://localhost:3001` (browser ส่ง Origin จริงของหน้าเอง) ยังไม่มี request interceptor เติม header ให้อัตโนมัติ
+- Swagger UI: login ผ่าน `POST /auth/login` ในหน้า `/docs` ก่อนใช้ write; ทุกคำขอเขียนต้องเลือก `X-CSRF-Protection` = `1` และกรอกช่อง `Origin` เป็น `http://localhost:3001` (browser ส่ง Origin จริงของหน้าเอง) (Swagger บังคับกรอกทั้งสองช่อง; interceptor เติม `X-CSRF-Protection` ให้คำขอเขียนอยู่แล้ว)
 - Spec แยกไฟล์อยู่ใน `gis-api/api-docs/` (generate ด้วย `npm run docs:generate`) รายการ endpoint: [API-ENDPOINTS](docs/swc/BE/API-ENDPOINTS.md)
 
 ## Seed Import
@@ -104,7 +104,7 @@ Integration tests ล้างตาราง จึงปฏิเสธฐา�
 - แผนที่พื้นหลังใช้ OpenStreetMap tiles (ต้องมีอินเทอร์เน็ตและ WebGL) สำหรับ demo เท่านั้น
 - Survey ไม่มี version: แก้พร้อมกันเป็น last-write-wins; หลัง admin ย้าย site อาจมี survey เดิมที่ห่างเกิน 50 m ค้างอยู่
 - `/surveys.geojson` คืนสูงสุด 5000 จุดใหม่สุด; rate limit login คิดตาม client+email เพราะ API เห็น IP เดียวของ web proxy
-- ผล hosted GitLab pipeline ยังไม่ได้ตรวจ; HTTP loopback เท่านั้น ไม่ใช่ production HTTPS
+- HTTP loopback เท่านั้น ไม่ใช่ production HTTPS
 
 ## Continue Work
 

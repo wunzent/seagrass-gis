@@ -21,3 +21,6 @@ test-results/
 tmp/
 .DS_Store
 Thumbs.db
+
+# Local database backups (UAT)
+backups/
