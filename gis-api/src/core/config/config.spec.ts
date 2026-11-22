@@ -22,6 +22,7 @@ describe('config', () => {
       jwtSecret: SECRET,
       allowedOrigins: ['http://localhost:3000', 'http://localhost:3001'],
       cookieSecure: false,
+      demoLoginEnabled: false,
     });
     expect(
       readAuthConfig({ ...base, PUBLIC_WEB_ORIGIN: 'https://gis.example', API_DOCS_ORIGIN: 'https://api.gis.example' })

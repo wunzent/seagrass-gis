@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { Role, UserRecord } from './entities/user.entity';
+import { Role, SessionUser, UserRecord } from './entities/user.entity';
 import { DATABASE, Database } from '../core/database/database.module';
 import { Queryable } from '../core/database/transaction';
 import { toDependencyError } from '../shared/errors/api-error';
@@ -7,6 +7,15 @@ import { toDependencyError } from '../shared/errors/api-error';
 @Injectable()
 export class UsersRepository {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
+
+  async findSessionUserByEmail(email: string): Promise<SessionUser | null> {
+    try {
+      const { rows } = await this.db.query('SELECT id, email, role FROM users WHERE email = $1', [email]);
+      return (rows[0] as unknown as SessionUser | undefined) ?? null;
+    } catch (error) {
+      throw toDependencyError(error);
+    }
+  }
 
   async findByEmail(email: string): Promise<UserRecord | null> {
     try {

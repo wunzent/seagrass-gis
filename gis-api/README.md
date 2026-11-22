@@ -40,6 +40,21 @@ npm start
 | `npm run docs:generate`                   | build แล้วเขียน `api-docs/` ใหม่จาก decorators                                |
 | `npm run format` / `npm run format:check` | Prettier                                                                      |
 
+## Demo Quick Login (T022)
+
+สำหรับสาธิตบนเครื่อง local ตั้ง `DEMO_LOGIN_ENABLED=true` ใน environment ของ API แล้วเริ่ม API ใหม่
+(ต้องมีผู้ใช้ `viewer@demo.local`, `editor@demo.local`, `admin@demo.local` จาก demo seeder เดิม)
+`GET /auth/demo-login` คืนรายการ role; `POST /auth/demo-login` รับเฉพาะ `{ "role": "viewer" | "editor" | "admin" }`
+พร้อม Origin ที่อนุญาตและ `X-CSRF-Protection: 1` เช่นเดียวกับ login เดิม แล้วตั้ง HttpOnly cookie อายุ 900 วินาที
+ทุก response ใช้ `Cache-Control: no-store`; ไม่รับรหัสผ่านและไม่คืน token ใน JSON
+POST ใช้ rate limiter เดิมแยก key `demo:<role>` โดยล้างตัวนับเมื่อเข้าสู่ระบบสำเร็จ จึงนับเฉพาะความล้มเหลว (ค่าเริ่มต้น 10 ครั้ง/15 นาทีต่อ role)
+และเพิกถอน session เดิมใน cookie เมื่อสร้าง session ใหม่สำเร็จ
+
+ค่าเริ่มต้น `DEMO_LOGIN_ENABLED=false`; ยอมรับเฉพาะข้อความ `true` ตัวพิมพ์เล็กเท่านั้น ค่าอื่นหรือไม่ตั้งถือว่าปิด:
+ทั้งสอง endpoint ตอบ 404 `NOT_FOUND` ก่อนตรวจ CSRF/body (image Docker รันด้วย `NODE_ENV=production` จึงใช้ flag นี้เป็นสวิตช์เดียว)
+ให้คงค่า `false` สำหรับการใช้งานจริง เพราะเมื่อเปิดผู้เข้าถึง API จะเข้าเป็น admin ได้
+`POST /auth/login` เดิมยังทำงานเหมือนเดิม
+
 ## Tests
 
 Jest รันโหมด ESM (`node --experimental-vm-modules`) ต้องรันจากโฟลเดอร์ `gis-api/`

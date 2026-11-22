@@ -1,0 +1,127 @@
+get:
+  operationId: AuthController_demoRoles
+  parameters: []
+  responses:
+    '200':
+      description: ''
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/DemoLoginRolesDto.yaml
+    '404':
+      description: NOT_FOUND
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: NOT_FOUND
+              message: ...
+              details: {}
+  summary: แสดง role สำหรับ demo quick login เมื่อเปิดใช้งาน
+  tags:
+    - auth
+post:
+  operationId: AuthController_demoLogin
+  parameters:
+    - name: X-CSRF-Protection
+      in: header
+      required: true
+      schema:
+        type: string
+        enum:
+          - '1'
+    - name: Origin
+      in: header
+      description: ต้องตรงกับ PUBLIC_WEB_ORIGIN หรือ API_DOCS_ORIGIN
+      required: true
+      schema:
+        type: string
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/DemoLoginDto.yaml
+  responses:
+    '200':
+      headers:
+        Set-Cookie:
+          schema:
+            type: string
+          description: gis_access=<JWT>; Max-Age=900; Path=/; HttpOnly; SameSite=Lax
+      description: ''
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/LoginResponse.yaml
+    '400':
+      description: VALIDATION_ERROR
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: ...
+              details: {}
+    '401':
+      description: INVALID_CREDENTIALS
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: INVALID_CREDENTIALS
+              message: ...
+              details: {}
+    '403':
+      description: CSRF_REJECTED
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: CSRF_REJECTED
+              message: ...
+              details: {}
+    '404':
+      description: NOT_FOUND
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: NOT_FOUND
+              message: ...
+              details: {}
+    '429':
+      description: AUTH_RATE_LIMITED
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: AUTH_RATE_LIMITED
+              message: ...
+              details: {}
+    '503':
+      description: SERVICE_UNAVAILABLE
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ErrorBody.yaml
+          example:
+            error:
+              code: SERVICE_UNAVAILABLE
+              message: ...
+              details: {}
+  summary: เข้าสู่ระบบด้วย demo role เมื่อเปิดใช้งาน; ปิดแล้วตอบ 404
+  tags:
+    - auth

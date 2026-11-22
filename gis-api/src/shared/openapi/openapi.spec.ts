@@ -44,6 +44,7 @@ describe('api docs', () => {
       expect(operations.map(([k]) => k).sort()).toEqual([
         'DELETE /sites/{code}',
         'DELETE /surveys/{id}',
+        'GET /auth/demo-login',
         'GET /auth/me',
         'GET /health',
         'GET /provinces.geojson',
@@ -55,6 +56,7 @@ describe('api docs', () => {
         'GET /surveys.geojson',
         'PATCH /sites/{code}',
         'PATCH /surveys/{id}',
+        'POST /auth/demo-login',
         'POST /auth/login',
         'POST /auth/logout',
         'POST /sites',

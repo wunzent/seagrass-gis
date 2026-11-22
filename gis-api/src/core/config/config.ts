@@ -16,6 +16,7 @@ export interface AuthConfig {
   jwtSecret: string;
   allowedOrigins: string[];
   cookieSecure: boolean;
+  demoLoginEnabled?: boolean;
 }
 
 const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
@@ -40,5 +41,11 @@ export function readAuthConfig(env: NodeJS.ProcessEnv): AuthConfig {
   if (Buffer.byteLength(jwtSecret) < 32) throw new Error('JWT_SECRET must be at least 32 bytes');
   const web = origin('PUBLIC_WEB_ORIGIN', env.PUBLIC_WEB_ORIGIN);
   const docs = origin('API_DOCS_ORIGIN', env.API_DOCS_ORIGIN);
-  return { jwtSecret, allowedOrigins: [web.origin, docs.origin], cookieSecure: web.protocol === 'https:' };
+  return {
+    jwtSecret,
+    allowedOrigins: [web.origin, docs.origin],
+    cookieSecure: web.protocol === 'https:',
+    // Explicit opt-in only; the Docker image always runs NODE_ENV=production, so the flag is the single switch.
+    demoLoginEnabled: env.DEMO_LOGIN_ENABLED === 'true',
+  };
 }

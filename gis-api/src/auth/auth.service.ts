@@ -3,7 +3,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { AUTH_CONFIG, LOGIN_LIMITER } from './auth.constants';
 import { LoginRateLimiter } from './utils/login-rate-limiter';
 import { AuthConfig } from '../core/config/config';
-import { AuthenticatedContext } from './entities/user.entity';
+import { AuthenticatedContext, Role, SessionUser } from './entities/user.entity';
 import { SessionsRepository } from './sessions.repository';
 import { UsersRepository } from './users.repository';
 import {
@@ -54,6 +54,22 @@ export class AuthService {
         ? await verifyPassword(password, user.password_hash)
         : await verifyAgainstDummy(password);
     if (!user || !ok) throw invalidCredentials();
+    const result = await this.createSession(user, previousToken);
+    this.limiter.succeed(throttleKey);
+    return result;
+  }
+
+  async demoLogin(role: Role, previousToken: string | undefined) {
+    const key = `demo:${role}`;
+    this.limiter.attempt(key);
+    const user = await this.users.findSessionUserByEmail(`${role}@demo.local`);
+    if (!user) throw invalidCredentials();
+    const result = await this.createSession(user, previousToken);
+    this.limiter.succeed(key);
+    return result;
+  }
+
+  private async createSession(user: SessionUser, previousToken: string | undefined) {
     const previous = this.claims(previousToken);
     const sid = randomUUID();
     const now = Math.floor(Date.now() / 1000);
@@ -64,7 +80,6 @@ export class AuthService {
       userId: user.id,
       expiresAt,
     });
-    this.limiter.succeed(throttleKey);
     return { token, user: { id: user.id, email: user.email, role: user.role }, expiresAt };
   }
 

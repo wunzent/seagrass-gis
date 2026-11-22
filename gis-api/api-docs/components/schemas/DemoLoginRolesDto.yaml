@@ -1,0 +1,16 @@
+type: object
+properties:
+  roles:
+    type: array
+    example:
+      - viewer
+      - editor
+      - admin
+    items:
+      type: string
+      enum:
+        - viewer
+        - editor
+        - admin
+required:
+  - roles
