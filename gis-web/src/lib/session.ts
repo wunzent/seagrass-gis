@@ -1,4 +1,5 @@
 export type Session = { user: { id: string; email: string; role: 'viewer' | 'editor' | 'admin' }; expires_at: string };
+export type DemoRole = Session['user']['role'];
 export type SessionState = {
   session: Session | null;
   phase: 'checking' | 'ready';
@@ -154,18 +155,43 @@ export function createSession(options: Options = {}) {
   }
   async function login(email: string, password: string) {
     const invalid = validateLogin(email, password);
-    if (invalid.email || invalid.password || state.busy || state.logoutPending) return false;
+    if (invalid.email || invalid.password) return false;
+    return submitLogin('login', { email: email.trim(), password });
+  }
+  async function demoRoles(): Promise<DemoRole[] | null> {
+    try {
+      const response = await request('demo-login', new AbortController().signal, { method: 'GET' });
+      if (response.status !== 200) return null;
+      const value: unknown = await response.json();
+      const roles = (value as { roles?: unknown } | null)?.roles;
+      if (!Array.isArray(roles) || !roles.every((role) => ['viewer', 'editor', 'admin'].includes(role))) return null;
+      return roles;
+    } catch {
+      return null;
+    }
+  }
+  async function demoLogin(role: DemoRole) {
+    return submitLogin('demo-login', { role }, (status) =>
+      [400, 401, 404].includes(status) ? 'เข้าสู่ระบบด้วยบัญชีสาธิตไม่สำเร็จ ลองใหม่หรือกรอกเอง' : loginMessage(status),
+    );
+  }
+  async function submitLogin(
+    path: string,
+    body: { email: string; password: string } | { role: DemoRole },
+    message: (status: number) => string = loginMessage,
+  ) {
+    if (state.busy || state.logoutPending) return false;
     const op = begin();
     publish({ busy: 'login', error: '' });
     try {
-      const response = await request('login', op.signal, {
+      const response = await request(path, op.signal, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Protection': '1' },
-        body: JSON.stringify({ email: email.trim(), password }),
+        body: JSON.stringify(body),
       });
       if (!current(op.id)) return false;
       if (!response.ok) {
-        publish({ busy: null, errorSource: 'login', error: loginMessage(response.status) });
+        publish({ busy: null, errorSource: 'login', error: message(response.status) });
         return false;
       }
       const session = parseSession(await response.json(), now());
@@ -173,7 +199,7 @@ export function createSession(options: Options = {}) {
       accept(session);
       return true;
     } catch {
-      if (current(op.id)) publish({ busy: null, errorSource: 'login', error: loginMessage(503) });
+      if (current(op.id)) publish({ busy: null, errorSource: 'login', error: message(503) });
       return false;
     }
   }
@@ -264,6 +290,8 @@ export function createSession(options: Options = {}) {
     },
     restore,
     login,
+    demoRoles,
+    demoLogin,
     logout,
     resume: async () => {
       expire();

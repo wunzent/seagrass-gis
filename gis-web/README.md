@@ -49,3 +49,5 @@ npm run dev
 ## CI
 
 `.gitlab-ci.yml` มี 3 jobs ตามลำดับ: `test` (node 22.18.0; `npm ci`, `format:check`, `lint`, `test:unit`, `build`, `typecheck`) → `docker-image` (build Dockerfile ด้วย dind) → `secret_detection` (GitLab template) จำลอง job `test` ใน Docker ผ่านแล้ว; ผล hosted pipeline ยังไม่ได้ตรวจ
+
+หน้า /login แสดงปุ่ม Viewer, Editor และ Admin สำหรับบัญชีสาธิตเฉพาะเมื่อ API ตั้ง DEMO_LOGIN_ENABLED=true และ discovery สำเร็จ เมื่อปิดหรือเรียก API ไม่สำเร็จจะแสดงเฉพาะฟอร์ม email/password เดิม ปุ่มส่งเฉพาะ role โดยไม่มีรหัสผ่านใน web code

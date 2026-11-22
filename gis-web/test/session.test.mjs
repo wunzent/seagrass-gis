@@ -36,6 +36,79 @@ function harness(fetcher) {
 }
 const json = (value) => Response.json(value);
 
+for (const status of [400, 401, 404]) {
+  test(`demo login ${status} uses a demo-specific error without email/password`, async () => {
+    const { store } = harness(async () => new Response(null, { status }));
+    assert.equal(await store.demoLogin('viewer'), false);
+    assert.equal(store.getSnapshot().error, 'เข้าสู่ระบบด้วยบัญชีสาธิตไม่สำเร็จ ลองใหม่หรือกรอกเอง');
+    assert.equal(store.getSnapshot().busy, null);
+    assert.equal(store.getSnapshot().errorSource, 'login');
+  });
+}
+
+test('demo roles discovery is same-origin no-store and silently unavailable on errors', async () => {
+  const roles = ['viewer', 'editor', 'admin'];
+  for (const result of [
+    json({ roles }),
+    new Response(null, { status: 404 }),
+    new Response(null, { status: 503 }),
+    new Error('offline'),
+  ]) {
+    const { store } = harness(async (url, init) => {
+      assert.equal(url, '/api/auth/demo-login');
+      assert.equal(init.method, 'GET');
+      assert.equal(init.credentials, 'same-origin');
+      assert.equal(init.cache, 'no-store');
+      if (result instanceof Error) throw result;
+      return result;
+    });
+    assert.deepEqual(await store.demoRoles(), result.status === 200 ? roles : null);
+    assert.equal(store.getSnapshot().error, '');
+  }
+});
+
+test('demo login posts only role with CSRF, shares busy guard and accepts safe session', async () => {
+  let reply;
+  let calls = 0;
+  const { store } = harness(async (url, init) => {
+    calls++;
+    assert.equal(url, '/api/auth/demo-login');
+    assert.equal(init.method, 'POST');
+    assert.equal(init.credentials, 'same-origin');
+    assert.equal(init.cache, 'no-store');
+    assert.equal(init.headers['Content-Type'], 'application/json');
+    assert.equal(init.headers['X-CSRF-Protection'], '1');
+    assert.deepEqual(JSON.parse(init.body), { role: 'editor' });
+    return new Promise((resolve) => {
+      reply = resolve;
+    });
+  });
+  const pending = store.demoLogin('editor');
+  assert.equal(store.getSnapshot().busy, 'login');
+  assert.equal(await store.demoLogin('admin'), false);
+  assert.equal(await store.login('a@demo.local', 'example'), false);
+  assert.equal(calls, 1);
+  const session = safe();
+  session.user.role = 'editor';
+  reply(json(session));
+  assert.equal(await pending, true);
+  assert.deepEqual(store.getSnapshot().session.user, { id: 'a', email: 'a@demo.local', role: 'editor' });
+  assert.equal(store.getSnapshot().busy, null);
+});
+
+test('demo login maps rejection and network errors through the existing login banner', async () => {
+  for (const status of [403, 429, 503, null]) {
+    const { store } = harness(async () => {
+      if (status === null) throw Error('offline');
+      return Response.json({ message: 'sensitive detail' }, { status });
+    });
+    assert.equal(await store.demoLogin('viewer'), false);
+    assert.equal(store.getSnapshot().error, loginMessage(status ?? 503));
+    assert.equal(store.getSnapshot().errorSource, 'login');
+    assert.equal(store.getSnapshot().busy, null);
+  }
+});
+
 test('restore allowlists safe session and sends same-origin no-store', async () => {
   const { store } = harness(async (url, init) => {
     assert.equal(url, '/api/auth/me');

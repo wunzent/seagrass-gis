@@ -2,16 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Nautical survey chart direction: gis-docs/docs/swc/FE/SWC/seagrass/page-map-wireframe.md (v0.2). */
+/* Bright palette: gis-docs/docs/swc/FE/SWC/seagrass/page-map-wireframe.md (v0.3). */
 :root {
-  --paper: #f5f1e8;
-  --paper-raised: #fbf9f4;
-  --paper-selected: #e9e3d3;
-  --ink: #1b2a3a;
-  --ink-muted: #55606b;
-  --rule: #cfc6b2;
-  --rule-soft: #ddd5c3;
-  --field-border: #8a7f68;
+  --bg: #ffffff;
+  --surface: #f6f8fa;
+  --text: #1f2937;
+  --text-muted: #57606a;
+  --border: #d0d7de;
+  --field-border: #848d97;
+  --primary: #0077b6;
+  --primary-soft: #e6f3fa;
   --sea: #dce7ea;
   --danger: #8f1d1d;
 }
@@ -19,8 +19,8 @@
 @layer base {
   body {
     margin: 0;
-    background: var(--paper);
-    color: var(--ink);
+    background: var(--bg);
+    color: var(--text);
     font-family: var(--font-plex), Tahoma, sans-serif;
     font-size: 15px;
     line-height: 1.55;
@@ -44,7 +44,7 @@
     cursor: default;
   }
   :focus-visible {
-    outline: 2px solid var(--ink);
+    outline: 2px solid var(--primary);
     outline-offset: 2px;
   }
   h1,
@@ -96,8 +96,8 @@
     gap: 24px;
     padding: 0 20px;
     min-height: 56px;
-    border-bottom: 1.5px solid var(--ink);
-    background: var(--paper);
+    border-bottom: 1.5px solid var(--border);
+    background: var(--bg);
   }
   .topbar-nav {
     display: flex;
@@ -107,17 +107,17 @@
   .nav-item {
     min-height: 44px;
     padding: 0 10px;
-    color: var(--ink-muted);
+    color: var(--text-muted);
     border-bottom: 2px solid transparent;
     margin-bottom: -1.5px;
   }
   .nav-item:hover {
-    color: var(--ink);
+    color: var(--text);
   }
   .nav-item[aria-current='page'] {
-    color: var(--ink);
+    color: var(--primary);
     font-weight: 500;
-    border-bottom-color: var(--ink);
+    border-bottom-color: var(--primary);
   }
   .topbar .session-controls {
     margin-left: auto;
@@ -140,7 +140,8 @@
     overflow: hidden;
   }
   .sidebar {
-    border-right: 1px solid var(--rule);
+    background: var(--surface);
+    border-right: 1px solid var(--border);
     padding: 16px;
     display: flex;
     flex-direction: column;
@@ -156,27 +157,28 @@
     display: grid;
     gap: 2px;
     font-size: 0.75rem;
-    color: var(--ink-muted);
+    color: var(--text-muted);
   }
   .filters input,
   .filters select {
     width: 100%;
     min-height: 40px;
     border: 1px solid var(--field-border);
-    border-radius: 3px;
-    background: var(--paper-raised);
+    border-radius: 6px;
+    background: var(--bg);
     padding: 6px 9px;
     font-size: 0.85rem;
-    color: var(--ink);
+    color: var(--text);
   }
   .filters input::placeholder {
-    color: #6b6456;
+    color: var(--text-muted);
   }
   .filter-error {
     color: var(--danger);
     font-size: 0.8rem;
   }
   .text-button {
+    color: var(--primary);
     justify-self: start;
     min-height: 44px;
     text-decoration: underline;
@@ -188,7 +190,7 @@
   }
   .text-button:disabled,
   .text-button[aria-disabled='true'] {
-    color: var(--ink-muted);
+    color: var(--text-muted);
     text-decoration: none;
   }
   .list-heading {
@@ -196,12 +198,12 @@
     justify-content: space-between;
     align-items: baseline;
     padding-bottom: 6px;
-    border-bottom: 1.5px solid var(--ink);
+    border-bottom: 1.5px solid var(--border);
     font-size: 0.75rem;
-    color: var(--ink-muted);
+    color: var(--text-muted);
   }
   .list-heading h2 {
-    color: var(--ink);
+    color: var(--text);
   }
   .site-rows {
     list-style: none;
@@ -209,10 +211,11 @@
     padding: 0;
   }
   .site-rows li {
-    border-bottom: 1px solid var(--rule-soft);
+    border-bottom: 1px solid var(--border);
   }
   .site-rows li.selected-row {
-    background: var(--paper-selected);
+    color: var(--text);
+    background: var(--primary-soft);
   }
   .site-button {
     display: grid;
@@ -226,7 +229,7 @@
   }
   .site-code {
     font-size: 0.72rem;
-    color: var(--ink-muted);
+    color: var(--text-muted);
     font-variant-numeric: tabular-nums;
   }
   .site-meta {
@@ -234,7 +237,7 @@
     justify-content: space-between;
     gap: 8px;
     font-size: 0.72rem;
-    color: var(--ink-muted);
+    color: var(--text-muted);
   }
   .site-name {
     display: flex;
@@ -270,7 +273,7 @@
   }
   .skeleton {
     height: 36px;
-    background: var(--rule-soft);
+    background: var(--border);
   }
   .error-box {
     display: flex;
@@ -295,12 +298,12 @@
     align-items: baseline;
     gap: 12px;
     padding: 6px 14px;
-    border-bottom: 1px solid var(--rule);
+    border-bottom: 1px solid var(--border);
     font-size: 0.75rem;
-    color: var(--ink-muted);
+    color: var(--text-muted);
   }
   .map-heading h2 {
-    color: var(--ink);
+    color: var(--text);
   }
   .map-notice {
     padding: 8px 14px;
@@ -331,7 +334,7 @@
   }
   .map-status {
     background: transparent;
-    color: var(--ink);
+    color: var(--text);
   }
   .legend {
     position: absolute;
@@ -339,13 +342,13 @@
     bottom: 28px;
     z-index: 3;
     padding: 8px 10px;
-    background: var(--paper-raised);
-    border: 1px solid var(--rule);
-    border-radius: 3px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
     font-size: 0.72rem;
   }
   .legend p {
-    color: var(--ink-muted);
+    color: var(--text-muted);
     margin-bottom: 2px;
   }
   .legend ul {
@@ -364,8 +367,8 @@
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    border: 1.5px solid var(--ink);
-    background: var(--paper-raised);
+    border: 1.5px solid var(--primary);
+    background: var(--bg);
   }
 
   /* Popup: the one raised surface over the chart. */
@@ -378,9 +381,9 @@
     width: min(300px, calc(100% - 16px));
     max-height: calc(100% - 16px);
     overflow: auto;
-    background: var(--paper-raised);
-    border: 1px solid var(--ink);
-    border-radius: 3px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
     box-shadow: 0 6px 18px #1b2a3a2e;
     font-size: 0.82rem;
   }
@@ -392,8 +395,8 @@
     justify-content: space-between;
     gap: 6px;
     padding: 2px 2px 2px 12px;
-    background: var(--paper-raised);
-    border-bottom: 1px solid var(--rule-soft);
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
   }
   .popup-heading h2 {
     font-size: 0.88rem;
@@ -409,7 +412,7 @@
     outline-offset: -2px;
   }
   .popup-close:hover {
-    background: var(--paper-selected);
+    background: var(--primary-soft);
   }
   .popup-body {
     padding: 10px 12px 12px;
@@ -427,20 +430,20 @@
   }
   dt {
     font-size: 0.7rem;
-    color: var(--ink-muted);
+    color: var(--text-muted);
   }
   dd {
     margin: 0;
     overflow-wrap: anywhere;
   }
   .rounds {
-    border-top: 1px solid var(--rule-soft);
+    border-top: 1px solid var(--border);
     padding-top: 8px;
     display: grid;
     gap: 4px;
   }
   .rounds h3 {
-    color: var(--ink-muted);
+    color: var(--text-muted);
     font-weight: 400;
     font-size: 0.7rem;
   }
@@ -458,7 +461,7 @@
   }
   .note {
     font-size: 0.72rem;
-    color: var(--ink-muted);
+    color: var(--text-muted);
   }
 
   /* Table view. */
@@ -474,7 +477,7 @@
     gap: 16px;
     flex-wrap: wrap;
     padding-bottom: 12px;
-    border-bottom: 1px solid var(--rule);
+    border-bottom: 1px solid var(--border);
   }
   .filters-row {
     display: flex;
@@ -491,7 +494,7 @@
   .table-total {
     margin-left: auto;
     font-size: 0.8rem;
-    color: var(--ink-muted);
+    color: var(--text-muted);
     padding-bottom: 12px;
   }
   .table-scroll {
@@ -506,17 +509,18 @@
     text-align: left;
     font-weight: 500;
     font-size: 0.72rem;
-    color: var(--ink-muted);
+    color: var(--text-muted);
     padding: 8px 10px;
-    border-bottom: 1.5px solid var(--ink);
+    border-bottom: 1.5px solid var(--border);
     white-space: nowrap;
   }
   td {
     padding: 4px 10px;
-    border-bottom: 1px solid var(--rule-soft);
+    border-bottom: 1px solid var(--border);
     white-space: nowrap;
   }
   .table-link {
+    color: var(--primary);
     min-height: 44px;
     text-align: left;
     text-decoration: underline;
@@ -542,9 +546,10 @@
     line-height: 1.3;
   }
   .session-user span {
-    color: var(--ink-muted);
+    color: var(--text-muted);
   }
   .session-link {
+    color: var(--primary);
     text-decoration: underline;
     text-underline-offset: 3px;
     display: inline-flex;
@@ -559,6 +564,7 @@
     margin-top: 8px;
   }
   .login-page {
+    background: var(--surface);
     min-height: 100svh;
     display: grid;
     place-items: center;
@@ -568,18 +574,39 @@
     width: 100%;
     max-width: 420px;
     padding: 24px;
-    border: 1px solid var(--ink);
-    border-radius: 3px;
-    background: var(--paper-raised);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
   }
   .product-name,
   .subtitle {
-    color: var(--ink-muted);
+    color: var(--text-muted);
     font-size: 0.85rem;
   }
   .login-panel h1 {
     margin: 4px 0 8px;
     font-size: 1.3rem;
+  }
+  .demo-login {
+    display: grid;
+    gap: 8px;
+    margin-top: 18px;
+  }
+  .demo-login-button {
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+    white-space: normal;
+  }
+  .demo-login-button span:last-child {
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+  .demo-divider {
+    text-align: center;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 0;
   }
   .login-panel form {
     display: flex;
@@ -595,13 +622,13 @@
     min-width: 0;
     min-height: 44px;
     border: 1px solid var(--field-border);
-    border-radius: 3px;
-    background: var(--paper);
+    border-radius: 6px;
+    background: var(--bg);
     padding: 8px 10px;
     margin-bottom: 8px;
   }
   .login-panel input:disabled {
-    background: var(--paper-selected);
+    background: var(--surface);
   }
   .login-panel form > button {
     margin-top: 8px;
@@ -649,9 +676,10 @@
       overflow: visible;
     }
     .sidebar {
+      background: var(--surface);
       overflow: visible;
       border-right: 0;
-      border-bottom: 1px solid var(--rule);
+      border-bottom: 1px solid var(--border);
       padding: 12px;
     }
     .map-container {

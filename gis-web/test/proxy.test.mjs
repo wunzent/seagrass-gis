@@ -75,3 +75,10 @@ test('upstream failure is sanitized and redirects are not followed', async () =>
   );
   assert.equal(redirect.status, 502);
 });
+
+test('demo-login is proxied like the other auth routes', () => {
+  assert.equal(
+    upstreamUrl('http://web/api/auth/demo-login', 'http://api:3001/').href,
+    'http://api:3001/auth/demo-login',
+  );
+});

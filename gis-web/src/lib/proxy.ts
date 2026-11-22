@@ -18,7 +18,7 @@ export function upstreamUrl(requestUrl: string, internalUrl: string): URL {
     throw new Error('Invalid proxy path');
   // Only the documented API resources are exposed through this application.
   if (
-    !/^\/(?:sites(?:\.geojson|\/[^/]+(?:\/surveys)?)?|auth\/(?:login|me|logout)|provinces\.geojson|surveys\.geojson)$/.test(
+    !/^\/(?:sites(?:\.geojson|\/[^/]+(?:\/surveys)?)?|auth\/(?:login|demo-login|me|logout)|provinces\.geojson|surveys\.geojson)$/.test(
       path,
     )
   )

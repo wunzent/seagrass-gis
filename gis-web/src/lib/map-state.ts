@@ -1,6 +1,7 @@
-// Nautical survey chart palette (gis-docs page-map-wireframe v0.2): ink survey marks on paper.
-export const INK = '#1B2A3A';
-export const PAPER = '#FBF9F4';
+// Bright survey marks follow gis-docs page-map-wireframe v0.3.
+export const POINT_STROKE = '#0077B6';
+export const POINT_FILL = '#FFFFFF';
+export const SITE_OUTLINE = '#1B2A3A';
 
 // Sequential seagrass greens follow cover %; no_data is drawn hatched so it never reads as the lowest level.
 export const statuses = {

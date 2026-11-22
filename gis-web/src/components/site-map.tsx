@@ -11,7 +11,7 @@ import {
   type GeoJSONSource,
   type ExpressionSpecification,
 } from 'maplibre-gl';
-import { debounce, INK, PAPER, statuses, validBbox, type Bbox } from '../lib/map-state';
+import { debounce, POINT_STROKE, POINT_FILL, SITE_OUTLINE, statuses, validBbox, type Bbox } from '../lib/map-state';
 import {
   geometryBounds,
   type ProvinceCollection,
@@ -165,12 +165,10 @@ export default function SiteMap({
           maxzoom: 19,
           attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         });
-        // Muted basemap so the survey data reads first, like an annotated chart.
         instance.addLayer({
           id: 'basemap',
           type: 'raster',
           source: 'basemap',
-          paint: { 'raster-saturation': -0.75, 'raster-contrast': -0.15, 'raster-brightness-min': 0.08 },
         });
         instance.addSource('provinces', { type: 'geojson', data: empty });
         instance.addLayer({
@@ -219,14 +217,14 @@ export default function SiteMap({
           id: 'sites-line',
           type: 'line',
           source: 'sites',
-          paint: { 'line-color': INK, 'line-width': 1.2 },
+          paint: { 'line-color': SITE_OUTLINE, 'line-width': 1.2 },
         });
         instance.addLayer({
           id: 'selected',
           type: 'line',
           source: 'sites',
           filter: ['==', ['get', 'code'], ''],
-          paint: { 'line-color': INK, 'line-width': 3.5 },
+          paint: { 'line-color': POINT_STROKE, 'line-width': 3.5 },
         });
         instance.addSource('surveys', { type: 'geojson', data: empty });
         instance.addLayer({
@@ -234,9 +232,9 @@ export default function SiteMap({
           type: 'circle',
           source: 'surveys',
           paint: {
-            'circle-color': PAPER,
+            'circle-color': POINT_FILL,
             'circle-radius': 4.5,
-            'circle-stroke-color': INK,
+            'circle-stroke-color': POINT_STROKE,
             'circle-stroke-width': 1.5,
           },
         });
@@ -245,14 +243,24 @@ export default function SiteMap({
           type: 'circle',
           source: 'surveys',
           filter: idFilter(''),
-          paint: { 'circle-color': PAPER, 'circle-radius': 7, 'circle-stroke-color': INK, 'circle-stroke-width': 2 },
+          paint: {
+            'circle-color': POINT_FILL,
+            'circle-radius': 7,
+            'circle-stroke-color': POINT_STROKE,
+            'circle-stroke-width': 2,
+          },
         });
         instance.addLayer({
           id: 'surveys-selected',
           type: 'circle',
           source: 'surveys',
           filter: idFilter(selectedSurvey.current ?? ''),
-          paint: { 'circle-color': INK, 'circle-radius': 6.5, 'circle-stroke-color': PAPER, 'circle-stroke-width': 2 },
+          paint: {
+            'circle-color': POINT_STROKE,
+            'circle-radius': 6.5,
+            'circle-stroke-color': POINT_FILL,
+            'circle-stroke-width': 2,
+          },
         });
         // A point within POINT_HIT_RADIUS px beats the polygon under it; among several, the nearest to the cursor wins.
         const nearestPoint = (point: { x: number; y: number }) => {

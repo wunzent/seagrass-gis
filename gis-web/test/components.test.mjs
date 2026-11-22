@@ -5,6 +5,129 @@ import { ApiError } from '../src/lib/sites.ts';
 import * as mapState from '../src/lib/map-state.ts';
 
 const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+function loginHarness(roles) {
+  const calls = [];
+  const state = {
+    session: null,
+    phase: 'ready',
+    busy: null,
+    logoutPending: false,
+    error: '',
+    store: {
+      demoRoles: async () => roles,
+      demoLogin: async (role) => {
+        calls.push(role);
+        return true;
+      },
+    },
+  };
+  const h = componentHarness('../src/components/login-form.tsx', {
+    'next/link': { default: 'a', __esModule: true },
+    'next/navigation': { useRouter: () => ({ replace: (path) => calls.push(path) }) },
+    './ui/button': { Button: 'button' },
+    './session-controls': { SessionControls: 'controls' },
+    './session-provider': { useSession: () => state },
+  });
+  return { state, calls, render: () => nodes(h.render(() => h.exports.LoginForm())) };
+}
+
+test('login demo buttons appear in role order with descriptions and Editor navigates home', async () => {
+  const h = loginHarness(['admin', 'viewer', 'editor']);
+  h.render();
+  await flush();
+  const tree = h.render();
+  const buttons = tree.filter((n) => n.type === 'button' && n.props.type === 'button');
+  assert.equal(buttons.length, 3);
+  const copy = (button) =>
+    nodes(button)
+      .map((n) => n.props.children)
+      .flat()
+      .filter((c) => typeof c === 'string')
+      .join(' ');
+  for (const [i, role, description] of [
+    [0, 'Viewer', 'อ่านข้อมูล และเห็นผู้บันทึก'],
+    [1, 'Editor', 'แก้ชื่อแหล่ง และจัดการ survey'],
+    [2, 'Admin', 'จัดการแหล่งทั้งหมด'],
+  ]) {
+    assert.ok(copy(buttons[i]).includes(role));
+    assert.ok(copy(buttons[i]).includes(description));
+  }
+  assert.ok(tree.some((n) => n.props?.children === 'บัญชีสาธิต กดเพื่อเข้าสู่ระบบทันที'));
+  assert.ok(tree.some((n) => n.props?.children === 'หรือกรอกเอง'));
+  await buttons[1].props.onClick();
+  assert.deepEqual(h.calls, ['editor', '/']);
+  h.state.busy = 'login';
+  assert.ok(
+    h
+      .render()
+      .filter((n) => n.type === 'button')
+      .every((n) => n.props.disabled),
+  );
+});
+
+test('clicked demo role shows progress and group busy until login settles', async () => {
+  const h = loginHarness(['viewer', 'editor', 'admin']);
+  let resolve;
+  h.state.store.demoLogin = () =>
+    new Promise((done) => {
+      resolve = done;
+    });
+  h.render();
+  await flush();
+  const buttons = () => h.render().filter((n) => n.type === 'button' && n.props.type === 'button');
+  const group = () => h.render().find((n) => n.props.role === 'group');
+  assert.equal(group().props['aria-busy'], false);
+  const pending = buttons()[1].props.onClick();
+  h.state.busy = 'login';
+  assert.equal(group().props['aria-busy'], true);
+  assert.equal(buttons()[1].props.children[0].props.children, 'กำลังเข้าสู่ระบบ…');
+  assert.equal(buttons()[1].props['aria-label'], 'Editor');
+  assert.equal(buttons()[0].props.children[0].props.children, 'Viewer');
+  assert.equal(buttons()[2].props.children[0].props.children, 'Admin');
+  assert.ok(
+    h
+      .render()
+      .filter((n) => n.type === 'button')
+      .every((n) => n.props.disabled),
+  );
+  resolve(true);
+  await pending;
+  h.state.busy = null;
+  assert.equal(group().props['aria-busy'], false);
+  assert.equal(buttons()[1].props.children[0].props.children, 'Editor');
+});
+
+test('unavailable demo roles leave the original form with no demo buttons or error', async () => {
+  const h = loginHarness(null);
+  h.render();
+  await flush();
+  const tree = h.render();
+  assert.equal(tree.filter((n) => n.type === 'button').length, 1);
+  assert.equal(
+    tree.some((n) => n.props?.role === 'alert'),
+    false,
+  );
+  assert.equal(tree.filter((n) => n.type === 'input').length, 2);
+});
+
+test('bright map preserves OSM paint and uses primary survey marks and selected outline', () => {
+  const { map } = mapHarness();
+  const raster = map.layers.find((layer) => layer.type === 'raster');
+  assert.ok(raster);
+  assert.equal(
+    Object.keys(raster.paint ?? {}).some((key) => /^raster-(saturation|contrast|brightness)/.test(key)),
+    false,
+  );
+  const points = map.layers.filter((layer) => layer.type === 'circle');
+  assert.equal(points.length, 3);
+  for (const point of points) {
+    const selected = point.id.includes('selected');
+    assert.equal(point.paint['circle-color'], selected ? '#0077B6' : '#FFFFFF');
+    assert.equal(point.paint['circle-stroke-color'], selected ? '#FFFFFF' : '#0077B6');
+  }
+  assert.equal(map.layers.find((layer) => layer.id === 'selected').paint['line-color'], '#0077B6');
+});
 test('session restore error retries restore while retaining the signed-in controls', () => {
   let restores = 0,
     logouts = 0;
