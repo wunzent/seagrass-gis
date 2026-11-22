@@ -37,6 +37,7 @@ services:
       DEMO_VIEWER_PASSWORD: ${DEMO_VIEWER_PASSWORD:-viewer-demo-only}
       DEMO_EDITOR_PASSWORD: ${DEMO_EDITOR_PASSWORD:-editor-demo-only}
       DEMO_ADMIN_PASSWORD: ${DEMO_ADMIN_PASSWORD:-admin-demo-only}
+      DEMO_LOGIN_ENABLED: ${DEMO_LOGIN_ENABLED:-false}
     ports:
       - "127.0.0.1:${API_PORT:-3001}:3001"
     volumes:
