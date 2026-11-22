@@ -46,7 +46,7 @@ export class RolesGuard implements CanActivate {
       // A non-object body cannot prove the restricted key is absent, so it is denied too.
       if (!allowed.includes(role) && (!isObject(body) || Object.prototype.hasOwnProperty.call(body, field)))
         throw forbidden();
-    checkCsrf(request.headers, this.config.allowedOrigins);
+    if (request.authSource !== 'bearer') checkCsrf(request.headers, this.config.allowedOrigins);
     return true;
   }
 }

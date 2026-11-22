@@ -3,6 +3,7 @@ post:
   parameters:
     - name: X-CSRF-Protection
       in: header
+      description: ต้องส่งเสมอ
       required: true
       schema:
         type: string
@@ -40,6 +41,7 @@ post:
               message: ...
               details: {}
   security:
+    - bearer: []
     - gis_access: []
   summary: 'ออกจากระบบ: เพิกถอน session และล้าง cookie (idempotent)'
   tags:

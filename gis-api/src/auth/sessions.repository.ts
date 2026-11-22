@@ -27,13 +27,12 @@ export class SessionsRepository {
     }
   }
 
-  /** Revokes the previous session (when given) and creates the new one in one transaction. */
-  async replace(
-    previous: { sid: string; userId: string } | null,
-    next: { sid: string; userId: string; expiresAt: Date },
-  ) {
+  /** Revokes previous sessions and creates the new one in one transaction. */
+  async replace(previous: { sid: string; userId: string }[], next: { sid: string; userId: string; expiresAt: Date }) {
     await withTransaction(this.db, async (tx) => {
-      if (previous) await tx.query(REVOKE, [previous.sid, previous.userId]);
+      // Concurrent replacements may present the same sessions in opposite cookie/header order.
+      for (const session of [...previous].sort((a, b) => a.sid.localeCompare(b.sid)))
+        await tx.query(REVOKE, [session.sid, session.userId]);
       await tx.query(
         `INSERT INTO access_sessions(id, user_id, expires_at, created_by, updated_by) VALUES($1, $2, $3, $2, $2)`,
         [next.sid, next.userId, next.expiresAt],
@@ -47,5 +46,12 @@ export class SessionsRepository {
     } catch (error) {
       throw toDependencyError(error);
     }
+  }
+
+  async revokeBoth(first: { sid: string; userId: string }, second: { sid: string; userId: string }) {
+    await withTransaction(this.db, async (tx) => {
+      for (const session of [first, second].sort((a, b) => a.sid.localeCompare(b.sid)))
+        await tx.query(REVOKE, [session.sid, session.userId]);
+    });
   }
 }

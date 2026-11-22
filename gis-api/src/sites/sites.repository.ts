@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { STATUS_THRESHOLDS } from './site-status';
 import { SiteRow } from './entities/site.entity';
 import { DATABASE, Database } from '../core/database/database.module';
 import { Queryable, withTransaction } from '../core/database/transaction';
@@ -12,8 +13,9 @@ const INPUT_GEOM = 'ST_SetSRID(ST_GeomFromGeoJSON($1), 4326)';
 export const SITE_VIEW = `
   SELECT s.id, s.code, s.name, s.province_code, round(s.area_rai, 2)::float8 AS area_rai, s.version, s.geom,
     l.surveyed_on, round(l.average, 2)::float8 AS average_cover_percent, l.count,
-    CASE WHEN l.average IS NULL THEN 'no_data' WHEN l.average >= 75 THEN 'very_good' WHEN l.average >= 50 THEN 'good'
-         WHEN l.average >= 25 THEN 'fair' ELSE 'poor' END AS status
+    CASE WHEN l.average IS NULL THEN 'no_data'
+         ${STATUS_THRESHOLDS.map(({ minimum, status }) => `WHEN l.average >= ${minimum} THEN '${status}'`).join(' ')}
+         ELSE 'poor' END AS status
   FROM sites s
   LEFT JOIN LATERAL (
     SELECT to_char(v.surveyed_on, 'YYYY-MM-DD') AS surveyed_on, avg(v.cover_percent) AS average, count(*)::int AS count

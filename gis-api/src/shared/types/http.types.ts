@@ -6,6 +6,7 @@ export interface HttpRequest {
   /** Parsed by the platform body parser before guards run; untrusted until the validation pipe has checked it. */
   body?: unknown;
   auth?: import('../../auth/entities/user.entity').AuthenticatedContext | null;
+  authSource?: 'bearer' | 'cookie';
 }
 export interface HttpResponse {
   setHeader(name: string, value: string): unknown;

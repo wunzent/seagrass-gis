@@ -1,8 +1,16 @@
 import { Controller, Get, Header, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common';
-import { ApiBody, ApiCookieAuth, ApiOkResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiBearerAuth,
+  ApiCookieAuth,
+  ApiOkResponse,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ApiCsrfHeaders } from '../shared/decorators/api-csrf-headers.decorator';
 import { ApiErrorResponse } from '../shared/decorators/api-error-response.decorator';
-import { tokenOf } from './middleware/auth.middleware';
+import { cookieTokenOf, hasAuthorization, tokenOf } from './middleware/auth.middleware';
 import { CsrfGuard } from './guards/csrf.guard';
 import { DemoLoginGuard } from './guards/demo-login.guard';
 import { DEMO_ROLES, DemoLoginDto, DemoLoginRolesDto } from './dto/demo-login.dto';
@@ -62,13 +70,19 @@ export class AuthController {
     @Res({ passthrough: true }) response: HttpResponse,
     @JsonBody() body: DemoLoginDto,
   ): Promise<LoginResponseDto> {
-    const result = await this.auth.demoLogin(body.role, tokenOf(request));
+    const result = await this.auth.demoLogin(body.role, cookieTokenOf(request), tokenOf(request));
     response.setHeader('Set-Cookie', accessCookie(result.token, ACCESS_TTL_SECONDS, this.auth.config.cookieSecure));
-    return { user: result.user, expires_in: ACCESS_TTL_SECONDS, expires_at: result.expiresAt.toISOString() };
+    return {
+      access_token: result.token,
+      token_type: 'Bearer',
+      user: result.user,
+      expires_in: ACCESS_TTL_SECONDS,
+      expires_at: result.expiresAt.toISOString(),
+    };
   }
 
   @Post('login')
-  @ApiOperation({ summary: 'เข้าสู่ระบบ: ตั้ง HttpOnly cookie gis_access (JWT 15 นาที) ไม่คืน token ใน JSON' })
+  @ApiOperation({ summary: 'เข้าสู่ระบบ: คืน JWT ใน JSON และตั้ง HttpOnly cookie gis_access (JWT 15 นาที)' })
   @CSRF_HEADERS
   @ApiBody({ type: LoginDto })
   @ApiOkResponse({
@@ -95,22 +109,31 @@ export class AuthController {
     const result = await this.auth.login(
       body.email,
       body.password,
-      tokenOf(request),
+      cookieTokenOf(request),
       request.socket.remoteAddress ?? 'unknown',
+      tokenOf(request),
     );
     response.setHeader('Set-Cookie', accessCookie(result.token, ACCESS_TTL_SECONDS, this.auth.config.cookieSecure));
-    return { user: result.user, expires_in: ACCESS_TTL_SECONDS, expires_at: result.expiresAt.toISOString() };
+    return {
+      access_token: result.token,
+      token_type: 'Bearer',
+      user: result.user,
+      expires_in: ACCESS_TTL_SECONDS,
+      expires_at: result.expiresAt.toISOString(),
+    };
   }
 
   @Get('me')
-  @ApiOperation({ summary: 'ผู้ใช้ปัจจุบันจาก cookie session (ไม่ต่ออายุ)' })
+  @ApiOperation({ summary: 'ผู้ใช้ปัจจุบันจาก Bearer หรือ cookie session (ไม่ต่ออายุ)' })
   @ApiCookieAuth('gis_access')
+  @ApiBearerAuth()
   @ApiOkResponse({ type: MeResponseDto })
   @ApiErrorResponse(401, ['UNAUTHORIZED'])
   @Header('Cache-Control', 'no-store')
   me(@Req() request: HttpRequest, @Res({ passthrough: true }) response: HttpResponse): MeResponseDto {
     if (!request.auth) {
-      if (tokenOf(request)) response.setHeader('Set-Cookie', clearedAccessCookie(this.auth.config.cookieSecure));
+      if (!hasAuthorization(request) && tokenOf(request))
+        response.setHeader('Set-Cookie', clearedAccessCookie(this.auth.config.cookieSecure));
       throw unauthorized();
     }
     return { user: request.auth.user, expires_at: request.auth.expiresAt.toISOString() };
@@ -119,6 +142,7 @@ export class AuthController {
   @Post('logout')
   @ApiOperation({ summary: 'ออกจากระบบ: เพิกถอน session และล้าง cookie (idempotent)' })
   @ApiCookieAuth('gis_access')
+  @ApiBearerAuth()
   @CSRF_HEADERS
   @ApiResponse({ status: 204, description: 'No content' })
   @ApiErrorResponse(503, ['SERVICE_UNAVAILABLE'])
@@ -126,7 +150,12 @@ export class AuthController {
   @Header('Cache-Control', 'no-store')
   @UseGuards(CsrfGuard)
   async logout(@Req() request: HttpRequest, @Res({ passthrough: true }) response: HttpResponse) {
-    await this.auth.logout(tokenOf(request));
+    const token = tokenOf(request);
+    if (hasAuthorization(request) && !(await this.auth.authenticate(token))) return;
+    const cookie = cookieTokenOf(request);
+    const cookieSession = hasAuthorization(request) ? await this.auth.authenticate(cookie) : null;
+    await this.auth.logout(token, cookieSession ? cookie : undefined);
+    if (hasAuthorization(request) && !cookieSession) return;
     response.setHeader('Set-Cookie', clearedAccessCookie(this.auth.config.cookieSecure));
   }
 }

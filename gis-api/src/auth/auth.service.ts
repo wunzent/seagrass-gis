@@ -43,7 +43,13 @@ export class AuthService {
    * `clientAddress` is the socket address until the web proxy forwards a trusted client address; the email keeps accounts apart
    * behind one proxy. Every attempt is reserved before credential work; success clears it.
    */
-  async login(email: string, password: string, previousToken: string | undefined, clientAddress: string) {
+  async login(
+    email: string,
+    password: string,
+    previousToken: string | undefined,
+    clientAddress: string,
+    headerToken?: string,
+  ) {
     const normalized = email.trim().toLowerCase();
     const throttleKey = `${clientAddress}|${normalized}`;
     this.limiter.attempt(throttleKey);
@@ -54,28 +60,31 @@ export class AuthService {
         ? await verifyPassword(password, user.password_hash)
         : await verifyAgainstDummy(password);
     if (!user || !ok) throw invalidCredentials();
-    const result = await this.createSession(user, previousToken);
+    const result = await this.createSession(user, previousToken, headerToken);
     this.limiter.succeed(throttleKey);
     return result;
   }
 
-  async demoLogin(role: Role, previousToken: string | undefined) {
+  async demoLogin(role: Role, previousToken: string | undefined, headerToken?: string) {
     const key = `demo:${role}`;
     this.limiter.attempt(key);
     const user = await this.users.findSessionUserByEmail(`${role}@demo.local`);
     if (!user) throw invalidCredentials();
-    const result = await this.createSession(user, previousToken);
+    const result = await this.createSession(user, previousToken, headerToken);
     this.limiter.succeed(key);
     return result;
   }
 
-  private async createSession(user: SessionUser, previousToken: string | undefined) {
-    const previous = this.claims(previousToken);
+  private async createSession(user: SessionUser, previousToken: string | undefined, headerToken?: string) {
+    const previous = [...new Set([previousToken, headerToken])].flatMap((value) => {
+      const claims = this.claims(value);
+      return claims ? [{ sid: claims.sid, userId: claims.sub }] : [];
+    });
     const sid = randomUUID();
     const now = Math.floor(Date.now() / 1000);
     const token = signAccessToken({ sub: user.id, sid }, this.config.jwtSecret, now);
     const expiresAt = new Date((now + ACCESS_TTL_SECONDS) * 1000);
-    await this.sessions.replace(previous && { sid: previous.sid, userId: previous.sub }, {
+    await this.sessions.replace(previous, {
       sid,
       userId: user.id,
       expiresAt,
@@ -83,9 +92,13 @@ export class AuthService {
     return { token, user: { id: user.id, email: user.email, role: user.role }, expiresAt };
   }
 
-  /** Revokes only the session named by a validly signed cookie, matched to its subject. */
-  async logout(token: string | undefined) {
+  /** Revokes only sessions named by validly signed tokens, matched to their subjects. */
+  async logout(token: string | undefined, cookieToken?: string) {
     const claims = this.claims(token);
-    if (claims) await this.sessions.revoke(claims.sid, claims.sub);
+    if (!claims) return;
+    const cookie = this.claims(cookieToken);
+    if (cookie && cookie.sid !== claims.sid) {
+      await this.sessions.revokeBoth({ sid: claims.sid, userId: claims.sub }, { sid: cookie.sid, userId: cookie.sub });
+    } else await this.sessions.revoke(claims.sid, claims.sub);
   }
 }

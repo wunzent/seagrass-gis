@@ -62,6 +62,22 @@ afterAll(async () => {
 });
 
 describe('demo login (real PostGIS)', () => {
+  it('demo-login revokes both the existing cookie and supplied bearer session', async () => {
+    const cookie = cookieOf(await post({ role: 'viewer' }));
+    const bearer = cookieOf(await post({ role: 'admin' }));
+    const response = await post(
+      { role: 'editor' },
+      { ...csrf, Cookie: cookie, Authorization: `Bearer ${bearer.split('=')[1]}` },
+    );
+    expect(response.status).toBe(200);
+    expect((await me(cookieOf(response))).status).toBe(200);
+    for (const old of [cookie, bearer]) {
+      expect((await me(old)).status).toBe(401);
+      expect(
+        (await fetch(`${base}/auth/me`, { headers: { Authorization: `Bearer ${old.split('=')[1]}` } })).status,
+      ).toBe(401);
+    }
+  });
   it.each([undefined, 'false', 'TRUE'])('flag %s returns normal 404 before CSRF and validation', async (flag) => {
     const disabled = await start(flag);
     try {
@@ -131,8 +147,12 @@ describe('demo login (real PostGIS)', () => {
       /^gis_access=[\w-]+\.[\w-]+\.[\w-]+; Max-Age=900; Path=\/; HttpOnly; SameSite=Lax$/,
     );
     const body = (await response.json()) as any;
-    expect(Object.keys(body).sort()).toEqual(['expires_at', 'expires_in', 'user']);
+    expect(Object.keys(body).sort()).toEqual(['access_token', 'expires_at', 'expires_in', 'token_type', 'user']);
+    expect(typeof body.access_token).toBe('string');
+    expect(body.access_token === cookieOf(response).split('=')[1]).toBe(true);
     expect(body).toEqual({
+      access_token: expect.any(String),
+      token_type: 'Bearer',
       user: { id: expect.any(String), email: `${role}@demo.local`, role },
       expires_in: 900,
       expires_at: expect.any(String),

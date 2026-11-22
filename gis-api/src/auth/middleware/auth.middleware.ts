@@ -3,15 +3,25 @@ import { AuthService } from '../auth.service';
 import { ACCESS_COOKIE, clearedAccessCookie, parseCookies } from '../utils/cookies';
 import type { HttpRequest, HttpResponse } from '../../shared/types/http.types';
 
-export const tokenOf = (request: Pick<HttpRequest, 'headers'>) => {
+export const hasAuthorization = (request: Pick<HttpRequest, 'headers'>) =>
+  Object.prototype.hasOwnProperty.call(request.headers, 'authorization');
+
+export const cookieTokenOf = (request: Pick<HttpRequest, 'headers'>) => {
   const raw = request.headers.cookie;
   return parseCookies(typeof raw === 'string' ? raw : undefined)[ACCESS_COOKIE] || undefined;
 };
 
+export const tokenOf = (request: Pick<HttpRequest, 'headers'>) => {
+  if (hasAuthorization(request)) {
+    const header = request.headers.authorization;
+    return typeof header === 'string' ? /^Bearer +([^\s,]+)$/i.exec(header)?.[1] : undefined;
+  }
+  return cookieTokenOf(request);
+};
+
 const SAFE_METHODS = new Set(['GET', 'HEAD']);
 
-/** Sets `request.auth` (null when the cookie is unusable; RolesGuard and /auth/me enforce 401). GET/HEAD also clear an
- * unusable cookie; unsafe methods never touch it, so a cross-site write cannot force a logout. */
+/** Header credentials take precedence, including malformed ones. Only cookie failures on safe methods clear cookies. */
 @Injectable()
 export class AuthMiddleware implements NestMiddleware {
   constructor(private readonly auth: AuthService) {}
@@ -19,7 +29,8 @@ export class AuthMiddleware implements NestMiddleware {
     try {
       const token = tokenOf(request);
       request.auth = await this.auth.authenticate(token);
-      if (token && !request.auth && SAFE_METHODS.has(request.method))
+      request.authSource = request.auth ? (hasAuthorization(request) ? 'bearer' : 'cookie') : undefined;
+      if (!hasAuthorization(request) && token && !request.auth && SAFE_METHODS.has(request.method))
         response.setHeader('Set-Cookie', clearedAccessCookie(this.auth.config.cookieSecure));
       next();
     } catch (error) {

@@ -1,4 +1,4 @@
-import { AuthMiddleware } from './auth.middleware';
+import { AuthMiddleware, tokenOf } from './auth.middleware';
 
 const context = { user: { id: 'u', email: 'a@b.c', role: 'viewer' }, sid: 's', expiresAt: new Date() };
 
@@ -39,5 +39,38 @@ describe('AuthMiddleware', () => {
     // A cross-site write with a stale cookie must not be able to force any cookie change (CSRF is checked later).
     for (const method of ['POST', 'PATCH', 'DELETE'])
       expect((await run(method, 'gis_access=stale', null)).setCookie).toBeUndefined();
+  });
+});
+
+describe('Bearer credential selection', () => {
+  it.each([
+    ['Bearer header-jwt', 'header-jwt'],
+    ['bearer header-jwt', 'header-jwt'],
+    ['Basic header-jwt', undefined],
+    ['Bearer', undefined],
+    ['Bearer a b', undefined],
+    ['', undefined],
+  ])('header (%#) takes precedence over cookies', (authorization, expected) => {
+    expect(tokenOf({ headers: { cookie: 'gis_access=cookie-jwt', authorization } })).toBe(expected);
+  });
+
+  it('array headers are unusable without cookie fallback', () => {
+    expect(
+      tokenOf({ headers: { cookie: 'gis_access=cookie-jwt', authorization: ['Bearer a', 'Bearer b'] } }),
+    ).toBeUndefined();
+  });
+
+  it('marks only authenticated Bearer requests and never clears cookies on header failures', async () => {
+    for (const resolved of [context, null]) {
+      const request: any = {
+        method: 'GET',
+        headers: { authorization: 'Bearer header-jwt', cookie: 'gis_access=cookie-jwt' },
+      };
+      const changed: string[] = [];
+      const auth = { authenticate: async () => resolved, config: { cookieSecure: false } } as any;
+      await new AuthMiddleware(auth).use(request, { setHeader: (key) => changed.push(key) }, () => {});
+      expect(request.authSource).toBe(resolved ? 'bearer' : undefined);
+      expect(changed).toEqual([]);
+    }
   });
 });

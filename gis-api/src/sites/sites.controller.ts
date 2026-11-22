@@ -2,6 +2,7 @@ import { Controller, Delete, Get, Header, HttpCode, Param, Patch, Post, Query, R
 import {
   ApiBody,
   ApiCookieAuth,
+  ApiBearerAuth,
   ApiCreatedResponse,
   ApiNoContentResponse,
   ApiOkResponse,
@@ -66,7 +67,8 @@ export class SitesController {
   @Roles('admin')
   @ApiOperation({ summary: 'สร้างแหล่ง (admin): คำนวณ province_code และ area_rai จาก geometry, version 1' })
   @ApiCookieAuth('gis_access')
-  @ApiCsrfHeaders()
+  @ApiBearerAuth()
+  @ApiCsrfHeaders(false)
   @ApiBody({ type: CreateSiteDto })
   @ApiCreatedResponse({ type: SiteFeatureResponseDto })
   @ApiErrorResponse(400, ['VALIDATION_ERROR', 'INVALID_GEOMETRY'])
@@ -86,7 +88,8 @@ export class SitesController {
     summary: 'แก้ไขแหล่งด้วย version ปัจจุบัน (editor แก้ name; admin แก้ name/geometry); สำเร็จแล้ว version+1',
   })
   @ApiCookieAuth('gis_access')
-  @ApiCsrfHeaders()
+  @ApiBearerAuth()
+  @ApiCsrfHeaders(false)
   @ApiBody({ type: UpdateSiteDto })
   @ApiOkResponse({ type: SiteFeatureResponseDto })
   @ApiErrorResponse(400, ['VALIDATION_ERROR', 'INVALID_GEOMETRY'])
@@ -109,7 +112,8 @@ export class SitesController {
   @HttpCode(204)
   @ApiOperation({ summary: 'ลบแหล่งแบบ soft delete (admin) เมื่อไม่มีข้อมูลการสำรวจ' })
   @ApiCookieAuth('gis_access')
-  @ApiCsrfHeaders()
+  @ApiBearerAuth()
+  @ApiCsrfHeaders(false)
   @ApiNoContentResponse({ description: 'No content' })
   @ApiErrorResponse(400, ['VALIDATION_ERROR'])
   @ApiErrorResponse(401, ['UNAUTHORIZED'])

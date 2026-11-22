@@ -2,6 +2,7 @@ import { Controller, Delete, Get, Header, HttpCode, Param, Patch, Post, Query, R
 import {
   ApiBody,
   ApiCookieAuth,
+  ApiBearerAuth,
   ApiCreatedResponse,
   ApiNoContentResponse,
   ApiOkResponse,
@@ -71,7 +72,8 @@ export class SurveysController {
     summary: 'บันทึกการสำรวจ (editor/admin): จุดต้องห่างแหล่งไม่เกิน 50 m; ตอบ status ของแหล่งหลังบันทึก',
   })
   @ApiCookieAuth('gis_access')
-  @ApiCsrfHeaders()
+  @ApiBearerAuth()
+  @ApiCsrfHeaders(false)
   @ApiBody({ type: CreateSurveyDto })
   @ApiCreatedResponse({ type: CreatedSurveyResponseDto })
   @ApiErrorResponse(400, ['VALIDATION_ERROR'])
@@ -92,7 +94,8 @@ export class SurveysController {
   @Roles('editor', 'admin')
   @ApiOperation({ summary: 'แก้ไขการสำรวจบางส่วน (editor/admin); ตรวจ record หลัง merge รวมระยะ 50 m' })
   @ApiCookieAuth('gis_access')
-  @ApiCsrfHeaders()
+  @ApiBearerAuth()
+  @ApiCsrfHeaders(false)
   @ApiBody({ type: UpdateSurveyDto })
   @ApiOkResponse({ type: SurveyResponseDto })
   @ApiErrorResponse(400, ['VALIDATION_ERROR'])
@@ -114,7 +117,8 @@ export class SurveysController {
   @HttpCode(204)
   @ApiOperation({ summary: 'ลบการสำรวจถาวร (editor/admin); status ของแหล่งคำนวณใหม่ตอนอ่านครั้งถัดไป' })
   @ApiCookieAuth('gis_access')
-  @ApiCsrfHeaders()
+  @ApiBearerAuth()
+  @ApiCsrfHeaders(false)
   @ApiNoContentResponse({ description: 'No content' })
   @ApiErrorResponse(400, ['VALIDATION_ERROR'])
   @ApiErrorResponse(401, ['UNAUTHORIZED'])

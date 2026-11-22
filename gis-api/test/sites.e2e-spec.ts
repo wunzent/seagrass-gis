@@ -1,3 +1,4 @@
+import { siteStatus } from '../src/sites/site-status';
 import { Test } from '@nestjs/testing';
 import { appModule } from '../src/app.module';
 import { readConfig } from '../src/core/config/config';
@@ -71,6 +72,35 @@ afterAll(async () => {
 });
 
 describe('sites (real PostGIS)', () => {
+  it.each([
+    ['E-005', 24.99],
+    ['F-006', 25],
+    ['B-002', 50],
+    ['A-001', 75],
+  ] as const)('GET /sites/%s agrees with siteStatus(%s)', async (code, average) => {
+    const response = await get(`/sites/${code}`);
+    expect(response.status).toBe(200);
+    expect(response.body.properties.latestSurvey.average_cover_percent).toBe(average);
+    expect(response.body.properties.status).toBe(siteStatus(average));
+  });
+
+  it('compares the raw latest-day average even when the displayed average rounds to 75', async () => {
+    const id = '00000000-0000-4000-8000-000000000110';
+    await survey(id, '2026-11-01', 74.99);
+    await survey(id, '2026-11-01', 75);
+    try {
+      const response = await get('/sites/A-001');
+      expect(response.body.properties.latestSurvey).toEqual({
+        surveyed_on: '2026-11-01',
+        average_cover_percent: 75,
+        count: 2,
+      });
+      expect(response.body.properties.status).toBe(siteStatus(74.995));
+    } finally {
+      await pool.query("DELETE FROM surveys WHERE site_id = $1 AND surveyed_on = '2026-11-01'", [id]);
+    }
+  });
+
   it('GET /sites lists active sites by code with computed status and no geometry', async () => {
     const { status, headers, body } = await get('/sites');
     expect(status).toBe(200);

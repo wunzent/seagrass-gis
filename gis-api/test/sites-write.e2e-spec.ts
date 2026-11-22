@@ -479,7 +479,7 @@ describe('DELETE /sites/:code (real PostGIS)', () => {
 });
 
 describe('site writes: authentication, role and CSRF order (IT-05-06/10-07/05-08-AUTH)', () => {
-  it('401 for missing, forged, expired, revoked and Bearer-only credentials, before validation or lookup', async () => {
+  it('401 for missing, forged, expired, revoked and malformed Bearer credentials, before validation or lookup', async () => {
     const now = Math.floor(Date.now() / 1000);
     const expired = signAccessToken(
       { sub: USERS.admin, sid: '00000000-0000-4000-8000-00000000beef' },
@@ -494,7 +494,7 @@ describe('site writes: authentication, role and CSRF order (IT-05-06/10-07/05-08
       ['forged', { cookie: 'gis_access=abc.def.ghi' }],
       ['expired', { cookie: `gis_access=${expired}` }],
       ['revoked', { cookie: revoked }],
-      ['bearer', { headers: { Authorization: `Bearer ${cookies.admin.split('=')[1]}` } }],
+      ['bearer', { headers: { Authorization: 'Bearer invalid' } }],
     ] as const) {
       for (const [method, path, body] of [
         ['POST', '/sites', feature('AUTH-001')],
@@ -679,5 +679,28 @@ describe('site writes: failure after a real write rolls back', () => {
       }
     }
     expect(await siteRows()).toEqual(before); // no ROLL-NEW row; ROLL-001 still version 1 and not renamed
+  });
+});
+
+describe('Bearer writes (real PostGIS)', () => {
+  it('admin writes without Origin/CSRF; cookie needs CSRF; viewer and bad bearer cannot write', async () => {
+    const code = 'BEARER-TEST';
+    await insertSite(code, square(99.3, 7.3, 0.01));
+    const patch = (headers: Record<string, string>) =>
+      fetch(`${base}/sites/${code}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({ version: 1, name: 'Bearer updated' }),
+      });
+    const cookie = await patch({ Cookie: cookies.admin });
+    expect([cookie.status, ((await cookie.json()) as any).error.code]).toEqual([403, 'CSRF_REJECTED']);
+    const viewer = await patch({ Authorization: `Bearer ${cookies.viewer.split('=')[1]}` });
+    expect([viewer.status, ((await viewer.json()) as any).error.code]).toEqual([403, 'FORBIDDEN']);
+    const bad = await patch({ Authorization: 'Bearer invalid', Cookie: cookies.admin });
+    expect(bad.status).toBe(401);
+    expect(bad.headers.get('set-cookie')).toBeNull();
+    const admin = await patch({ Authorization: `Bearer ${cookies.admin.split('=')[1]}` });
+    expect(admin.status).toBe(200);
+    expect(((await admin.json()) as any).properties.version).toBe(2);
   });
 });

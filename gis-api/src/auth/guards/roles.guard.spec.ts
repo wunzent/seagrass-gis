@@ -88,3 +88,25 @@ describe('RolesGuard', () => {
     expect(guard.canActivate(ctx({ name: 'x' }))).toBe(true); // handler overrides the class rule for `name`
   });
 });
+
+describe('Bearer CSRF exemption', () => {
+  it('skips CSRF only for an authenticated Bearer source and still enforces roles', () => {
+    class Handler {
+      patch() {}
+    }
+    Roles('admin')(Handler.prototype, 'patch', Object.getOwnPropertyDescriptor(Handler.prototype, 'patch')!);
+    const guard = new RolesGuard(new Reflector(), { allowedOrigins: ['http://localhost:3000'] } as any);
+    const ctx = (auth: unknown, authSource?: string) =>
+      ({
+        getHandler: () => Handler.prototype.patch,
+        getClass: () => Handler,
+        switchToHttp: () => ({
+          getRequest: () => ({ auth, authSource, headers: { authorization: 'Bearer supplied' } }),
+        }),
+      }) as any;
+    expect(guard.canActivate(ctx({ user: { role: 'admin' } }, 'bearer'))).toBe(true);
+    expect(status(() => guard.canActivate(ctx({ user: { role: 'admin' } }, 'cookie')))).toEqual([403, 'CSRF_REJECTED']);
+    expect(status(() => guard.canActivate(ctx(null, 'bearer')))).toEqual([401, 'UNAUTHORIZED']);
+    expect(status(() => guard.canActivate(ctx({ user: { role: 'viewer' } }, 'bearer')))).toEqual([403, 'FORBIDDEN']);
+  });
+});

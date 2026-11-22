@@ -20,7 +20,8 @@ get:
               message: ...
               details: {}
   security:
+    - bearer: []
     - gis_access: []
-  summary: ผู้ใช้ปัจจุบันจาก cookie session (ไม่ต่ออายุ)
+  summary: ผู้ใช้ปัจจุบันจาก Bearer หรือ cookie session (ไม่ต่ออายุ)
   tags:
     - auth

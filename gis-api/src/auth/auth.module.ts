@@ -18,7 +18,7 @@ export interface AuthModuleOptions {
 }
 
 /**
- * Cookie-JWT sessions. Registers RolesGuard globally (no-op unless a handler or class has @Roles) and resolves
+ * Bearer/cookie JWT sessions. Registers RolesGuard globally (no-op unless a handler or class has @Roles) and resolves
  * request.auth for every route except those excluded in configure(). Exports AuthService for modules that need the actor.
  */
 @Module({})
@@ -45,7 +45,7 @@ export class AuthModule implements NestModule {
   }
 
   configure(consumer: MiddlewareConsumer) {
-    // Excluded: /health (readiness must not depend on sessions), /docs, and login/logout, which read their own cookie
+    // Excluded: /health (readiness must not depend on sessions), /docs, and login/logout, which select their own token
     // after the CSRF guard so a cross-site request never reaches the session table.
     consumer
       .apply(AuthMiddleware)

@@ -27,6 +27,7 @@ post:
   parameters:
     - name: X-CSRF-Protection
       in: header
+      description: ต้องส่งเสมอ
       required: true
       schema:
         type: string

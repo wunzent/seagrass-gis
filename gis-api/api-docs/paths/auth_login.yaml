@@ -3,6 +3,7 @@ post:
   parameters:
     - name: X-CSRF-Protection
       in: header
+      description: ต้องส่งเสมอ
       required: true
       schema:
         type: string
@@ -87,6 +88,6 @@ post:
               code: SERVICE_UNAVAILABLE
               message: ...
               details: {}
-  summary: 'เข้าสู่ระบบ: ตั้ง HttpOnly cookie gis_access (JWT 15 นาที) ไม่คืน token ใน JSON'
+  summary: 'เข้าสู่ระบบ: คืน JWT ใน JSON และตั้ง HttpOnly cookie gis_access (JWT 15 นาที)'
   tags:
     - auth

@@ -78,15 +78,16 @@ post:
         type: string
     - name: X-CSRF-Protection
       in: header
-      required: true
+      description: ต้องส่งเมื่อใช้ cookie; Bearer ไม่ต้องส่ง
+      required: false
       schema:
         type: string
         enum:
           - '1'
     - name: Origin
       in: header
-      description: ต้องตรงกับ PUBLIC_WEB_ORIGIN หรือ API_DOCS_ORIGIN
-      required: true
+      description: ต้องตรงกับ PUBLIC_WEB_ORIGIN หรือ API_DOCS_ORIGIN; ต้องส่งเมื่อใช้ cookie; Bearer ไม่ต้องส่ง
+      required: false
       schema:
         type: string
   requestBody:
@@ -169,6 +170,7 @@ post:
               message: ...
               details: {}
   security:
+    - bearer: []
     - gis_access: []
   summary: 'บันทึกการสำรวจ (editor/admin): จุดต้องห่างแหล่งไม่เกิน 50 m; ตอบ status ของแหล่งหลังบันทึก'
   tags:

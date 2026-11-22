@@ -4,7 +4,7 @@ export interface SessionUser {
   email: string;
   role: Role;
 }
-/** Resolved by auth_middleware from the gis_access cookie and an active DB session; null for anonymous requests. */
+/** Resolved by auth_middleware from Bearer or the gis_access cookie and an active DB session; null for anonymous requests. */
 export interface AuthenticatedContext {
   user: SessionUser;
   sid: string;

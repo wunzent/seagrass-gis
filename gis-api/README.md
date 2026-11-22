@@ -46,9 +46,9 @@ npm start
 (ต้องมีผู้ใช้ `viewer@demo.local`, `editor@demo.local`, `admin@demo.local` จาก demo seeder เดิม)
 `GET /auth/demo-login` คืนรายการ role; `POST /auth/demo-login` รับเฉพาะ `{ "role": "viewer" | "editor" | "admin" }`
 พร้อม Origin ที่อนุญาตและ `X-CSRF-Protection: 1` เช่นเดียวกับ login เดิม แล้วตั้ง HttpOnly cookie อายุ 900 วินาที
-ทุก response ใช้ `Cache-Control: no-store`; ไม่รับรหัสผ่านและไม่คืน token ใน JSON
+ทุก response ใช้ `Cache-Control: no-store`; ไม่รับรหัสผ่าน; คืน `access_token` และ `token_type: "Bearer"` เช่นเดียวกับ login
 POST ใช้ rate limiter เดิมแยก key `demo:<role>` โดยล้างตัวนับเมื่อเข้าสู่ระบบสำเร็จ จึงนับเฉพาะความล้มเหลว (ค่าเริ่มต้น 10 ครั้ง/15 นาทีต่อ role)
-และเพิกถอน session เดิมใน cookie เมื่อสร้าง session ใหม่สำเร็จ
+และเพิกถอน session เดิมใน cookie รวมถึง Bearer header ที่ส่งมาด้วย เมื่อสร้าง session ใหม่สำเร็จใน transaction เดียวกัน
 
 ค่าเริ่มต้น `DEMO_LOGIN_ENABLED=false`; ยอมรับเฉพาะข้อความ `true` ตัวพิมพ์เล็กเท่านั้น ค่าอื่นหรือไม่ตั้งถือว่าปิด:
 ทั้งสอง endpoint ตอบ 404 `NOT_FOUND` ก่อนตรวจ CSRF/body (image Docker รันด้วย `NODE_ENV=production` จึงใช้ flag นี้เป็นสวิตช์เดียว)
@@ -71,3 +71,25 @@ Integration suites ล้างตาราง จึงยอมรับเฉ
 ## CI
 
 `.gitlab-ci.yml` มี 3 jobs ตามลำดับ: `test` (node 22.18.0 + PostGIS service สองตัว `db`/`db-import`; `npm ci`, `format:check`, `build`, unit, integration, import unit, import integration) → `docker-image` (build Dockerfile ด้วย dind) → `secret_detection` (GitLab template) จำลอง job `test` ใน Docker ผ่านแล้ว; ผล hosted pipeline ยังไม่ได้ตรวจ
+
+## JWT และ Bearer (DEC-14)
+
+`POST /auth/login` และ `POST /auth/demo-login` คืน `{access_token, token_type:"Bearer", user, expires_in:900, expires_at}`
+พร้อม HttpOnly cookie `gis_access` ที่มี JWT เดียวกัน ใช้ session revocation เดิมและไม่ต่ออายุเมื่ออ่านข้อมูล
+client ส่ง `Authorization: Bearer <JWT>` ได้; เมื่อมี header จะเลือก header ก่อน cookie แม้ header ผิดรูปหรือ token ใช้ไม่ได้
+จะไม่ fallback และไม่ล้าง cookie เพราะ Bearer ล้มเหลว; public reads ยังคงตอบข้อมูล anonymous ส่วน protected endpoints ตอบ 401
+
+protected writes ที่ยืนยันตัวตนด้วย Bearer ไม่ต้องส่ง Origin/X-CSRF-Protection แต่ยังตรวจ role และสิทธิ์ราย field ตามเดิม
+ถ้าใช้ cookie ต้องส่ง Origin ที่อนุญาตและ `X-CSRF-Protection: 1` เสมอ
+`POST /auth/login`, `/auth/demo-login`, `/auth/logout` ยังตรวจ CSRF ทุกกรณี
+login ทั้งสองแบบเพิกถอน session เดิมจาก cookie และ Bearer header พร้อมสร้าง session ใหม่ใน transaction เดียวกัน
+logout เลือกเพิกถอน session จาก header เมื่อมี header มิฉะนั้นเลือก cookie; JWT ที่ถูกเพิกถอนใช้ไม่ได้ทั้งสองช่องทาง
+เมื่อ Bearer ใช้ได้และมี cookie session ที่ยังใช้ได้ จะเพิกถอน cookie session ด้วยและส่ง clearing Set-Cookie;
+ถ้าไม่มี cookie session ที่ใช้ได้ จะไม่ส่ง clearing Set-Cookie สำหรับ Bearer logout
+ถ้า Bearer ใช้ไม่ได้ logout ตอบ 204 โดยไม่ล้าง cookie หรือเพิกถอน session ของ cookie
+Swagger `/docs` มีทั้ง cookie และ Bearer security; ห้าม log token
+
+เว็บใช้ cookie อย่างเดียวและเลือกเก็บเฉพาะ safe user กับ expiry โดยไม่เก็บ `access_token` หรือส่ง Authorization
+กฎ status ใช้ `src/sites/site-status.ts` เป็นแหล่ง thresholds ร่วมกับ SQL CASE:
+75 → very_good, 50 → good, 25 → fair, ต่ำกว่า 25 → poor, null → no_data
+เปรียบเทียบค่าเฉลี่ยของ survey ทั้งหมดในวันล่าสุดโดยไม่ปัดเศษก่อน; ปัดเฉพาะค่าที่แสดง

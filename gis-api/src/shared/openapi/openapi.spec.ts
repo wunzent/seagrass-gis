@@ -82,6 +82,32 @@ describe('api docs', () => {
       const spec: any = await (await fetch(`${base}/docs/openapi.json`)).json();
       expect(spec.components.securitySchemes.gis_access.in).toBe('cookie');
       expect(spec.paths['/sites']).toBeTruthy();
+      expect(spec.components.securitySchemes.bearer).toMatchObject({ type: 'http', scheme: 'bearer' });
+      for (const path of ['/auth/login', '/auth/demo-login', '/auth/logout']) {
+        expect(
+          spec.paths[path].post.parameters.filter((p: any) => p.in === 'header').every((p: any) => p.required),
+        ).toBe(true);
+      }
+      for (const path of ['/sites/{code}', '/surveys/{id}']) {
+        expect(
+          spec.paths[path].patch.parameters.filter((p: any) => p.in === 'header').every((p: any) => !p.required),
+        ).toBe(true);
+      }
+      for (const [path, method] of [
+        ['/auth/me', 'get'],
+        ['/auth/logout', 'post'],
+        ['/sites', 'post'],
+        ['/sites/{code}', 'patch'],
+        ['/sites/{code}', 'delete'],
+        ['/sites/{code}/surveys', 'post'],
+        ['/surveys/{id}', 'patch'],
+        ['/surveys/{id}', 'delete'],
+      ]) {
+        expect(spec.paths[path][method].security).toEqual(expect.arrayContaining([{ gis_access: [] }, { bearer: [] }]));
+      }
+      expect(spec.components.schemas.LoginResponse.required).toEqual(
+        expect.arrayContaining(['access_token', 'token_type']),
+      );
     } finally {
       await app.close();
     }

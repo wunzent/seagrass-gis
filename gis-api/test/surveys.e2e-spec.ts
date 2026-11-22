@@ -642,7 +642,7 @@ describe('survey writes: authentication, role and CSRF order (IT-06-10/06-11/07-
       ['DELETE', '/surveys/999999999', undefined],
     ] as const;
 
-  it('401 for missing, forged, expired, revoked and Bearer-only credentials, before validation or lookup', async () => {
+  it('401 for missing, forged, expired, revoked and malformed Bearer credentials, before validation or lookup', async () => {
     const expired = signAccessToken(
       { sub: USERS.editor, sid: '00000000-0000-4000-8000-00000000beef' },
       SECRET,
@@ -656,7 +656,7 @@ describe('survey writes: authentication, role and CSRF order (IT-06-10/06-11/07-
       ['forged', { cookie: 'gis_access=abc.def.ghi' }],
       ['expired', { cookie: `gis_access=${expired}` }],
       ['revoked', { cookie: revoked }],
-      ['bearer', { headers: { Authorization: `Bearer ${cookies.editor.split('=')[1]}` } }],
+      ['bearer', { headers: { Authorization: 'Bearer invalid' } }],
     ] as const)
       for (const [method, path, payload] of writes()) {
         const response = await send(method, path, { ...options, body: payload });

@@ -63,15 +63,16 @@ patch:
         type: string
     - name: X-CSRF-Protection
       in: header
-      required: true
+      description: ต้องส่งเมื่อใช้ cookie; Bearer ไม่ต้องส่ง
+      required: false
       schema:
         type: string
         enum:
           - '1'
     - name: Origin
       in: header
-      description: ต้องตรงกับ PUBLIC_WEB_ORIGIN หรือ API_DOCS_ORIGIN
-      required: true
+      description: ต้องตรงกับ PUBLIC_WEB_ORIGIN หรือ API_DOCS_ORIGIN; ต้องส่งเมื่อใช้ cookie; Bearer ไม่ต้องส่ง
+      required: false
       schema:
         type: string
   requestBody:
@@ -165,6 +166,7 @@ patch:
               message: ...
               details: {}
   security:
+    - bearer: []
     - gis_access: []
   summary: แก้ไขแหล่งด้วย version ปัจจุบัน (editor แก้ name; admin แก้ name/geometry); สำเร็จแล้ว version+1
   tags:
@@ -181,15 +183,16 @@ delete:
         type: string
     - name: X-CSRF-Protection
       in: header
-      required: true
+      description: ต้องส่งเมื่อใช้ cookie; Bearer ไม่ต้องส่ง
+      required: false
       schema:
         type: string
         enum:
           - '1'
     - name: Origin
       in: header
-      description: ต้องตรงกับ PUBLIC_WEB_ORIGIN หรือ API_DOCS_ORIGIN
-      required: true
+      description: ต้องตรงกับ PUBLIC_WEB_ORIGIN หรือ API_DOCS_ORIGIN; ต้องส่งเมื่อใช้ cookie; Bearer ไม่ต้องส่ง
+      required: false
       schema:
         type: string
   responses:
@@ -262,6 +265,7 @@ delete:
               message: ...
               details: {}
   security:
+    - bearer: []
     - gis_access: []
   summary: ลบแหล่งแบบ soft delete (admin) เมื่อไม่มีข้อมูลการสำรวจ
   tags:

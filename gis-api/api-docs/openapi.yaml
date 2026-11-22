@@ -29,7 +29,9 @@ paths:
     $ref: ./paths/species.yaml
 info:
   title: Seagrass GIS API
-  description: 'API ติดตามแหล่งหญ้าทะเล; write endpoints ใช้ HttpOnly cookie gis_access + Origin + X-CSRF-Protection: 1'
+  description: >-
+    API ติดตามแหล่งหญ้าทะเล; write endpoints ใช้ Bearer JWT หรือ HttpOnly cookie gis_access + Origin +
+    X-CSRF-Protection: 1; login/demo-login/logout ตรวจ CSRF เสมอ
   version: 0.1.0
   contact: {}
 tags: []
@@ -40,6 +42,10 @@ components:
       type: apiKey
       in: cookie
       name: gis_access
+    bearer:
+      scheme: bearer
+      bearerFormat: JWT
+      type: http
   schemas:
     DemoLoginRolesDto:
       $ref: ./components/schemas/DemoLoginRolesDto.yaml

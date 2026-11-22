@@ -54,7 +54,165 @@ afterAll(async () => {
 });
 
 describe('auth (real PostGIS)', () => {
-  it('login sets an HttpOnly host-only cookie and never returns the JWT in JSON', async () => {
+  it('GET /auth/me accepts only the Bearer header', async () => {
+    const cookie = cookieOf(await login('viewer@demo.local', 'viewer-pass'));
+    const response = await fetch(`${base}/auth/me`, { headers: { Authorization: `Bearer ${cookie.split('=')[1]}` } });
+    expect(response.status).toBe(200);
+    expect(response.headers.get('set-cookie')).toBeNull();
+    expect(((await response.json()) as any).user.id).toBe(USERS.viewer);
+  });
+
+  it('a valid Bearer header wins over a different valid cookie', async () => {
+    const cookie = cookieOf(await login('admin@demo.local', 'admin-pass'));
+    const viewer = cookieOf(await login('viewer@demo.local', 'viewer-pass')).split('=')[1];
+    const response = await fetch(`${base}/auth/me`, { headers: { Cookie: cookie, Authorization: `Bearer ${viewer}` } });
+    expect(response.status).toBe(200);
+    expect(((await response.json()) as any).user.role).toBe('viewer');
+  });
+
+  it.each(['Bearer invalid', 'Basic invalid', 'Bearer', 'Bearer a b', '', 'Bearer '])(
+    'unusable Authorization header (%#) never falls back or clears the valid cookie',
+    async (authorization) => {
+      const cookie = cookieOf(await login('admin@demo.local', 'admin-pass'));
+      for (const path of ['/auth/me', '/sites']) {
+        const response = await fetch(`${base}${path}`, { headers: { Cookie: cookie, Authorization: authorization } });
+        expect(response.status).toBe(path === '/auth/me' ? 401 : 200);
+        expect(response.headers.get('set-cookie')).toBeNull();
+      }
+      expect((await me(cookie)).status).toBe(200);
+    },
+  );
+
+  it('bearer logout still requires CSRF and revokes both header and cookie sessions', async () => {
+    const headerCookie = cookieOf(await login('admin@demo.local', 'admin-pass'));
+    const otherCookie = cookieOf(await login('viewer@demo.local', 'viewer-pass'));
+    const headers = { Authorization: `Bearer ${headerCookie.split('=')[1]}`, Cookie: otherCookie };
+    const blocked = await fetch(`${base}/auth/logout`, { method: 'POST', headers });
+    expect([blocked.status, await errorCode(blocked)]).toEqual([403, 'CSRF_REJECTED']);
+    expect(blocked.headers.get('set-cookie')).toBeNull();
+    expect((await me(headerCookie)).status).toBe(200);
+    const out = await fetch(`${base}/auth/logout`, { method: 'POST', headers: { ...headers, ...csrf } });
+    expect(out.status).toBe(204);
+    expect(out.headers.get('set-cookie')).toBe('gis_access=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax');
+    expect((await me(headerCookie)).status).toBe(401);
+    const replay = await fetch(`${base}/auth/me`, { headers: { Authorization: headers.Authorization } });
+    expect(replay.status).toBe(401);
+    expect(replay.headers.get('set-cookie')).toBeNull();
+    expect((await me(otherCookie)).status).toBe(401);
+  });
+
+  it('bearer-only logout does not clear an absent cookie and blocks a subsequent PATCH', async () => {
+    const cookie = cookieOf(await login('admin@demo.local', 'admin-pass'));
+    const Authorization = `Bearer ${cookie.split('=')[1]}`;
+    const out = await fetch(`${base}/auth/logout`, { method: 'POST', headers: { ...csrf, Authorization } });
+    expect(out.status).toBe(204);
+    expect(out.headers.get('set-cookie')).toBeNull();
+    const patch = await fetch(`${base}/sites/REVOKED`, {
+      method: 'PATCH',
+      headers: { Authorization, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ version: 1, name: 'Denied' }),
+    });
+    expect(patch.status).toBe(401);
+    expect(await errorCode(patch)).toBe('UNAUTHORIZED');
+  });
+
+  it('bearer logout clears and revokes the matching cookie session', async () => {
+    const cookie = cookieOf(await login('admin@demo.local', 'admin-pass'));
+    const out = await fetch(`${base}/auth/logout`, {
+      method: 'POST',
+      headers: { ...csrf, Cookie: cookie, Authorization: `Bearer ${cookie.split('=')[1]}` },
+    });
+    expect(out.status).toBe(204);
+    expect(out.headers.get('set-cookie')).toBe('gis_access=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax');
+    expect((await me(cookie)).status).toBe(401);
+  });
+
+  it('login revokes both the existing cookie and the supplied bearer session', async () => {
+    const cookie = cookieOf(await login('viewer@demo.local', 'viewer-pass'));
+    const bearer = cookieOf(await login('admin@demo.local', 'admin-pass'));
+    const response = await login('viewer@demo.local', 'viewer-pass', {
+      Cookie: cookie,
+      Authorization: `Bearer ${bearer.split('=')[1]}`,
+    });
+    expect(response.status).toBe(200);
+    expect((await me(cookieOf(response))).status).toBe(200);
+    for (const old of [cookie, bearer]) {
+      expect((await me(old)).status).toBe(401);
+      expect(
+        (await fetch(`${base}/auth/me`, { headers: { Authorization: `Bearer ${old.split('=')[1]}` } })).status,
+      ).toBe(401);
+    }
+  });
+
+  it('bad bearer logout does not fall back to the cookie session', async () => {
+    const cookie = cookieOf(await login('viewer@demo.local', 'viewer-pass'));
+    const revoked = cookieOf(await login('admin@demo.local', 'admin-pass'));
+    expect((await fetch(`${base}/auth/logout`, { method: 'POST', headers: { ...csrf, Cookie: revoked } })).status).toBe(
+      204,
+    );
+    const expired = signAccessToken(
+      { sub: USERS.viewer, sid: '00000000-0000-4000-8000-000000000123' },
+      SECRET,
+      Math.floor(Date.now() / 1000) - 1000,
+    );
+    for (const authorization of [
+      'Bearer invalid',
+      'Basic invalid',
+      '',
+      `Bearer ${expired}`,
+      `Bearer ${revoked.split('=')[1]}`,
+    ]) {
+      const response = await fetch(`${base}/auth/logout`, {
+        method: 'POST',
+        headers: { ...csrf, Cookie: cookie, Authorization: authorization },
+      });
+      expect(response.status).toBe(204);
+      expect(response.headers.get('set-cookie')).toBeNull();
+      expect((await me(cookie)).status).toBe(200);
+    }
+  });
+
+  it('dual-session logout rolls back both revocations on failure and can be retried', async () => {
+    const cookie = cookieOf(await login('viewer@demo.local', 'viewer-pass'));
+    const bearer = cookieOf(await login('admin@demo.local', 'admin-pass'));
+    let updates = 0;
+    const query = async (client: any, sql: string, params?: unknown[]) => {
+      if (sql.startsWith('UPDATE access_sessions') && ++updates === 2)
+        throw Object.assign(new Error('injected unavailable database'), { code: '08006' });
+      return client.query(sql, params);
+    };
+    const flaky = await startApp(
+      {
+        query: (sql: string, params?: unknown[]) => query(pool, sql, params),
+        connect: async () => {
+          const client = await pool.connect();
+          return {
+            query: (sql: string, params?: unknown[]) => query(client, sql, params),
+            release: () => client.release(),
+          };
+        },
+      },
+      { auth },
+    );
+    try {
+      const url = `${await flaky.getUrl()}/auth/logout`;
+      const headers = { ...csrf, Cookie: cookie, Authorization: `Bearer ${bearer.split('=')[1]}` };
+      const failed = await fetch(url, { method: 'POST', headers });
+      expect(failed.status).toBe(503);
+      expect(failed.headers.get('set-cookie')).toBeNull();
+      expect((await me(cookie)).status).toBe(200);
+      expect((await me(bearer)).status).toBe(200);
+      const retry = await fetch(url, { method: 'POST', headers });
+      expect(retry.status).toBe(204);
+      expect(retry.headers.get('set-cookie')).toBe('gis_access=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax');
+      expect((await me(cookie)).status).toBe(401);
+      expect((await me(bearer)).status).toBe(401);
+    } finally {
+      await flaky.close();
+    }
+  });
+
+  it('login returns the cookie JWT and Bearer token type while preserving cookie attributes', async () => {
     const response = await login('Viewer@Demo.Local', 'viewer-pass');
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('no-store');
@@ -63,10 +221,12 @@ describe('auth (real PostGIS)', () => {
     expect(setCookie).not.toMatch(/Domain=|Secure/);
     const text = await response.text();
     const body = JSON.parse(text);
-    expect(Object.keys(body).sort()).toEqual(['expires_at', 'expires_in', 'user']);
+    expect(Object.keys(body).sort()).toEqual(['access_token', 'expires_at', 'expires_in', 'token_type', 'user']);
     expect(body.user).toEqual({ id: USERS.viewer, email: 'viewer@demo.local', role: 'viewer' });
     expect(body.expires_in).toBe(900);
-    expect(text.includes(cookieOf(response).split('=')[1])).toBe(false); // token not in body
+    expect(body.token_type).toBe('Bearer');
+    expect(typeof body.access_token).toBe('string');
+    expect(body.access_token === cookieOf(response).split('=')[1]).toBe(true);
     const restored = await me(cookieOf(response));
     expect(restored.status).toBe(200);
     expect(restored.headers.get('cache-control')).toBe('no-store');
@@ -180,7 +340,7 @@ describe('auth (real PostGIS)', () => {
     const bearer = await fetch(`${base}/auth/me`, {
       headers: { Authorization: `Bearer ${viewerCookie.split('=')[1]}` },
     });
-    expect(bearer.status).toBe(401); // no Bearer fallback
+    expect(bearer.status).toBe(200);
   });
 
   it('role changes in the database apply to the existing session', async () => {
