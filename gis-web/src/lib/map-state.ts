@@ -1,11 +1,14 @@
-export const SURVEY_POINT_COLOR = '#075985';
+// Nautical survey chart palette (gis-docs page-map-wireframe v0.2): ink survey marks on paper.
+export const INK = '#1B2A3A';
+export const PAPER = '#FBF9F4';
 
+// Sequential seagrass greens follow cover %; no_data is drawn hatched so it never reads as the lowest level.
 export const statuses = {
-  very_good: { label: 'ดีมาก', color: '#166534' },
-  good: { label: 'ดี', color: '#22a447' },
-  fair: { label: 'ปานกลาง', color: '#e5a11a' },
-  poor: { label: 'เสื่อมโทรม', color: '#dc2626' },
-  no_data: { label: 'ไม่มีข้อมูลสำรวจ', color: '#737d87' },
+  very_good: { label: 'ดีมาก', color: '#1E5A3C', range: '75% ขึ้นไป' },
+  good: { label: 'ดี', color: '#3E8A55', range: '50 ถึง 74%' },
+  fair: { label: 'ปานกลาง', color: '#8DBF73', range: '25 ถึง 49%' },
+  poor: { label: 'เสื่อมโทรม', color: '#D9E8B8', range: 'ต่ำกว่า 25%' },
+  no_data: { label: 'ไม่มีข้อมูลสำรวจ', color: '#F2EEE4', range: '' },
 } as const;
 
 export type Status = keyof typeof statuses;

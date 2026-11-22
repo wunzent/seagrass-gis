@@ -144,8 +144,17 @@ function mapHarness(globals = {}, onDisplayChange, onSelect = () => {}) {
       return (this.canvas ??= { style: {} });
     }
     queryRenderedFeatures(point, options) {
-      assert.deepEqual(Array.from(options.layers), ['surveys-circle', 'sites-fill']);
+      const layers = Array.from(options.layers);
+      if (layers.includes('surveys-circle')) {
+        assert.deepEqual(layers, ['surveys-circle']);
+        return this.clickedPoints ?? [];
+      }
+      assert.deepEqual(layers, ['sites-fill', 'sites-nodata']);
       return this.clickedFeatures ?? [];
+    }
+    addImage() {}
+    project() {
+      return this.point ?? { x: 0, y: 0 };
     }
     getCenter() {
       return { toArray: () => [99.2, 8.1] };
@@ -178,7 +187,7 @@ function mapHarness(globals = {}, onDisplayChange, onSelect = () => {}) {
   const h = componentHarness(
     '../src/components/site-map.tsx',
     {
-      'maplibre-gl': { Map: FakeMap, NavigationControl: class {}, setWorkerUrl() {} },
+      'maplibre-gl': { Map: FakeMap, NavigationControl: class {}, ScaleControl: class {}, setWorkerUrl() {} },
       '../lib/map-state': { ...mapState, debounce: (fn) => ({ run: fn, cancel() {} }) },
     },
     {
@@ -338,7 +347,13 @@ function provinceWorkspace(provinces) {
   });
   const Content = h.render(() => h.exports.default()).type;
   const render = () => nodes(h.render(() => Content()));
-  return { h, render, Content };
+  const provinceCell = () => {
+    render()
+      .find((node) => node.props?.className === 'nav-item' && node.props.children === 'ตารางแหล่งหญ้าทะเล')
+      .props.onClick();
+    return render().filter((node) => node.type === 'td')[2].props.children;
+  };
+  return { h, render, Content, provinceCell };
 }
 
 test('province select options and labels come from the provinces API, falling back to the code on failure', () => {
@@ -357,15 +372,15 @@ test('province select options and labels come from the provinces API, falling ba
     ['81', 'กระบี่'],
     ['92', 'ตรัง'],
   ]);
-  assert.equal(loaded.render().find((node) => node.props?.className === 'site-meta').props.children[0], 'กระบี่');
+  assert.equal(loaded.provinceCell(), 'กระบี่');
 
   const failed = provinceWorkspace({ error: new Error('offline'), loading: false });
   assert.deepEqual(options(failed.render()), [['', 'ทุกจังหวัด']]);
-  assert.equal(failed.render().find((node) => node.props?.className === 'site-meta').props.children[0], '81');
+  assert.equal(failed.provinceCell(), '81');
 
   const loading = provinceWorkspace({ loading: true });
   assert.deepEqual(options(loading.render()), [['', 'ทุกจังหวัด']]);
-  assert.equal(loading.render().find((node) => node.props?.className === 'site-meta').props.children[0], '81');
+  assert.equal(loading.provinceCell(), '81');
 
   provinceSelect(failed.render()).props.onChange({ target: { value: '92' } });
   assert.deepEqual(options(failed.render()), [
@@ -392,12 +407,10 @@ test('province outlines stay below sites and points remain above sites through e
   render(empty, { surveys: empty });
   assert.equal(map.sources.get('provinces').data, provinces);
   assert.equal(map.sources.get('surveys').data, empty);
-  map.clickedFeatures = [{ properties: { site_code: 'S1' } }, { properties: { code: 'S2' } }];
-  map.emit('click', { point: {} });
-  assert.deepEqual(selected, ['S1']);
+  assert.ok(ids.indexOf('sites-nodata') > ids.indexOf('sites-fill'), 'hatched no_data sites are their own layer');
   map.clickedFeatures = [{ properties: { code: 'S2' } }];
-  map.emit('click', { point: {} });
-  assert.deepEqual(selected, ['S1', 'S2']);
+  map.emit('click', { point: { x: 10, y: 10 } });
+  assert.deepEqual(selected, ['S2']);
 });
 
 function historyWorkspace() {
@@ -459,7 +472,6 @@ function historyWorkspace() {
   };
 }
 const mapNode = (tree) => tree.find((node) => node.type === 'SiteMap');
-const historyNav = (tree) => tree.find((node) => node.props?.['aria-label'] === 'หน้าประวัติการสำรวจ');
 const textOf = (tree) =>
   nodes(tree)
     .flatMap((node) => [node.props?.children])
@@ -492,48 +504,102 @@ test('workspace shares province resource and exact bounded filters with survey p
   );
 });
 
-test('history displays fields, pages explicitly and resets when selection changes', () => {
+test('site popup summarises survey rounds from one request and reloads for a new selection', () => {
   const w = historyWorkspace();
   mapNode(w.render()).props.onSelect('S1');
-  const survey = {
-    id: 'a',
-    surveyed_on: '2026-11-21',
-    cover_percent: 42,
-    species: ['EA', 'TH'],
-    note: 'field note',
-    created_by: { id: 'u', email: 'recorder@example.test' },
-  };
-  w.setHistory({ data: { items: [survey], total: 6, page: 1 }, loading: false });
-  let tree = w.render();
-  assert.ok(w.calls.some(({ url }) => url === '/api/sites/S1/surveys?page=1&pageSize=5'));
-  for (const value of [
-    '2026-11-21',
-    '42',
-    'EA',
-    'TH',
-    'field note',
-    'recorder@example.test',
-    'วันที่สำรวจ',
-    'ผู้บันทึก',
-  ])
-    assert.ok(textOf(tree).includes(value), value);
-  let buttons = nodes(historyNav(tree)).filter((node) => node.type === 'button');
-  assert.equal(buttons[0].props.disabled, true);
-  buttons[1].props.onClick();
-  w.setHistory({ data: { items: [{ ...survey, created_by: undefined }], total: 6, page: 2 }, loading: false });
-  tree = w.render();
-  assert.ok(w.calls.some(({ url }) => url === '/api/sites/S1/surveys?page=2&pageSize=5'));
-  assert.equal(textOf(tree).includes('ผู้บันทึก'), false);
-  assert.equal(textOf(tree).includes('recorder@example.test'), false);
-  buttons = nodes(historyNav(tree)).filter((node) => node.type === 'button');
-  assert.equal(buttons[1].props.disabled, true);
-  buttons[0].props.onClick();
-  w.render();
-  assert.ok(w.calls.some(({ url }) => url === '/api/sites/S1/surveys?page=1&pageSize=5'));
-  buttons[1].props.onClick();
+  const survey = (id, surveyed_on, cover_percent) => ({ id, surveyed_on, cover_percent, species: [], note: null });
+  w.setHistory({
+    data: {
+      items: [survey('a', '2026-06-24', 50), survey('b', '2026-06-24', 45), survey('c', '2025-03-28', 87)],
+      total: 3,
+      page: 1,
+    },
+    loading: false,
+  });
+  const tree = w.render();
+  assert.ok(w.calls.some(({ url }) => url === '/api/sites/S1/surveys?page=1&pageSize=100'));
+  const rounds = tree.find((node) => node.props?.className === 'round-list');
+  const items = nodes(rounds).filter((node) => node.type === 'li');
+  assert.deepEqual(
+    items.map((item) => item.key),
+    ['2026-06-24', '2025-03-28'],
+    'newest round first',
+  );
+  const allText = (node) =>
+    nodes(node)
+      .flatMap((item) => [item.props?.children])
+      .flat(Infinity)
+      .filter((value) => typeof value === 'string' || typeof value === 'number')
+      .join('')
+      .replace(/\s/g, '');
+  assert.match(allText(items[0]), /47\.5%\(2จุด\)/);
+  assert.match(allText(items[1]), /87%\(1จุด\)/);
+  assert.equal(
+    tree.some((node) => node.props?.className === 'note'),
+    false,
+  );
+  w.setHistory({ data: { items: [survey('a', '2026-06-24', 50)], total: 140, page: 1 }, loading: false });
+  assert.match(allText(w.render()), /รอบนี้อาจแสดงข้อมูลไม่ครบจาก1จุดล่าสุดจากทั้งหมด140จุด/);
   mapNode(w.render()).props.onSelect('S2');
   w.render();
-  assert.ok(w.calls.some(({ url }) => url === '/api/sites/S2/surveys?page=1&pageSize=5'));
+  assert.ok(w.calls.some(({ url }) => url === '/api/sites/S2/surveys?page=1&pageSize=100'));
+});
+
+test('clicking a survey point opens its own popup with its fields, creator only when present', () => {
+  const w = historyWorkspace();
+  const point = {
+    type: 'Feature',
+    geometry: { type: 'Point', coordinates: [98.64326, 8.12352] },
+    properties: {
+      id: '17',
+      site_code: 'S1',
+      surveyed_on: '2025-03-28',
+      cover_percent: 87,
+      species: ['TH'],
+      note: null,
+      created_by: { id: 'u', email: 'recorder@example.test' },
+    },
+  };
+  w.setResource('/api/surveys.geojson', { data: { type: 'FeatureCollection', features: [point] }, loading: false });
+  let tree = w.render();
+  mapNode(tree).props.onViewport([98, 7, 99, 9]);
+  tree = w.render();
+  mapNode(tree).props.onSelectSurvey('17');
+  tree = w.render();
+  const dialog = tree.find((node) => node.props?.role === 'dialog');
+  const text = textOf(dialog);
+  for (const value of [
+    'จุดสำรวจ 2025-03-28',
+    'S1',
+    '87',
+    'TH',
+    'ไม่มี',
+    'recorder@example.test',
+    '98.64326',
+    '8.12352',
+  ])
+    assert.ok(text.includes(value), value);
+  assert.equal(mapNode(tree).props.selectedSurveyId, '17');
+  assert.deepEqual(JSON.parse(JSON.stringify(mapNode(tree).props.popup)), {
+    key: 'survey:17',
+    point: [98.64326, 8.12352],
+  });
+  assert.equal(
+    w.calls.some(({ url }) => url?.startsWith('/api/sites/S1')),
+    false,
+    'no extra request for a point',
+  );
+  tree
+    .find((node) => node.props?.className === 'text-button' && textOf(node).includes('ดูรายละเอียดแหล่ง'))
+    .props.onClick();
+  tree = w.render();
+  assert.equal(mapNode(tree).props.popup.key, 'site:S1');
+  assert.equal(mapNode(tree).props.selectedSurveyId, null);
+
+  point.properties = { ...point.properties, id: '18', created_by: undefined };
+  w.render();
+  mapNode(w.render()).props.onSelectSurvey('18');
+  assert.equal(textOf(w.render()).includes('ผู้บันทึก'), false);
 });
 
 test('history has loading, empty, error and retry states', () => {
@@ -590,7 +656,7 @@ test('history resource drops old pages, selections and creator data across ident
   assert.equal(render(other).data.items[0].created_by, undefined);
 });
 
-for (const kind of ['history', 'list']) {
+for (const kind of ['list']) {
   test(`${kind} pagination preserves host instances and keyboard focus through loading and boundaries`, () => {
     const w = historyWorkspace();
     const label = kind === 'history' ? 'หน้าประวัติการสำรวจ' : 'หน้ารายการแหล่ง';
@@ -712,13 +778,22 @@ test('list pagination ignores clicks and is aria-disabled while a filter validat
 
 test('cursor stays a pointer moving from a survey point to a polygon, and clears over water', () => {
   const { map } = mapHarness();
-  for (const properties of [{ site_code: 'S1' }, { code: 'S2' }]) {
-    map.clickedFeatures = [{ properties }];
-    map.emit('mousemove', { point: {} });
-    assert.equal(map.getCanvas().style.cursor, 'pointer');
-  }
+  const filters = [];
+  map.setFilter = (layer, filter) => {
+    if (layer === 'surveys-hover') filters.push(JSON.parse(JSON.stringify(filter)).at(-1));
+  };
+  map.clickedPoints = [{ properties: { id: 7, site_code: 'S1' }, geometry: { coordinates: [98, 7] } }];
+  map.point = { x: 13, y: 10 };
+  map.emit('mousemove', { point: { x: 10, y: 10 } });
+  assert.equal(map.getCanvas().style.cursor, 'pointer');
+  assert.equal(filters.at(-1), '7', 'hovered point is enlarged');
+  map.clickedPoints = [];
+  map.clickedFeatures = [{ properties: { code: 'S2' } }];
+  map.emit('mousemove', { point: { x: 10, y: 10 } });
+  assert.equal(map.getCanvas().style.cursor, 'pointer');
+  assert.equal(filters.at(-1), '');
   map.clickedFeatures = [];
-  map.emit('mousemove', { point: {} });
+  map.emit('mousemove', { point: { x: 10, y: 10 } });
   assert.equal(map.getCanvas().style.cursor, '');
 });
 
@@ -758,7 +833,8 @@ test('layer failures share one named banner and retry only failing layers with a
   const legend = tree.find((node) => node.props?.['aria-label'] === 'คำอธิบายแผนที่');
   assert.ok(legend);
   const entries = nodes(legend).filter((node) => node.type === 'li');
-  assert.ok(entries.every((entry) => entry.props.children.props));
+  assert.equal(entries.length, 6, 'five statuses plus the survey mark');
+  assert.match(textOf(legend), /ดีมาก/);
 });
 
 test('history 404 before detail resolves does not flash a retry banner', () => {
@@ -837,6 +913,7 @@ test('map reports unavailable when MapLibre cannot start and available again on 
           }
         },
         NavigationControl: class {},
+        ScaleControl: class {},
         setWorkerUrl() {},
       },
       '../lib/map-state': { ...mapState, debounce: (fn) => ({ run: fn, cancel() {} }) },
@@ -872,39 +949,323 @@ test('unavailable map drops the loading text and aria-busy from the map panel', 
   assert.equal(tree.find((node) => node.props?.className === 'map-progress').props.children, '');
 });
 
-test('closing details returns focus to the selected row, or a visible heading when the row is hidden', () => {
-  for (const [rowVisible, headingVisible] of [
+const siteRows = {
+  data: {
+    items: [{ code: 'S1', name: 'Site', province_code: '81', area_rai: 1, status: 'good' }],
+    total: 1,
+    page: 1,
+  },
+  loading: false,
+};
+const byClass = (tree, name) => tree.find((node) => node.props?.className?.split?.(' ').includes(name));
+const navItem = (tree, label) =>
+  tree.find((node) => node.props?.className === 'nav-item' && node.props.children === label);
+
+test('top menu switches between the map and the table view and marks the current one', () => {
+  const w = historyWorkspace();
+  w.setResource('/api/sites?', siteRows);
+  let tree = w.render();
+  assert.equal(navItem(tree, 'แผนที่').props['aria-current'], 'page');
+  assert.equal(navItem(tree, 'ตารางแหล่งหญ้าทะเล').props['aria-current'], undefined);
+  assert.ok(byClass(tree, 'sidebar'), 'filters and list sit in the map sidebar');
+  assert.equal(byClass(tree, 'table-view'), undefined);
+  navItem(tree, 'ตารางแหล่งหญ้าทะเล').props.onClick();
+  tree = w.render();
+  assert.equal(navItem(tree, 'ตารางแหล่งหญ้าทะเล').props['aria-current'], 'page');
+  assert.ok(byClass(tree, 'table-view'));
+  assert.ok(byClass(tree, 'map-layout').props.className.includes('view-hidden'), 'map stays mounted, hidden');
+  assert.equal(byClass(tree, 'sidebar'), undefined, 'one set of filter controls at a time');
+  assert.equal(tree.filter((node) => node.type === 'select').length, 2);
+  assert.equal(
+    tree.some((node) => node.props?.role === 'dialog'),
+    false,
+    'no popup until a site is selected',
+  );
+});
+
+test('choosing a site from the list opens the map popup with focus on its heading; Escape closes it', () => {
+  const w = historyWorkspace();
+  w.setResource('/api/sites?', siteRows);
+  let tree = w.render();
+  navItem(tree, 'ตารางแหล่งหญ้าทะเล').props.onClick();
+  tree = w.render();
+  tree.find((node) => node.props?.className === 'table-link').props.onClick();
+  tree = w.render();
+  assert.ok(!byClass(tree, 'map-layout').props.className.includes('view-hidden'), 'switched to the map');
+  const dialog = tree.find((node) => node.props?.role === 'dialog');
+  assert.equal(dialog.props['aria-labelledby'], 'detail-heading');
+  assert.equal(mapNode(tree).props.popup.key, 'site:S1');
+  assert.equal(mapNode(w.render()).props.popupElement, w.host(dialog), 'SiteMap receives the mounted popup element');
+  tree = w.render();
+  assert.equal(w.document.activeElement, w.host(tree.find((node) => node.props?.id === 'detail-heading')));
+  assert.match(textOf(dialog), /Site/);
+  const mapHeading = w.host(tree.find((node) => node.props?.id === 'map-heading'));
+  w.host(tree.find((node) => node.props?.className === 'site-button')).getClientRects = () => [];
+  mapHeading.getClientRects = () => [{}];
+  tree.find((node) => node.props?.className === 'map-container').props.onKeyDown({ key: 'Escape' });
+  tree = w.render();
+  assert.equal(
+    tree.some((node) => node.props?.role === 'dialog'),
+    false,
+  );
+  assert.equal(mapNode(tree).props.popup, null);
+  assert.equal(w.document.activeElement, mapHeading, 'focus returns to the visible map heading');
+});
+
+test('a map click opens the popup without moving focus; clicking empty water closes it', () => {
+  const w = historyWorkspace();
+  let tree = w.render();
+  mapNode(tree).props.onSelect('S1');
+  tree = w.render();
+  assert.ok(tree.find((node) => node.props?.role === 'dialog'));
+  assert.equal(w.document.activeElement, w.document.body);
+  mapNode(tree).props.onDeselect();
+  tree = w.render();
+  assert.equal(
+    tree.some((node) => node.props?.role === 'dialog'),
+    false,
+  );
+});
+
+test('closing the popup returns focus to the selected row, else the map heading, else the sites heading', () => {
+  for (const [rowVisible, mapVisible] of [
     [true, true],
     [false, true],
     [false, false],
   ]) {
     const w = historyWorkspace();
-    w.setResource('/api/sites?', {
-      data: {
-        items: [{ code: 'S1', name: 'Site', province_code: '81', area_rai: 1, status: 'good' }],
-        total: 1,
-        page: 1,
-      },
-      loading: false,
-    });
+    w.setResource('/api/sites?', siteRows);
     let tree = w.render();
     const row = () => tree.find((node) => node.props?.className === 'site-button');
     row().props.onClick();
     tree = w.render();
     const rowHost = w.host(row());
+    const mapHeading = w.host(tree.find((node) => node.props?.id === 'map-heading'));
     const sitesHeading = w.host(tree.find((node) => node.props?.id === 'sites-heading'));
-    const detailHeading = w.host(tree.find((node) => node.props?.id === 'detail-heading'));
     rowHost.getClientRects = () => (rowVisible ? [{}] : []);
-    sitesHeading.getClientRects = () => (headingVisible ? [{}] : []);
-    detailHeading.getClientRects = () => [{}];
-    const close = tree.find((node) => node.type === 'button' && node.props.children === 'ปิดรายละเอียด');
+    mapHeading.getClientRects = () => (mapVisible ? [{}] : []);
+    sitesHeading.getClientRects = () => [{}];
+    const close = tree.find((node) => node.props?.className === 'popup-close');
+    assert.equal(close.props['aria-label'], 'ปิดรายละเอียด');
     w.host(close).focus();
     close.props.onClick();
     tree = w.render();
     assert.equal(
-      tree.some((node) => node.props?.children === 'ปิดรายละเอียด'),
+      tree.some((node) => node.props?.role === 'dialog'),
       false,
     );
-    assert.equal(w.document.activeElement, rowVisible ? rowHost : headingVisible ? sitesHeading : detailHeading);
+    assert.equal(w.document.activeElement, rowVisible ? rowHost : mapVisible ? mapHeading : sitesHeading);
   }
+});
+
+function popupMap(point = { x: 400, y: 300 }) {
+  const selected = [];
+  const h = mapHarness({}, undefined, (code) => selected.push(code));
+  const element = { style: {}, offsetWidth: 200, offsetHeight: 100 };
+  const projected = [];
+  h.map.point = point;
+  h.map.project = (lngLat) => {
+    projected.push(JSON.parse(JSON.stringify(lngLat)));
+    return { ...h.map.point };
+  };
+  return { h, element, projected, selected };
+}
+
+test('popup is anchored at the clicked location, kept inside the map and follows map moves', () => {
+  const { h, element, projected, selected } = popupMap();
+  let deselected = 0;
+  const extra = { popupElement: element, onDeselect: () => deselected++ };
+  h.map.clickedFeatures = [{ properties: { code: 'S1' } }];
+  h.map.emit('click', { point: {}, lngLat: { toArray: () => [98.6, 7.4] } });
+  assert.deepEqual(selected, ['S1']);
+  h.render(undefined, { ...extra, popup: { key: 'site:S1' } });
+  assert.deepEqual(projected.at(-1), [98.6, 7.4]);
+  assert.equal(element.style.transform, 'translate(300px, 186px)', 'centred above the point');
+  h.map.point = { x: 20, y: 40 };
+  h.map.emit('move');
+  assert.equal(element.style.transform, 'translate(8px, 54px)', 'clamped left and flipped below near the top');
+  h.map.point = { x: 400, y: 900 };
+  h.map.emit('move');
+  assert.equal(element.style.transform, 'translate(300px, 492px)', 'an anchor below the canvas keeps the popup inside');
+  h.map.clickedFeatures = [];
+  h.map.emit('click', { point: {} });
+  assert.equal(deselected, 1);
+});
+
+test('popup for a list selection points at the selection centre, not an older click on the same site', () => {
+  const { h, element, projected } = popupMap();
+  h.map.clickedFeatures = [{ properties: { code: 'S1' } }];
+  h.map.emit('click', { point: {}, lngLat: { toArray: () => [98.6, 7.4] } });
+  h.render(undefined, { popupElement: element, popup: { key: 'site:S1' } });
+  h.render(undefined, { popupElement: element, popup: null });
+  h.render(undefined, { selection: square, popupElement: element, popup: { key: 'site:S1' } });
+  assert.deepEqual(projected.at(-1), [98.5, 7.5]);
+});
+
+test('popup without an anchor yet (details loading) or without a map stays visible at the top-left', () => {
+  const { h, element, projected } = popupMap();
+  h.render(undefined, { popupElement: element, popup: { key: 'site:S1' } });
+  assert.equal(projected.length, 0);
+  assert.equal(element.style.transform, 'translate(8px, 8px)');
+  assert.equal(element.style.visibility, undefined, 'never hidden');
+
+  const failing = componentHarness(
+    '../src/components/site-map.tsx',
+    {
+      'maplibre-gl': {
+        Map: class {
+          constructor() {
+            throw new Error('no WebGL');
+          }
+        },
+        NavigationControl: class {},
+        ScaleControl: class {},
+        setWorkerUrl() {},
+      },
+      '../lib/map-state': { ...mapState, debounce: (fn) => ({ run: fn, cancel() {} }) },
+    },
+    {
+      ResizeObserver: class {
+        observe() {}
+        disconnect() {}
+      },
+    },
+  );
+  const card = { style: {}, offsetWidth: 200, offsetHeight: 100 };
+  failing.render(() =>
+    failing.exports.default({
+      onViewport() {},
+      onSelect() {},
+      selection: square,
+      popupElement: card,
+      popup: { key: 'site:S1' },
+    }),
+  );
+  assert.equal(card.style.transform, 'translate(8px, 8px)', 'details stay reachable when the map cannot start');
+});
+
+test('popup position includes the canvas offset below a map warning banner', () => {
+  const { h, element } = popupMap();
+  h.map.clickedFeatures = [{ properties: { code: 'S1' } }];
+  h.map.emit('click', { point: {}, lngLat: { toArray: () => [98.6, 7.4] } });
+  const canvas = nodes(h.render(undefined, { popupElement: element, popup: { key: 'site:S1' } })).find(
+    (node) => node.props?.className === 'map-canvas',
+  );
+  canvas.props.ref.current.offsetTop = 48;
+  h.map.emit('move');
+  assert.equal(element.style.transform, 'translate(300px, 234px)');
+});
+
+test('a click picks the nearest survey point within the hit radius before the polygon under it', () => {
+  const sites = [];
+  const surveysPicked = [];
+  const h = mapHarness({}, undefined, (code) => sites.push(code));
+  h.render(undefined, { onSelectSurvey: (id) => surveysPicked.push(id) });
+  const at = { a: { x: 15, y: 10 }, b: { x: 12, y: 10 }, far: { x: 30, y: 10 } };
+  h.map.project = (coordinates) => at[coordinates[0]];
+  const point = (id, key) => ({ properties: { id, site_code: 'S1' }, geometry: { coordinates: [key, 0] } });
+  h.map.clickedFeatures = [{ properties: { code: 'S1' } }];
+  h.map.clickedPoints = [point(1, 'a'), point(2, 'b')];
+  h.map.emit('click', { point: { x: 10, y: 10 } });
+  assert.deepEqual(surveysPicked, ['2'], 'nearest point wins');
+  assert.deepEqual(sites, [], 'the polygon is not selected under a point');
+  h.map.clickedPoints = [point(3, 'far')];
+  h.map.emit('click', { point: { x: 10, y: 10 }, lngLat: { toArray: () => [98, 7] } });
+  assert.deepEqual(surveysPicked, ['2'], 'a point beyond the radius is ignored');
+  assert.deepEqual(sites, ['S1']);
+});
+
+test('a still-drawn survey point opens its popup while the points layer reloads or has failed', () => {
+  const w = historyWorkspace();
+  const point = {
+    type: 'Feature',
+    geometry: { type: 'Point', coordinates: [98.6, 8.1] },
+    properties: { id: 17, site_code: 'S1', surveyed_on: '2025-03-28', cover_percent: 87, species: [], note: null },
+  };
+  w.setResource('/api/surveys.geojson', { data: { type: 'FeatureCollection', features: [point] }, loading: false });
+  mapNode(w.render()).props.onViewport([98, 7, 99, 9]);
+  w.render();
+  for (const state of [{ loading: true }, { error: new Error('offline'), loading: false }]) {
+    w.setResource('/api/surveys.geojson', state);
+    mapNode(w.render()).props.onSelectSurvey('17');
+    const dialog = w.render().find((node) => node.props?.role === 'dialog');
+    assert.ok(dialog, 'popup opens from the last displayed points');
+    assert.match(textOf(dialog), /จุดสำรวจ 2025-03-28/);
+    const tree = w.render();
+    for (const node of tree) if (node.props?.id === 'map-heading') w.host(node).getClientRects = () => [{}];
+    tree.find((node) => node.props?.className === 'map-container').props.onKeyDown({ key: 'Escape' });
+    w.render();
+  }
+});
+
+test('a popup taller than the canvas is capped to the canvas below a warning banner', () => {
+  const { h, element } = popupMap();
+  element.offsetHeight = 900;
+  h.map.container = { clientWidth: 800, clientHeight: 500 };
+  const canvas = nodes(h.render(undefined, { popupElement: element, popup: { key: 'survey:1', point: [98, 7] } })).find(
+    (node) => node.props?.className === 'map-canvas',
+  );
+  canvas.props.ref.current.offsetTop = 48;
+  h.map.emit('move');
+  assert.equal(element.style.maxHeight, '484px');
+  assert.match(element.style.transform, /translate\(\d+px, 56px\)/);
+});
+
+test('Escape on the map closes an open popup even when focus is on the canvas', () => {
+  const w = historyWorkspace();
+  mapNode(w.render()).props.onSelect('S1');
+  const tree = w.render();
+  w.host(tree.find((node) => node.props?.id === 'map-heading')).getClientRects = () => [{}];
+  const container = tree.find((node) => node.props?.className === 'map-container');
+  container.props.onKeyDown({ key: 'Escape' });
+  assert.equal(
+    w.render().some((node) => node.props?.role === 'dialog'),
+    false,
+  );
+});
+
+test('when rows are missing the oldest listed round is left out because it may be partial', () => {
+  const w = historyWorkspace();
+  mapNode(w.render()).props.onSelect('S1');
+  const survey = (id, surveyed_on) => ({ id, surveyed_on, cover_percent: 50, species: [], note: null });
+  w.setHistory({
+    data: { items: [survey(1, '2026-06-24'), survey(2, '2025-03-28')], total: 120, page: 1 },
+    loading: false,
+  });
+  const rounds = w.render().find((node) => node.props?.className === 'round-list');
+  assert.deepEqual(
+    nodes(rounds)
+      .filter((node) => node.type === 'li')
+      .map((node) => node.key),
+    ['2026-06-24'],
+  );
+});
+
+test('Escape from the canvas closes the popup without moving focus; a point gone from fresh data closes its popup', () => {
+  const w = historyWorkspace();
+  const canvas = { closest: () => null };
+  w.document.activeElement = canvas;
+  mapNode(w.render()).props.onSelect('S1');
+  const tree = w.render();
+  w.host(tree.find((node) => node.props?.id === 'map-heading')).getClientRects = () => [{}];
+  tree.find((node) => node.props?.className === 'map-container').props.onKeyDown({ key: 'Escape' });
+  w.render();
+  assert.equal(w.document.activeElement, canvas, 'focus stays on the canvas');
+
+  const point = (id) => ({
+    type: 'Feature',
+    geometry: { type: 'Point', coordinates: [98.6, 8.1] },
+    properties: { id, site_code: 'S1', surveyed_on: '2025-03-28', cover_percent: 87, species: [], note: null },
+  });
+  w.setResource('/api/surveys.geojson', { data: { type: 'FeatureCollection', features: [point(17)] }, loading: false });
+  mapNode(w.render()).props.onViewport([98, 7, 99, 9]);
+  w.render();
+  mapNode(w.render()).props.onSelectSurvey('17');
+  assert.ok(w.render().some((node) => node.props?.role === 'dialog'));
+  w.setResource('/api/surveys.geojson', { data: { type: 'FeatureCollection', features: [point(18)] }, loading: false });
+  w.render();
+  assert.equal(
+    w.render().some((node) => node.props?.role === 'dialog'),
+    false,
+  );
 });

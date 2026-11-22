@@ -34,7 +34,7 @@ export function LoginForm() {
   return (
     <main className="login-page">
       <section className="login-panel" aria-labelledby="login-heading">
-        <p className="eyebrow">SEAGRASS · ANDAMAN</p>
+        <p className="product-name">ติดตามแหล่งหญ้าทะเล</p>
         <h1 id="login-heading">เข้าสู่ระบบ</h1>
         <p className="subtitle">เข้าสู่ระบบด้วยบัญชีที่ได้รับ หรือกลับไปดูข้อมูลสาธารณะ</p>
         {session || logoutPending || phase === 'checking' ? <SessionControls /> : null}

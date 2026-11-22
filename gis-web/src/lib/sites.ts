@@ -17,7 +17,7 @@ export type SitesGeoJSON = FeatureCollection<Polygon | MultiPolygon, SitePropert
 export type SiteList = { items: Site[]; total: number; page: number };
 export type ProvinceCollection = FeatureCollection<Polygon | MultiPolygon, { code: string; name_th: string }>;
 export type Survey = {
-  id: string;
+  id: string | number;
   lon: number;
   lat: number;
   surveyed_on: string;

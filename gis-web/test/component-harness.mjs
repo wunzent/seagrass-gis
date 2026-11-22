@@ -66,6 +66,17 @@ export function componentHarness(path, mocks = {}, globals = {}) {
         dispatch(name, event) {
           for (let ancestor = current; ancestor; ancestor = ancestor.parent) ancestor.props?.[name]?.(event);
         },
+        closest(selector) {
+          // Class selectors only (".name"), enough for the components under test.
+          for (let ancestor = current; ancestor; ancestor = ancestor.parent)
+            if (
+              String(ancestor.props?.className ?? '')
+                .split(' ')
+                .includes(selector.slice(1))
+            )
+              return ancestor.host ?? {};
+          return null;
+        },
         querySelector(selector) {
           const descendants = (node) => (node ? [node, ...(node.children ?? []).flatMap(descendants)] : []);
           return descendants(current).find((node) =>
@@ -79,7 +90,8 @@ export function componentHarness(path, mocks = {}, globals = {}) {
         current.host.dispatch('onBlurCapture', { target: current.host, relatedTarget: null });
       }
       hosts.set(value, current.host);
-      if (value.props.ref) value.props.ref.current = current.host;
+      if (typeof value.props.ref === 'function') value.props.ref(current.host);
+      else if (value.props.ref) value.props.ref.current = current.host;
     }
     const children = Array.isArray(value) ? value : [value.props?.children];
     current.children = children.map((child, i) => reconcile(child, current.children?.[i], current));
@@ -104,7 +116,10 @@ export function componentHarness(path, mocks = {}, globals = {}) {
       effects = [];
       const tree = fn();
       if (globals.document) mounted = reconcile(tree, mounted);
-      else for (const node of nodes(tree)) if (node.props?.ref) node.props.ref.current = {};
+      else
+        for (const node of nodes(tree))
+          if (typeof node.props?.ref === 'function') node.props.ref({});
+          else if (node.props?.ref) node.props.ref.current = {};
       effects.forEach((effect) => effect());
       return tree;
     },

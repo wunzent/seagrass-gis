@@ -1,14 +1,17 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   Map as MapLibreMap,
   NavigationControl,
+  ScaleControl,
   setWorkerUrl,
+  type MapGeoJSONFeature,
+  type PointLike,
   type GeoJSONSource,
   type ExpressionSpecification,
 } from 'maplibre-gl';
-import { debounce, statuses, SURVEY_POINT_COLOR, validBbox, type Bbox } from '../lib/map-state';
+import { debounce, INK, PAPER, statuses, validBbox, type Bbox } from '../lib/map-state';
 import {
   geometryBounds,
   type ProvinceCollection,
@@ -30,7 +33,38 @@ type Props = {
   onViewport: (box: Bbox | null) => void;
   onDisplayChange?: (displayed: boolean, layer?: 'sites' | 'surveys') => void;
   onAvailabilityChange?: (available: boolean) => void;
+  onDeselect?: () => void;
+  onSelectSurvey?: (id: string) => void;
+  selectedSurveyId?: string | null;
+  /** Detail popup rendered by the parent inside the map container; positioned here at the selected location. */
+  popupElement?: HTMLElement | null;
+  /** `site:<code>` or `survey:<id>`; a survey popup carries its own point. */
+  popup?: { key: string; point?: [number, number] } | null;
 };
+
+/** A survey point within this many pixels of a click wins over the polygon under it. */
+export const POINT_HIT_RADIUS = 8;
+const idFilter = (id: string): ExpressionSpecification => ['==', ['to-string', ['get', 'id']], id];
+const SITE_LAYERS = ['sites-fill', 'sites-nodata'];
+
+function hatchImage() {
+  // 8px diagonal ink hatch on paper, the no_data fill (see wireframe Visual Direction).
+  const size = 8;
+  const data = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++) {
+      const line = (x + y) % size < 2;
+      data.set(line ? [138, 143, 148, 255] : [242, 238, 228, 235], (y * size + x) * 4);
+    }
+  return { width: size, height: size, data };
+}
+
+const POPUP_GAP = 14;
+const POPUP_MARGIN = 8;
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), Math.max(min, max));
+}
 
 export default function SiteMap({
   data,
@@ -41,15 +75,50 @@ export default function SiteMap({
   onViewport,
   onDisplayChange,
   onAvailabilityChange,
+  onDeselect,
+  onSelectSurvey,
+  selectedSurveyId = null,
+  popupElement = null,
+  popup = null,
 }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | null>(null);
-  const camera = useRef<{ center: [number, number]; zoom: number }>({ center: [99.2, 8.1], zoom: 6.2 });
+  const camera = useRef<{ center: [number, number]; zoom: number }>({ center: [98.75, 7.85], zoom: 7.3 });
   const fittedSelection = useRef<SiteFeature | undefined>(undefined);
   const pendingFit = useRef<() => void>(() => {});
-  const callbacks = useRef({ onSelect, onViewport, onDisplayChange, onAvailabilityChange });
+  // Where the popup points: the clicked location for map clicks, else the selection's bounds centre.
+  const lastClick = useRef<{ key: string; lngLat: [number, number] } | null>(null);
+  const anchor = useRef<[number, number] | null>(null);
+  const selectedSurvey = useRef(selectedSurveyId);
+  const callbacks = useRef({ onSelect, onViewport, onDisplayChange, onAvailabilityChange, onDeselect, onSelectSurvey });
   // eslint-disable-next-line react-hooks/refs -- intentional: latest-callback ref pattern keeps map listeners stable
-  callbacks.current = { onSelect, onViewport, onDisplayChange, onAvailabilityChange };
+  callbacks.current = { onSelect, onViewport, onDisplayChange, onAvailabilityChange, onDeselect, onSelectSurvey };
+  const popupTarget = useRef(popupElement);
+  // eslint-disable-next-line react-hooks/refs -- intentional: map move listeners read the latest popup element
+  popupTarget.current = popupElement;
+  // The popup is never hidden: without a usable map or anchor (map failed, details still loading or failed)
+  // it sits at the canvas's top-left so details, loading text and retry stay reachable.
+  const placePopup = useRef(() => {
+    const element = popupTarget.current;
+    if (!element) return;
+    const instance = map.current;
+    const box = instance?.getContainer() ?? container.current;
+    // Offset by the canvas position inside the map container (a warning banner can sit above it).
+    const top = container.current?.offsetTop ?? 0;
+    if (box?.clientHeight) element.style.maxHeight = `${Math.max(0, box.clientHeight - 2 * POPUP_MARGIN)}px`;
+    let x = POPUP_MARGIN;
+    let y = POPUP_MARGIN;
+    if (instance && anchor.current && box?.clientWidth && box.clientHeight) {
+      const point = instance.project(anchor.current);
+      const width = element.offsetWidth;
+      const height = element.offsetHeight;
+      const maxY = box.clientHeight - height - POPUP_MARGIN;
+      x = clamp(point.x - width / 2, POPUP_MARGIN, box.clientWidth - width - POPUP_MARGIN);
+      const above = point.y - height - POPUP_GAP;
+      y = above >= POPUP_MARGIN ? clamp(above, POPUP_MARGIN, maxY) : clamp(point.y + POPUP_GAP, POPUP_MARGIN, maxY);
+    }
+    element.style.transform = `translate(${Math.round(x)}px, ${Math.round(y + top)}px)`;
+  });
   const [ready, setReady] = useState(false);
   const [failure, setFailure] = useState('');
   const [generation, setGeneration] = useState(0);
@@ -82,11 +151,12 @@ export default function SiteMap({
         style: {
           version: 8,
           sources: {},
-          layers: [{ id: 'sea', type: 'background', paint: { 'background-color': '#e3eff2' } }],
+          layers: [{ id: 'sea', type: 'background', paint: { 'background-color': '#DCE7EA' } }],
         },
       });
       map.current = instance;
       instance.addControl(new NavigationControl({ showCompass: false }), 'top-right');
+      instance.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-left');
       instance.on('load', () => {
         instance.addSource('basemap', {
           type: 'raster',
@@ -95,13 +165,19 @@ export default function SiteMap({
           maxzoom: 19,
           attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         });
-        instance.addLayer({ id: 'basemap', type: 'raster', source: 'basemap' });
+        // Muted basemap so the survey data reads first, like an annotated chart.
+        instance.addLayer({
+          id: 'basemap',
+          type: 'raster',
+          source: 'basemap',
+          paint: { 'raster-saturation': -0.75, 'raster-contrast': -0.15, 'raster-brightness-min': 0.08 },
+        });
         instance.addSource('provinces', { type: 'geojson', data: empty });
         instance.addLayer({
           id: 'provinces-line',
           type: 'line',
           source: 'provinces',
-          paint: { 'line-color': '#64748b', 'line-width': 1.5 },
+          paint: { 'line-color': '#8A7F68', 'line-width': 1.2, 'line-dasharray': [3, 2] },
         });
         instance.addSource('sites', { type: 'geojson', data: empty });
         const colors: ExpressionSpecification = [
@@ -121,20 +197,36 @@ export default function SiteMap({
           id: 'sites-fill',
           type: 'fill',
           source: 'sites',
-          paint: { 'fill-color': colors, 'fill-opacity': 0.65 },
+          filter: ['!=', ['get', 'status'], 'no_data'],
+          paint: { 'fill-color': colors, 'fill-opacity': 0.78 },
+        });
+        let hatch = true;
+        try {
+          instance.addImage('no-data-hatch', hatchImage());
+        } catch {
+          hatch = false; // A missing pattern draws nothing, so fall back to the plain paper fill.
+        }
+        instance.addLayer({
+          id: 'sites-nodata',
+          type: 'fill',
+          source: 'sites',
+          filter: ['==', ['get', 'status'], 'no_data'],
+          paint: hatch
+            ? { 'fill-pattern': 'no-data-hatch', 'fill-opacity': 0.9 }
+            : { 'fill-color': statuses.no_data.color, 'fill-opacity': 0.9 },
         });
         instance.addLayer({
           id: 'sites-line',
           type: 'line',
           source: 'sites',
-          paint: { 'line-color': '#183b43', 'line-width': 1.5 },
+          paint: { 'line-color': INK, 'line-width': 1.2 },
         });
         instance.addLayer({
           id: 'selected',
           type: 'line',
           source: 'sites',
           filter: ['==', ['get', 'code'], ''],
-          paint: { 'line-color': '#081c22', 'line-width': 4 },
+          paint: { 'line-color': INK, 'line-width': 3.5 },
         });
         instance.addSource('surveys', { type: 'geojson', data: empty });
         instance.addLayer({
@@ -142,25 +234,63 @@ export default function SiteMap({
           type: 'circle',
           source: 'surveys',
           paint: {
-            'circle-color': SURVEY_POINT_COLOR,
-            'circle-radius': 5,
-            'circle-stroke-color': '#ffffff',
+            'circle-color': PAPER,
+            'circle-radius': 4.5,
+            'circle-stroke-color': INK,
             'circle-stroke-width': 1.5,
           },
         });
-        // Resolve the topmost feature once so a point over another site's polygon wins.
+        instance.addLayer({
+          id: 'surveys-hover',
+          type: 'circle',
+          source: 'surveys',
+          filter: idFilter(''),
+          paint: { 'circle-color': PAPER, 'circle-radius': 7, 'circle-stroke-color': INK, 'circle-stroke-width': 2 },
+        });
+        instance.addLayer({
+          id: 'surveys-selected',
+          type: 'circle',
+          source: 'surveys',
+          filter: idFilter(selectedSurvey.current ?? ''),
+          paint: { 'circle-color': INK, 'circle-radius': 6.5, 'circle-stroke-color': PAPER, 'circle-stroke-width': 2 },
+        });
+        // A point within POINT_HIT_RADIUS px beats the polygon under it; among several, the nearest to the cursor wins.
+        const nearestPoint = (point: { x: number; y: number }) => {
+          const box: [PointLike, PointLike] = [
+            [point.x - POINT_HIT_RADIUS, point.y - POINT_HIT_RADIUS],
+            [point.x + POINT_HIT_RADIUS, point.y + POINT_HIT_RADIUS],
+          ];
+          let best: { feature: MapGeoJSONFeature; distance: number } | null = null;
+          for (const feature of instance.queryRenderedFeatures(box, { layers: ['surveys-circle'] })) {
+            const coordinates = (feature.geometry as { coordinates?: [number, number] }).coordinates;
+            const at = coordinates ? instance.project(coordinates) : point;
+            const distance = Math.hypot(at.x - point.x, at.y - point.y);
+            if (distance <= POINT_HIT_RADIUS && (!best || distance < best.distance)) best = { feature, distance };
+          }
+          return best?.feature;
+        };
+        const siteAt = (point: { x: number; y: number }) =>
+          instance.queryRenderedFeatures([point.x, point.y], { layers: SITE_LAYERS })[0]?.properties?.code;
         instance.on('click', (event) => {
-          const feature = instance.queryRenderedFeatures(event.point, { layers: ['surveys-circle', 'sites-fill'] })[0];
-          const code = feature?.properties?.site_code ?? feature?.properties?.code;
-          if (typeof code === 'string') callbacks.current.onSelect(code);
+          const id = nearestPoint(event.point)?.properties?.id;
+          if (id !== undefined && id !== null) {
+            callbacks.current.onSelectSurvey?.(String(id));
+            return;
+          }
+          const code = siteAt(event.point);
+          if (typeof code === 'string') {
+            const lngLat = event.lngLat?.toArray?.();
+            lastClick.current = lngLat ? { key: 'site:' + code, lngLat: [lngLat[0], lngLat[1]] } : null;
+            callbacks.current.onSelect(code);
+          } else callbacks.current.onDeselect?.();
         });
         instance.on('mousemove', (event) => {
-          instance.getCanvas().style.cursor = instance.queryRenderedFeatures(event.point, {
-            layers: ['surveys-circle', 'sites-fill'],
-          }).length
-            ? 'pointer'
-            : '';
+          const survey = nearestPoint(event.point);
+          const id = survey?.properties?.id;
+          instance.setFilter('surveys-hover', idFilter(id === undefined || id === null ? '' : String(id)));
+          instance.getCanvas().style.cursor = survey || siteAt(event.point) ? 'pointer' : '';
         });
+        instance.on('mouseout', () => instance.setFilter('surveys-hover', idFilter('')));
         setReady(true);
         updateViewport.run(undefined);
       });
@@ -168,6 +298,7 @@ export default function SiteMap({
         callbacks.current.onViewport(null);
         updateViewport.cancel();
       });
+      instance.on('move', () => placePopup.current());
       instance.on('moveend', () => {
         camera.current = { center: instance.getCenter().toArray(), zoom: instance.getZoom() };
         updateViewport.run(undefined);
@@ -198,6 +329,7 @@ export default function SiteMap({
     const observer = new ResizeObserver(() => {
       map.current?.resize();
       pendingFit.current();
+      placePopup.current();
     });
     observer.observe(container.current);
     return () => {
@@ -248,12 +380,40 @@ export default function SiteMap({
     fit();
   }, [selection, ready]);
 
+  useEffect(() => {
+    selectedSurvey.current = selectedSurveyId;
+    if (ready) map.current?.setFilter('surveys-selected', idFilter(selectedSurveyId ?? ''));
+  }, [selectedSurveyId, ready]);
+
+  // Anchor the popup: a survey's own point, the clicked location for a polygon click, else the selection centre.
+  // Re-place it whenever it opens, its content resizes or the map moves.
+  const popupKey = popup?.key ?? null;
+  const popupLng = popup?.point?.[0];
+  const popupLat = popup?.point?.[1];
+  useLayoutEffect(() => {
+    if (lastClick.current?.key !== popupKey) lastClick.current = null;
+    const click = lastClick.current;
+    const siteCode = popupKey?.startsWith('site:') ? popupKey.slice(5) : null;
+    if (!popupKey) anchor.current = null;
+    else if (popupLng !== undefined && popupLat !== undefined) anchor.current = [popupLng, popupLat];
+    else if (click) anchor.current = click.lngLat;
+    else if (siteCode && selection?.properties.code === siteCode) {
+      const bounds = geometryBounds(selection);
+      anchor.current = validBbox(bounds) ? [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2] : null;
+    } else anchor.current = null;
+    placePopup.current();
+    if (!popupElement) return;
+    const observer = new ResizeObserver(() => placePopup.current());
+    observer.observe(popupElement);
+    return () => observer.disconnect();
+  }, [popupKey, popupLng, popupLat, popupElement, selection, ready, failure]);
+
   return (
     <>
       {failure && (
         <div className="map-warning" role="status">
           {failure}{' '}
-          <button className="underline" onClick={() => setGeneration((value) => value + 1)}>
+          <button type="button" className="text-button" onClick={() => setGeneration((value) => value + 1)}>
             ลองเปิดแผนที่ใหม่
           </button>
         </div>
