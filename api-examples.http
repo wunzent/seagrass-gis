@@ -288,3 +288,22 @@ GET {{api}}/sites/{{code}}
 POST {{api}}/auth/logout
 Origin: {{origin}}
 X-CSRF-Protection: 1
+
+### DEC-14: login คืน JWT ใน access_token (และตั้ง cookie เหมือนเดิม)
+# @name tokenLogin
+# expect: 200
+POST {{api}}/auth/login
+Origin: {{origin}}
+X-CSRF-Protection: 1
+Content-Type: application/json
+
+{"email":"viewer@demo.local","password":"viewer-demo-only"}
+
+### ใช้ JWT ผ่าน Authorization: Bearer
+# expect: 200
+GET {{api}}/auth/me
+Authorization: Bearer {{tokenLogin.response.body.$.access_token}}
+
+### Demo quick login: 404 เมื่อ DEMO_LOGIN_ENABLED=false (ค่าตั้งต้น); 200 {roles} เมื่อเปิด
+# expect: 404
+GET {{api}}/auth/demo-login

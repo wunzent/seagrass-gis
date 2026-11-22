@@ -1,6 +1,6 @@
 # DESIGN — Seagrass GIS
 
-**Date**: 2026-11-22 · **Scope**: assessment steps 1–6 + 9.5 CI · หลักฐานจริงอยู่ที่ [WORK-STATUS](docs/WORK-STATUS.md)
+**Date**: 2026-11-23 · **Scope**: assessment steps 1–6 + 9.5 CI · หลักฐานจริงอยู่ที่ [WORK-STATUS](docs/WORK-STATUS.md)
 
 ## Architecture
 
@@ -27,7 +27,7 @@
 
 ## Authentication
 
-- Login ตั้ง HttpOnly cookie `gis_access` (JWT HS256 อายุ 900 วินาที, `SameSite=Lax`) ไม่คืน token ใน JSON และ web ไม่เก็บ token ใน storage
+- `POST /auth/login` คืน JWT (HS256 อายุ 900 วินาที) ใน `access_token` ตามโจทย์ข้อ 5.1 และตั้ง HttpOnly cookie `gis_access` ค่าเดียวกัน (`SameSite=Lax`); API รับได้ทั้ง `Authorization: Bearer` และ cookie; หน้าเว็บใช้ cookie อย่างเดียวและไม่เก็บ token ใน storage (DEC-14)
 - JWT ผูกกับแถว `access_sessions`; logout revoke session ฝั่ง server cookie เดิมที่ถูก replay ได้ 401; ไม่มี refresh token
 - CSRF: ทุก POST/PATCH/DELETE (รวม login/logout) ต้องมี Origin ตรง allowlist, `X-CSRF-Protection: 1` และไม่ใช่ `Sec-Fetch-Site: cross-site`; ลำดับตรวจ 401 → 403 role → 403 CSRF → validation → lookup
 - Roles: viewer อ่าน (เห็นผู้บันทึก), editor แก้ชื่อ site และ CRUD survey, admin สร้าง/แก้ geometry/ลบ site; anonymous ไม่เห็น `created_by`
@@ -48,6 +48,6 @@
 
 ## Remaining Work and Next-Day Plan
 
-- ค้าง: ตรวจผล hosted GitLab pipeline (ตอนนี้มีเพียง CI simulation ใน Docker), fresh code/security review รอบปิด, injected-failure browser checks, แพ็กเกจ UAT
-- Deferred (ไม่อยู่ในขอบเขตส่ง): Step 7 UI เขียนข้อมูลบนแผนที่, Step 8 stats/export, Senior overlap/reference/UTM import, vector tiles, Kong, BullMQ, Playwright ดู [DEFERRED](docs/swc/DEFERRED.md)
-- วันถัดไป: (1) owner ตรวจ pipeline จริงและแก้ถ้า fail (2) review รอบปิดและแก้ finding (3) ส่งชุด UAT ภายในพุธ 25 พ.ย. ตาม [UAT](docs/swc/UAT.md) (4) ถ้ามีเวลาหลัง UAT ผ่าน เริ่ม vector tiles ตามข้อเสนอด้านบน
+- ทำแล้วเพิ่มเติม: GitLab pipeline ของ gis-api/gis-web ผ่าน, fresh code/security review ทุกงานแก้ครบ, owner pre-UAT, หน้าแผนที่ออกแบบใหม่ (popup แหล่งพร้อมประวัติสรุปรอบ, popup จุดสำรวจ, หน้าตาราง) และปุ่มเข้าสู่ระบบตาม role สำหรับสาธิต (`DEMO_LOGIN_ENABLED` ค่าตั้งต้นปิด)
+- ยังไม่ทำ: แนบรูปผลสำรวจ (ข้อเสริมขั้นที่ 4), Senior ขั้นที่ 3/6/7/8 (overlap, SURVEYS_OUTSIDE, reference UTM, layer list, URL state, วาด/แก้บนแผนที่, dashboard/export), ขั้นที่ 9 ข้ออื่นนอกจาก CI ดู [DEFERRED](docs/swc/DEFERRED.md)
+- ถ้ามีเวลาอีก 1 วัน: (1) ขั้นที่ 7 เพิ่ม/แก้/ลบผลสำรวจจาก popup บนแผนที่ (API พร้อมแล้ว เหลือ UI + Playwright) (2) layer list และเก็บสถานะใน URL (3) vector tiles ตามข้อเสนอด้านบนพร้อมวัดผล
