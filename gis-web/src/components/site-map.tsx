@@ -48,6 +48,7 @@ export default function SiteMap({
   const fittedSelection = useRef<SiteFeature | undefined>(undefined);
   const pendingFit = useRef<() => void>(() => {});
   const callbacks = useRef({ onSelect, onViewport, onDisplayChange, onAvailabilityChange });
+  // eslint-disable-next-line react-hooks/refs -- intentional: latest-callback ref pattern keeps map listeners stable
   callbacks.current = { onSelect, onViewport, onDisplayChange, onAvailabilityChange };
   const [ready, setReady] = useState(false);
   const [failure, setFailure] = useState('');
@@ -189,6 +190,7 @@ export default function SiteMap({
         if (!erroredTiles.size && instance.isSourceLoaded('basemap')) setFailure('');
       });
     } catch {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: map init failure is reported once from the mount effect
       setFailure('อุปกรณ์นี้เปิดแผนที่ไม่ได้ ยังใช้ตารางและรายละเอียดได้');
       callbacks.current.onViewport(null);
       callbacks.current.onAvailabilityChange?.(false);

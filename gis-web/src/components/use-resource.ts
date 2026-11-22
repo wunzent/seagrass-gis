@@ -9,7 +9,7 @@ import { publicData } from '../lib/session';
 export function useResource<T>(url: string | null, retry: number) {
   const { store, generation, phase, session, busy } = useSession();
   const readyUrl = phase === 'ready' && !busy ? url : null;
-  const requests = useMemo(latestRequest, []);
+  const requests = useMemo(() => latestRequest(), []);
   const identity = useMemo(() => ({ url: readyUrl, retry, generation }), [readyUrl, retry, generation]);
   const [result, setResult] = useState<{ identity: typeof identity; data?: T; error?: Error }>();
   useEffect(() => {

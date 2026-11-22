@@ -32,6 +32,7 @@ npm run dev
 | `npm run dev` / `npm run build` / `npm start` | สร้าง `src/app/tailwind.css` + copy MapLibre worker แล้วรัน Next |
 | `npm run styles`                              | compile Tailwind ใหม่หลังแก้ CSS/class ระหว่าง dev               |
 | `npm run typecheck`                           | `tsc --noEmit`                                                   |
+| `npm run lint`                                | ESLint (`eslint-config-next` core-web-vitals + typescript)       |
 | `npm run format` / `npm run format:check`     | Prettier                                                         |
 | `npm run test:unit`                           | unit tests ใน `test/`                                            |
 
@@ -47,4 +48,4 @@ npm run dev
 
 ## CI
 
-`.gitlab-ci.yml` มี 3 jobs ตามลำดับ: `test` (node 22.18.0; `npm ci`, `format:check`, `test:unit`, `build`, `typecheck`) → `docker-image` (build Dockerfile ด้วย dind) → `secret_detection` (GitLab template) จำลอง job `test` ใน Docker ผ่านแล้ว; ผล hosted pipeline ยังไม่ได้ตรวจ
+`.gitlab-ci.yml` มี 3 jobs ตามลำดับ: `test` (node 22.18.0; `npm ci`, `format:check`, `lint`, `test:unit`, `build`, `typecheck`) → `docker-image` (build Dockerfile ด้วย dind) → `secret_detection` (GitLab template) จำลอง job `test` ใน Docker ผ่านแล้ว; ผล hosted pipeline ยังไม่ได้ตรวจ

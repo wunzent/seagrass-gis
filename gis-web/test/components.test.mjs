@@ -119,6 +119,7 @@ function mapHarness(globals = {}, onDisplayChange, onSelect = () => {}) {
       return this.coveringKeys.map((key) => ({ key }));
     }
     constructor() {
+      // eslint-disable-next-line @typescript-eslint/no-this-alias -- test double captures the constructed map instance
       map = this;
     }
     on(name, ...args) {

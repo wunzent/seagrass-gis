@@ -147,9 +147,11 @@ function MapContent() {
     historyRetry,
   );
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: keep last page totals while a new page loads
     if (list.data) setListPagination({ total: list.data.total, page: list.data.page });
   }, [list.data]);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: keep last page totals while a new page loads
     if (history.data) setHistoryPagination({ code, total: history.data.total, page: history.data.page });
   }, [history.data, code]);
   const listPages = list.data ?? listPagination;
@@ -158,6 +160,7 @@ function MapContent() {
   const missing = detail.error instanceof ApiError && detail.error.status === 404;
   useEffect(() => {
     if (missing) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: reset selection when the site no longer exists
       setCode(null);
       setSelectionNotice('ไม่พบแหล่งนี้แล้ว กรุณาเลือกรายการใหม่');
     }
