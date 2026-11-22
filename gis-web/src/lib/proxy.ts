@@ -108,6 +108,17 @@ export async function proxyRequest(request: Request, internalUrl: string, fetche
     const retryAfter = upstream.headers.get('retry-after');
     if (retryAfter) responseHeaders.set('retry-after', retryAfter);
     for (const cookie of upstream.headers.getSetCookie()) responseHeaders.append('set-cookie', cookie);
+    if (
+      request.method === 'POST' &&
+      ['/auth/login', '/auth/demo-login'].includes(target.pathname) &&
+      upstream.ok &&
+      /^application\/(?:[\w.-]+\+)?json(?:\s*;|$)/i.test(contentType ?? '')
+    ) {
+      const payload = await upstream.json();
+      delete payload.access_token;
+      delete payload.token_type;
+      return new Response(JSON.stringify(payload), { status: upstream.status, headers: responseHeaders });
+    }
     return new Response(upstream.body, { status: upstream.status, headers: responseHeaders });
   } catch {
     return errorResponse(503, 'SERVICE_UNAVAILABLE');

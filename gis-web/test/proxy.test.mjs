@@ -35,6 +35,7 @@ test('proxy forwards cookie/CSRF and body, preserves separate cookies and never 
       'sec-fetch-site': 'same-origin',
       'content-type': 'application/json',
       'x-forwarded-host': 'evil',
+      authorization: 'Bearer browser-supplied-token',
     },
     body: '{"example":true}',
   });
@@ -44,6 +45,7 @@ test('proxy forwards cookie/CSRF and body, preserves separate cookies and never 
     assert.equal(init.headers.get('origin'), 'http://web');
     assert.equal(init.headers.get('x-csrf-protection'), '1');
     assert.equal(init.headers.has('x-forwarded-host'), false);
+    assert.equal(init.headers.has('authorization'), false);
     assert.equal(init.cache, 'no-store');
     assert.equal(init.redirect, 'manual');
     assert.equal(new TextDecoder().decode(init.body), '{"example":true}');
@@ -81,4 +83,49 @@ test('demo-login is proxied like the other auth routes', () => {
     upstreamUrl('http://web/api/auth/demo-login', 'http://api:3001/').href,
     'http://api:3001/auth/demo-login',
   );
+});
+
+for (const path of ['login', 'demo-login']) {
+  test(`successful POST ${path} hides JWT fields while preserving session data and cookies`, async () => {
+    const safe = { user: { id: 'user-id', role: 'viewer' }, expires_in: 900, expires_at: '2026-11-23T00:15:00Z' };
+    const body = JSON.stringify({ ...safe, access_token: 'private-jwt', token_type: 'Bearer' });
+    const response = await proxyRequest(
+      new Request(`http://web/api/auth/${path}`, { method: 'POST' }),
+      'http://api:3001',
+      async () =>
+        new Response(body, {
+          headers: {
+            'content-type': 'application/json; charset=utf-8',
+            'content-length': String(Buffer.byteLength(body)),
+            'set-cookie': 'gis_access=private-jwt; HttpOnly; Path=/',
+          },
+        }),
+    );
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), safe);
+    assert.equal(response.headers.get('content-length'), null);
+    assert.deepEqual(response.headers.getSetCookie(), ['gis_access=private-jwt; HttpOnly; Path=/']);
+  });
+}
+
+test('proxy streams errors, other routes, GET auth and non-JSON login unchanged', async () => {
+  for (const [path, method, status, type] of [
+    ['auth/login', 'POST', 401, 'application/json'],
+    ['auth/demo-login', 'POST', 401, 'application/json'],
+    ['sites', 'POST', 200, 'application/json'],
+    ['auth/demo-login', 'GET', 200, 'application/json'],
+    ['auth/login', 'POST', 200, 'text/plain'],
+  ]) {
+    const body = '{ "access_token": "unchanged", "token_type": "Bearer" }';
+    const upstream = new Response(body, { status, headers: { 'content-type': type } });
+    const stream = upstream.body;
+    const response = await proxyRequest(
+      new Request(`http://web/api/${path}`, { method }),
+      'http://api:3001',
+      async () => upstream,
+    );
+    assert.equal(response.body, stream);
+    assert.equal(response.status, status);
+    assert.equal(await response.text(), body);
+  }
 });

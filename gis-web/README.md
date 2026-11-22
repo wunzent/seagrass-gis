@@ -39,6 +39,7 @@ npm run dev
 ## Behaviour
 
 - Browser เรียก relative `/api/*`; proxy ตัด `/api`, ส่ง Cookie/Set-Cookie และ CSRF headers, ไม่ cache, ไม่เปิด CORS JavaScript ไม่อ่านหรือเก็บ JWT
+- proxy ลบ `access_token` และ `token_type` จาก JSON response ที่สำเร็จของ `POST /api/auth/login` และ `POST /api/auth/demo-login` ก่อนส่งให้ browser โดยคง user/expiry และ Set-Cookie; response อื่นยังส่งแบบ stream เดิม และไม่ forward `Authorization` จาก browser
 - หน้า `/`: ตัวกรองจังหวัด (จาก `/provinces.geojson`)/สถานะ/คำค้น, ตารางหน้าละ 20, polygons ตาม bbox, province outlines, survey points, legend 5 สถานะ, รายละเอียดและประวัติการสำรวจหน้าละ 5; mobile สลับแผนที่/รายการ
 - `/login` และ session: เริ่มหน้าเรียก `/api/auth/me` (401 = anonymous), logout revoke session, ไม่มี refresh token; ผู้บันทึก survey แสดงเฉพาะผู้ login
 - ยังไม่มี UI เขียนข้อมูล (Step 7 deferred)

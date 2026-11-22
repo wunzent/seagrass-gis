@@ -441,3 +441,26 @@ test('dispose clears the retry handle so resume can continue a pending logout', 
   assert.equal(calls, 2);
   assert.equal(h.store.getSnapshot().logoutPending, false);
 });
+
+for (const action of ['login', 'demoLogin']) {
+  test(`${action} ignores JWT response fields in every published snapshot and subsequent request`, async () => {
+    const snapshots = [];
+    const requests = [];
+    const marker = 'test-jwt-must-not-enter-web-state';
+    const { store } = harness(async (url, init) => {
+      requests.push({ url, init });
+      return json({ ...safe(), access_token: marker, token_type: 'Bearer', expires_in: 900 });
+    });
+    store.subscribe(() => snapshots.push(structuredClone(store.getSnapshot())));
+    assert.equal(await (action === 'login' ? store.login('a@demo.local', 'example') : store.demoLogin('viewer')), true);
+    const session = store.getSnapshot().session;
+    assert.deepEqual(Object.keys(session).sort(), ['expires_at', 'user']);
+    assert.deepEqual(Object.keys(session.user).sort(), ['email', 'id', 'role']);
+    await store.resume();
+    assert.equal(JSON.stringify(snapshots).includes(marker), false);
+    assert.equal(JSON.stringify(snapshots).includes('access_token'), false);
+    assert.equal(JSON.stringify(requests).includes(marker), false);
+    for (const { init } of requests) assert.equal(new Headers(init.headers).has('Authorization'), false);
+    store.dispose();
+  });
+}
