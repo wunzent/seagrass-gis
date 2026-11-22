@@ -31,7 +31,7 @@ seagrass-gis/
 | 4 Surveys | CRUD survey, history, `/surveys.geojson`, `/provinces.geojson`, `/species` | real PostGIS e2e |
 | 5 Auth | login/me/logout, HttpOnly cookie JWT 15 นาที, session revocation, CSRF, roles viewer/editor/admin | e2e + Docker smoke |
 | 6 Web | แผนที่ MapLibre (polygons ตาม bbox, province outlines, survey points), ตัวกรอง/ค้นหา/ตาราง/รายละเอียด/ประวัติ, login | unit + browser บน Docker (desktop และ 375px) |
-| 9.5 CI | `.gitlab-ci.yml` ใน gis-api/gis-web: `test` → `docker-image` → `secret_detection` | hosted GitLab pipeline ผ่านทั้ง 3 repo (owner-reported 2026-11-22) |
+| 9.5 CI | `.gitlab-ci.yml` ใน gis-api/gis-web: `test` → `docker-image` → `secret_detection` | hosted GitLab pipeline ของ gis-api/gis-web ผ่าน (owner-reported 2026-11-22); gis-docs ไม่มี pipeline |
 
 ผลคำสั่งและตัวเลขจริงอยู่ที่ [WORK-STATUS](docs/WORK-STATUS.md); แผนและ spec ที่ [SWC](docs/swc/README.md); ขั้นตอนรับงานที่ [UAT](docs/swc/UAT.md) และชุดส่งมอบ [UAT Package](docs/swc/UAT-PACKAGE.md); งานที่เลื่อนออกที่ [DEFERRED](docs/swc/DEFERRED.md)
 
