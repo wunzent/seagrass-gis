@@ -47,7 +47,7 @@ npm run dev
 - ยังไม่มี UI เขียนข้อมูล (Step 7 deferred)
 - พื้นหลังใช้ OpenStreetMap raster tiles (ต้องมีอินเทอร์เน็ตและ WebGL) สำหรับ demo เท่านั้น ก่อนใช้งานจริงต้องเลือกผู้ให้บริการและปฏิบัติตาม [OSM tile usage policy](https://operations.osmfoundation.org/policies/tiles/); ถ้าแผนที่เปิดไม่ได้ ตารางและรายละเอียดยังใช้ได้
 
-หลักฐาน browser (Docker, desktop และ 375px) และรายงาน Codex ดู [WORK-STATUS](../docs/WORK-STATUS.md) และ [handoff](../docs/handoff/)
+หลักฐาน browser (Docker, desktop และ 375px) ดู [WORK-STATUS](../docs/WORK-STATUS.md) (รายงาน Codex เก็บนอก repo)
 
 ## CI
 
