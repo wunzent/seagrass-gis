@@ -29,28 +29,6 @@ export type Survey = {
 export type SurveysGeoJSON = FeatureCollection<Point, Survey & { site_code: string }>;
 export type SurveyList = { items: Survey[]; total: number; page: number };
 
-export class ApiError extends Error {
-  status: number;
-  constructor(status: number) {
-    super(
-      status === 404
-        ? 'ไม่พบแหล่งนี้แล้ว กรุณาเลือกรายการใหม่'
-        : status === 400
-          ? 'ตัวกรองหรือขอบเขตไม่ถูกต้อง กรุณาตรวจสอบ'
-          : status === 403
-            ? 'ไม่มีสิทธิ์เข้าถึงข้อมูลนี้'
-            : status === 401
-              ? 'เซสชันหมดอายุ กรุณาลองใหม่เพื่อดูข้อมูลสาธารณะ'
-              : 'โหลดข้อมูลไม่สำเร็จ กรุณาลองใหม่',
-    );
-    this.status = status;
-  }
-}
-export async function fetchJson<T>(url: string, signal: AbortSignal): Promise<T> {
-  const response = await fetch(url, { credentials: 'same-origin', cache: 'no-store', signal });
-  if (!response.ok) throw new ApiError(response.status);
-  return response.json();
-}
 export function geometryBounds(feature: SiteFeature): [number, number, number, number] {
   const positions =
     feature.geometry.type === 'Polygon' ? feature.geometry.coordinates.flat() : feature.geometry.coordinates.flat(2);

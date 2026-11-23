@@ -2,7 +2,7 @@
 node_modules
 coverage
 public/maplibre
-src/app/tailwind.css
+src/assets/styles/tailwind.css
 package-lock.json
 next-env.d.ts
 tsconfig.tsbuildinfo

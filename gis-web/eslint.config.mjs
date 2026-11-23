@@ -5,7 +5,13 @@ import nextTypescript from 'eslint-config-next/typescript';
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTypescript,
-  globalIgnores(['.next/**', 'public/maplibre/**', 'src/app/tailwind.css', 'next-env.d.ts', 'node_modules/**']),
+  globalIgnores([
+    '.next/**',
+    'public/maplibre/**',
+    'src/assets/styles/tailwind.css',
+    'next-env.d.ts',
+    'node_modules/**',
+  ]),
 ]);
 
 export default eslintConfig;

@@ -1,8 +1,23 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { componentHarness, nodes } from './component-harness.mjs';
-import { ApiError } from '../src/lib/sites.ts';
+import { componentHarness as createComponentHarness, nodes } from './component-harness.mjs';
+import { fileURLToPath } from 'node:url';
+import { createResourceStore } from '../src/stores/resource-store.ts';
+import { ApiError } from '../src/services/http-client.ts';
 import * as mapState from '../src/lib/map-state.ts';
+
+const sourceFile = (name) => fileURLToPath(new URL('../src/' + name, import.meta.url));
+const inlineFixtures = [
+  'guards/session-guard.tsx',
+  'features/map/filters-panel.tsx',
+  'features/map/legend.tsx',
+  'features/map/site-list.tsx',
+  'features/map/site-popup.tsx',
+  'features/map/sites-table.tsx',
+  'features/map/survey-popup.tsx',
+  'features/map/top-nav.tsx',
+].map(sourceFile);
+const componentHarness = (entry, mocks, globals) => createComponentHarness(entry, mocks, globals, { inlineFixtures });
 
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 
@@ -22,22 +37,42 @@ function loginHarness(roles) {
       },
     },
   };
-  const h = componentHarness('../src/components/login-form.tsx', {
+  const h = componentHarness('../src/features/auth/login-form.tsx', {
     'next/link': { default: 'a', __esModule: true },
     'next/navigation': { useRouter: () => ({ replace: (path) => calls.push(path) }) },
-    './ui/button': { Button: 'button' },
-    './session-controls': { SessionControls: 'controls' },
-    './session-provider': { useSession: () => state },
+    [sourceFile('components/ui/button.tsx')]: { Button: 'button' },
+    [sourceFile('features/auth/session-controls.tsx')]: { SessionControls: 'controls' },
+    [sourceFile('stores/session-context.tsx')]: { useSession: () => state },
   });
   return { state, calls, render: () => nodes(h.render(() => h.exports.LoginForm())) };
 }
+
+test('filling a demo account clears both field errors without submitting', async () => {
+  const h = loginHarness(null);
+  for (const node of h.render().filter((n) => n.type === 'input')) node.props.onChange({ target: { value: '' } });
+  const tree = h.render();
+  for (const node of tree.filter((n) => n.type === 'input')) node.props.ref.current = { focus() {} };
+  await tree.find((n) => n.type === 'form').props.onSubmit({ preventDefault() {} });
+  assert.equal(h.render().filter((n) => n.props.className === 'field-error').length, 2);
+  nodes(h.render().find((n) => n.props.className === 'demo-accounts'))
+    .find((n) => n.type === 'button')
+    .props.onClick();
+  const filled = h.render();
+  assert.equal(filled.filter((n) => n.props.className === 'field-error').length, 0);
+  for (const input of filled.filter((n) => n.type === 'input')) {
+    assert.equal(input.props['aria-invalid'], false);
+    assert.equal(input.props['aria-describedby'], undefined);
+    assert.ok(input.props.value);
+  }
+  assert.deepEqual(h.calls, []);
+});
 
 test('login demo buttons appear in role order with descriptions and Editor navigates home', async () => {
   const h = loginHarness(['admin', 'viewer', 'editor']);
   h.render();
   await flush();
   const tree = h.render();
-  const buttons = tree.filter((n) => n.type === 'button' && n.props.type === 'button');
+  const buttons = tree.filter((n) => n.type === 'button' && n.props.className === 'demo-login-button');
   assert.equal(buttons.length, 3);
   const copy = (button) =>
     nodes(button)
@@ -75,7 +110,7 @@ test('clicked demo role shows progress and group busy until login settles', asyn
     });
   h.render();
   await flush();
-  const buttons = () => h.render().filter((n) => n.type === 'button' && n.props.type === 'button');
+  const buttons = () => h.render().filter((n) => n.type === 'button' && n.props.className === 'demo-login-button');
   const group = () => h.render().find((n) => n.props.role === 'group');
   assert.equal(group().props['aria-busy'], false);
   const pending = buttons()[1].props.onClick();
@@ -103,12 +138,139 @@ test('unavailable demo roles leave the original form with no demo buttons or err
   h.render();
   await flush();
   const tree = h.render();
-  assert.equal(tree.filter((n) => n.type === 'button').length, 1);
+  assert.equal(tree.filter((n) => n.type === 'button' && n.props.className === 'demo-login-button').length, 0);
+  assert.equal(tree.filter((n) => n.type === 'button' && n.props.type === 'submit').length, 1);
   assert.equal(
     tree.some((n) => n.props?.role === 'alert'),
     false,
   );
   assert.equal(tree.filter((n) => n.type === 'input').length, 2);
+});
+
+test('demo credentials list renders three constant accounts with bold values and Thai control labels', async () => {
+  const h = loginHarness(null);
+  const tree = h.render();
+  const list = tree.find((n) => n.type === 'ul' && n.props['aria-label'] === 'บัญชีสาธิตสำหรับกรอกฟอร์ม');
+  assert.ok(list, 'บัญชีสาธิต list');
+  const { DEMO_ACCOUNTS } = await import('../src/lib/demo-accounts.ts');
+  const items = nodes(list).filter((n) => n.type === 'li');
+  assert.equal(items.length, 3);
+  for (const [i, account] of DEMO_ACCOUNTS.entries()) {
+    const button = nodes(items[i]).find((n) => n.type === 'button');
+    assert.equal(button.props.type, 'button');
+    assert.equal(button.props['aria-label'], undefined);
+    assert.equal(nodes(button).find((n) => n.props.className === 'sr-only').props.children, 'ใช้บัญชีสาธิต ');
+    assert.ok(button.props.children.includes(account.label));
+    assert.equal(nodes(button).filter((n) => n.props.className === 'demo-value').length, 2);
+    assert.deepEqual(
+      nodes(button)
+        .filter((n) => n.type === 'strong')
+        .map((n) => n.props.children),
+      [account.email, account.password],
+    );
+  }
+});
+
+test('login fields start with admin demo values; selecting every account only fills fields', async () => {
+  const h = loginHarness(null);
+  const inputs = () => h.render().filter((n) => n.type === 'input');
+  assert.equal(inputs()[0].props.value, 'admin@demo.local');
+  assert.equal(inputs()[1].props.value, 'admin-demo-only');
+  const { DEMO_ACCOUNTS } = await import('../src/lib/demo-accounts.ts');
+  for (const account of DEMO_ACCOUNTS) {
+    const button = h
+      .render()
+      .find((n) => n.type === 'button' && Array.isArray(n.props.children) && n.props.children.includes(account.label));
+    assert.equal(button.props.type, 'button');
+    button.props.onClick();
+    assert.equal(inputs()[0].props.value, account.email);
+    assert.equal(inputs()[1].props.value, account.password);
+    assert.deepEqual(h.calls, []);
+  }
+});
+
+test('password visibility toggles type and accessible pressed label without submitting or losing values', () => {
+  const h = loginHarness(null);
+  const input = () => h.render().find((n) => n.props.id === 'password');
+  const toggle = () => h.render().find((n) => n.type === 'button' && n.props['aria-pressed'] !== undefined);
+  assert.ok(toggle(), 'password visibility control');
+  assert.equal(input().props.type, 'password');
+  assert.equal(toggle().props['aria-label'], 'แสดงรหัสผ่าน');
+  assert.equal(toggle().props['aria-pressed'], false);
+  assert.equal(toggle().props.type, 'button');
+  toggle().props.onClick();
+  assert.equal(input().props.type, 'text');
+  assert.equal(toggle().props['aria-label'], 'แสดงรหัสผ่าน');
+  assert.equal(toggle().props['aria-pressed'], true);
+  assert.equal(input().props.value, 'admin-demo-only');
+  toggle().props.onClick();
+  assert.equal(input().props.type, 'password');
+  assert.equal(toggle().props['aria-label'], 'แสดงรหัสผ่าน');
+  assert.equal(toggle().props['aria-pressed'], false);
+  assert.deepEqual(h.calls, []);
+});
+
+test('prefilled and selected credentials use the unchanged login action and clear password after submit', async () => {
+  const h = loginHarness(null);
+  h.state.store.login = async (...args) => {
+    h.calls.push(args);
+    return true;
+  };
+  let prevented = 0;
+  const tree = h.render();
+  for (const node of tree.filter((n) => n.type === 'input')) node.props.ref.current = { focus() {} };
+  await tree.find((n) => n.type === 'form').props.onSubmit({ preventDefault: () => prevented++ });
+  assert.equal(prevented, 1);
+  assert.deepEqual(h.calls, [['admin@demo.local', 'admin-demo-only'], '/']);
+  assert.equal(h.render().find((n) => n.props.id === 'password').props.value, '');
+  h.calls.length = 0;
+  h.render()
+    .find((n) => n.type === 'button' && Array.isArray(n.props.children) && n.props.children.includes('Editor'))
+    .props.onClick();
+  await h
+    .render()
+    .find((n) => n.type === 'form')
+    .props.onSubmit({ preventDefault() {} });
+  assert.deepEqual(h.calls, [['editor@demo.local', 'editor-demo-only'], '/']);
+});
+
+test('prefilled form submits only email and password through the real service with CSRF', async () => {
+  const { createSessionService } = await import('../src/services/session-service.ts');
+  const { createSessionStore } = await import('../src/stores/session-store.ts');
+  const sink = createSessionStore(() => 1000);
+  const requests = [];
+  const service = createSessionService(sink, {
+    now: () => 1000,
+    schedule: () => undefined,
+    cancel() {},
+    fetcher: async (url, init) => {
+      requests.push({ url, init });
+      return Response.json({
+        user: { id: 'a', email: 'admin@demo.local', role: 'admin' },
+        expires_at: new Date(10000).toISOString(),
+      });
+    },
+  });
+  const h = loginHarness(null);
+  h.state.store.login = service.login;
+  try {
+    await h
+      .render()
+      .find((n) => n.type === 'form')
+      .props.onSubmit({ preventDefault() {} });
+    assert.equal(requests.length, 1);
+    const { url, init } = requests[0];
+    assert.equal(url, '/api/auth/login');
+    assert.equal(init.method, 'POST');
+    assert.deepEqual(JSON.parse(init.body), { email: 'admin@demo.local', password: 'admin-demo-only' });
+    assert.equal(init.headers['X-CSRF-Protection'], '1');
+    assert.equal(init.headers['Content-Type'], 'application/json');
+    assert.equal(init.credentials, 'same-origin');
+    assert.equal(init.cache, 'no-store');
+    assert.deepEqual(h.calls, ['/']);
+  } finally {
+    service.dispose();
+  }
 });
 
 test('bright map preserves OSM paint and uses primary survey marks and selected outline', () => {
@@ -131,10 +293,10 @@ test('bright map preserves OSM paint and uses primary survey marks and selected 
 test('session restore error retries restore while retaining the signed-in controls', () => {
   let restores = 0,
     logouts = 0;
-  const h = componentHarness('../src/components/session-controls.tsx', {
+  const h = componentHarness('../src/features/auth/session-controls.tsx', {
     'next/link': { default: 'a', __esModule: true },
-    './ui/button': { Button: 'button' },
-    './session-provider': {
+    [sourceFile('components/ui/button.tsx')]: { Button: 'button' },
+    [sourceFile('stores/session-context.tsx')]: {
       useSession: () => ({
         session: { user: { email: 'a@demo.local', role: 'viewer' } },
         phase: 'ready',
@@ -163,10 +325,10 @@ test('logout retry shows the rate-limit wait and is disabled until the store ret
     rateLimitedUntil: 91000,
     store: { logout() {} },
   };
-  const h = componentHarness('../src/components/session-controls.tsx', {
+  const h = componentHarness('../src/features/auth/session-controls.tsx', {
     'next/link': { default: 'a', __esModule: true },
-    './ui/button': { Button: 'button' },
-    './session-provider': { useSession: () => state },
+    [sourceFile('components/ui/button.tsx')]: { Button: 'button' },
+    [sourceFile('stores/session-context.tsx')]: { useSession: () => state },
   });
   let button = nodes(h.render(() => h.exports.SessionControls())).find((node) => node.type === 'button');
   assert.equal(button.props.disabled, true);
@@ -180,25 +342,25 @@ test('anonymous resource 401 becomes retryable error; authenticated 401 invalida
   for (const session of [null, { user: { id: 'a' } }]) {
     let unauthorized = 0,
       calls = 0;
-    const h = componentHarness('../src/components/use-resource.ts', {
-      './session-provider': { useSession: () => ({ session, phase: 'ready', generation: 1, busy: null, store }) },
-      '../lib/sites': {
-        ApiError,
-        fetchJson: async () => {
-          calls++;
-          throw new ApiError(401);
-        },
+    const h = componentHarness('../src/features/map/use-resource.ts', {
+      [sourceFile('stores/session-context.tsx')]: {
+        useSession: () => ({ session, phase: 'ready', generation: 1, busy: null, store }),
       },
     });
+    const resource = createResourceStore();
+    const load = async () => {
+      calls++;
+      throw new ApiError(401);
+    };
     const store = { isCurrent: () => true, unauthorized: () => unauthorized++ };
-    h.render(() => h.exports.useResource('/api/sites', 0));
+    h.render(() => h.exports.useResource('/api/sites', load, 0, resource));
     await flush();
-    const result = h.render(() => h.exports.useResource('/api/sites', 0));
+    const result = h.render(() => h.exports.useResource('/api/sites', load, 0, resource));
     assert.equal(unauthorized, session ? 1 : 0);
     if (!session) {
       assert.equal(result.error.status, 401);
       assert.equal(result.loading, false);
-      h.render(() => h.exports.useResource('/api/sites', 1));
+      h.render(() => h.exports.useResource('/api/sites', load, 1, resource));
       await flush();
       assert.equal(calls, 2);
     }
@@ -206,19 +368,19 @@ test('anonymous resource 401 becomes retryable error; authenticated 401 invalida
 });
 
 test('invalid filters show validation without list skeleton or map loading status', () => {
-  const h = componentHarness('../src/components/map-workspace.tsx', {
+  const h = componentHarness('../src/features/map/map-workspace.tsx', {
     'next/dynamic': { default: () => 'SiteMap', __esModule: true },
-    './ui/button': { Button: 'button' },
-    './session-controls': { SessionControls: 'controls' },
-    './session-provider': { useSession: () => ({ generation: 1 }) },
-    './use-resource': { useResource: () => ({ loading: false }) },
+    [sourceFile('components/ui/button.tsx')]: { Button: 'button' },
+    [sourceFile('features/auth/session-controls.tsx')]: { SessionControls: 'controls' },
+    [sourceFile('stores/session-context.tsx')]: { useSession: () => ({ generation: 1 }) },
+    [sourceFile('features/map/use-resource.ts')]: { useResource: () => ({ loading: false }) },
   });
-  const Content = h.render(() => h.exports.default()).type;
-  const tree = h.render(() => Content());
+  const Content = h.render(() => h.exports.default({})).type;
+  const tree = h.render(() => Content({}));
   nodes(tree)
     .find((node) => node.type === 'input')
     .props.onChange({ target: { value: '\0' } });
-  const invalid = nodes(h.render(() => Content()));
+  const invalid = nodes(h.render(() => Content({})));
   assert.ok(invalid.some((node) => node.props?.className === 'filter-error'));
   assert.equal(
     invalid.some((node) => node.props?.className === 'loading-state'),
@@ -308,10 +470,10 @@ function mapHarness(globals = {}, onDisplayChange, onSelect = () => {}) {
     }
   }
   const h = componentHarness(
-    '../src/components/site-map.tsx',
+    '../src/features/map/site-map.tsx',
     {
       'maplibre-gl': { Map: FakeMap, NavigationControl: class {}, ScaleControl: class {}, setWorkerUrl() {} },
-      '../lib/map-state': { ...mapState, debounce: (fn) => ({ run: fn, cancel() {} }) },
+      [sourceFile('lib/map-state.ts')]: { ...mapState, debounce: (fn) => ({ run: fn, cancel() {} }) },
     },
     {
       ResizeObserver: class {
@@ -413,15 +575,17 @@ test('non-basemap errors retain MapLibre console error reporting', () => {
 
 test('map stale notice starts only after a collection and stays stable through viewport updates', () => {
   let resource = { loading: true };
-  const h = componentHarness('../src/components/map-workspace.tsx', {
+  const h = componentHarness('../src/features/map/map-workspace.tsx', {
     'next/dynamic': { default: () => 'SiteMap', __esModule: true },
-    './ui/button': { Button: 'button' },
-    './session-controls': { SessionControls: 'controls' },
-    './session-provider': { useSession: () => ({ generation: 1 }) },
-    './use-resource': { useResource: (url) => (url?.startsWith('/api/sites.geojson') ? resource : { loading: false }) },
+    [sourceFile('components/ui/button.tsx')]: { Button: 'button' },
+    [sourceFile('features/auth/session-controls.tsx')]: { SessionControls: 'controls' },
+    [sourceFile('stores/session-context.tsx')]: { useSession: () => ({ generation: 1 }) },
+    [sourceFile('features/map/use-resource.ts')]: {
+      useResource: (url) => (url?.startsWith('/api/sites.geojson') ? resource : { loading: false }),
+    },
   });
-  const Content = h.render(() => h.exports.default()).type;
-  const render = () => nodes(h.render(() => Content()));
+  const Content = h.render(() => h.exports.default({})).type;
+  const render = () => nodes(h.render(() => Content({})));
   const progress = (tree) => tree.find((node) => node.props?.className === 'map-progress').props;
   let tree = render();
   assert.equal(progress(tree).children, 'กำลังปรับขอบเขต / โหลดข้อมูล…');
@@ -446,12 +610,12 @@ test('map stale notice starts only after a collection and stays stable through v
 });
 
 function provinceWorkspace(provinces) {
-  const h = componentHarness('../src/components/map-workspace.tsx', {
+  const h = componentHarness('../src/features/map/map-workspace.tsx', {
     'next/dynamic': { default: () => 'SiteMap', __esModule: true },
-    './ui/button': { Button: 'button' },
-    './session-controls': { SessionControls: 'controls' },
-    './session-provider': { useSession: () => ({ generation: 1 }) },
-    './use-resource': {
+    [sourceFile('components/ui/button.tsx')]: { Button: 'button' },
+    [sourceFile('features/auth/session-controls.tsx')]: { SessionControls: 'controls' },
+    [sourceFile('stores/session-context.tsx')]: { useSession: () => ({ generation: 1 }) },
+    [sourceFile('features/map/use-resource.ts')]: {
       useResource: (url) => {
         if (url === '/api/provinces.geojson') return provinces;
         if (url?.startsWith('/api/sites?')) {
@@ -468,8 +632,8 @@ function provinceWorkspace(provinces) {
       },
     },
   });
-  const Content = h.render(() => h.exports.default()).type;
-  const render = () => nodes(h.render(() => Content()));
+  const Content = h.render(() => h.exports.default({})).type;
+  const render = () => nodes(h.render(() => Content({})));
   const provinceCell = () => {
     render()
       .find((node) => node.props?.className === 'nav-item' && node.props.children === 'ตารางแหล่งหญ้าทะเล')
@@ -544,15 +708,15 @@ function historyWorkspace() {
   const calls = [];
   const provinces = { type: 'FeatureCollection', features: [] };
   const h = componentHarness(
-    '../src/components/map-workspace.tsx',
+    '../src/features/map/map-workspace.tsx',
     {
       'next/dynamic': { default: () => 'SiteMap', __esModule: true },
-      './ui/button': { Button: 'button' },
-      './session-controls': { SessionControls: 'controls' },
-      './session-provider': { useSession: () => ({ generation: 1 }) },
-      '../lib/map-state': { ...mapState, debounce: (fn) => ({ run: fn, cancel() {} }) },
-      './use-resource': {
-        useResource: (url, retry) => {
+      [sourceFile('components/ui/button.tsx')]: { Button: 'button' },
+      [sourceFile('features/auth/session-controls.tsx')]: { SessionControls: 'controls' },
+      [sourceFile('stores/session-context.tsx')]: { useSession: () => ({ generation: 1 }) },
+      [sourceFile('lib/map-state.ts')]: { ...mapState, debounce: (fn) => ({ run: fn, cancel() {} }) },
+      [sourceFile('features/map/use-resource.ts')]: {
+        useResource: (url, _load, retry) => {
           calls.push({ url, retry });
           for (const [prefix, resource] of resources) if (url?.startsWith(prefix)) return resource;
           if (url === '/api/provinces.geojson') return { data: provinces };
@@ -575,10 +739,10 @@ function historyWorkspace() {
     },
     { document },
   );
-  const Content = h.render(() => h.exports.default()).type;
+  const Content = h.render(() => h.exports.default({})).type;
   const render = () => {
     calls.length = 0;
-    return nodes(h.render(() => Content()));
+    return nodes(h.render(() => Content({})));
   };
   return {
     render,
@@ -746,14 +910,18 @@ test('history resource drops old pages, selections and creator data across ident
   let session = { user: { id: 'u' } };
   const pending = [];
   const store = { isCurrent: (value) => value === generation };
-  const h = componentHarness('../src/components/use-resource.ts', {
-    './session-provider': { useSession: () => ({ session, phase: 'ready', generation, busy: null, store }) },
-    '../lib/sites': {
-      ApiError,
-      fetchJson: (url, signal) => new Promise((resolve) => pending.push({ url, signal, resolve })),
+  const h = componentHarness('../src/features/map/use-resource.ts', {
+    [sourceFile('stores/session-context.tsx')]: {
+      useSession: () => ({ session, phase: 'ready', generation, busy: null, store }),
     },
   });
-  const render = (url) => h.render(() => h.exports.useResource(url, 0));
+  const resource = createResourceStore();
+  const loaders = new Map();
+  const render = (url) => {
+    if (!loaders.has(url))
+      loaders.set(url, (signal) => new Promise((resolve) => pending.push({ url, signal, resolve })));
+    return h.render(() => h.exports.useResource(url, loaders.get(url), 0, resource));
+  };
   const page1 = '/api/sites/S1/surveys?page=1&pageSize=5';
   const page2 = '/api/sites/S1/surveys?page=2&pageSize=5';
   const other = '/api/sites/S2/surveys?page=1&pageSize=5';
@@ -1018,7 +1186,7 @@ test('map reports unavailable when MapLibre cannot start and available again on 
   const reports = [];
   let fail = true;
   const h = componentHarness(
-    '../src/components/site-map.tsx',
+    '../src/features/map/site-map.tsx',
     {
       'maplibre-gl': {
         Map: class {
@@ -1039,7 +1207,7 @@ test('map reports unavailable when MapLibre cannot start and available again on 
         ScaleControl: class {},
         setWorkerUrl() {},
       },
-      '../lib/map-state': { ...mapState, debounce: (fn) => ({ run: fn, cancel() {} }) },
+      [sourceFile('lib/map-state.ts')]: { ...mapState, debounce: (fn) => ({ run: fn, cancel() {} }) },
     },
     {
       ResizeObserver: class {
@@ -1233,7 +1401,7 @@ test('popup without an anchor yet (details loading) or without a map stays visib
   assert.equal(element.style.visibility, undefined, 'never hidden');
 
   const failing = componentHarness(
-    '../src/components/site-map.tsx',
+    '../src/features/map/site-map.tsx',
     {
       'maplibre-gl': {
         Map: class {
@@ -1245,7 +1413,7 @@ test('popup without an anchor yet (details loading) or without a map stays visib
         ScaleControl: class {},
         setWorkerUrl() {},
       },
-      '../lib/map-state': { ...mapState, debounce: (fn) => ({ run: fn, cancel() {} }) },
+      [sourceFile('lib/map-state.ts')]: { ...mapState, debounce: (fn) => ({ run: fn, cancel() {} }) },
     },
     {
       ResizeObserver: class {

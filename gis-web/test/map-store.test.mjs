@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { createMapStore } from '../src/stores/map-store.ts';
+
+test('workspace stores isolate mounts and publish functional updates to subscribers until unsubscribe', () => {
+  const first = createMapStore();
+  const second = createMapStore();
+  const snapshots = [];
+  const unsubscribe = first.subscribe(() => snapshots.push(first.getSnapshot()));
+  const original = first.getSnapshot();
+  first.setView('table');
+  first.setState((previous) => ({ ...previous, page: previous.page + 1 }));
+  first.setPopup({ kind: 'site', code: 'S1' });
+  assert.equal(snapshots.length, 3);
+  assert.equal(snapshots.at(-1).view, 'table');
+  assert.equal(snapshots.at(-1).state.page, 2);
+  assert.deepEqual(snapshots.at(-1).popup, { kind: 'site', code: 'S1' });
+  assert.equal(original.view, 'map');
+  assert.equal(original.state.page, 1);
+  assert.deepEqual(second.getSnapshot(), original);
+  const stable = first.getSnapshot();
+  first.setView('table');
+  first.setPopup((previous) => previous);
+  assert.equal(first.getSnapshot(), stable);
+  assert.equal(snapshots.length, 3);
+  unsubscribe();
+  first.setPopup(null);
+  assert.equal(first.getSnapshot().popup, null);
+  assert.equal(snapshots.length, 3);
+});

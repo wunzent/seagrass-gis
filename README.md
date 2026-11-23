@@ -78,6 +78,7 @@ API สร้างบัญชีสาธิตตอน start จาก `DEMO
 ## API Usage
 
 - `POST /auth/login` คืน JWT (15 นาที) ใน `access_token` ตามโจทย์ข้อ 5.1 และตั้ง HttpOnly cookie `gis_access`; เรียก API ได้ด้วย `Authorization: Bearer <access_token>` (ไม่ต้องใช้ CSRF header) หรือ cookie (ต้องใช้ CSRF header); logout revoke session ฝั่ง server; ไม่มี refresh token
+- หน้า `/login` มีบัญชีสาธิตให้เลือกกรอก เริ่มด้วย Admin และมีปุ่มแสดง/ซ่อนรหัสผ่าน; styles/font/icons อยู่ `gis-web/src/assets/`
 - ปุ่มเข้าสู่ระบบตาม role (Viewer/Editor/Admin) บนหน้า `/login` แสดงเมื่อตั้ง `DEMO_LOGIN_ENABLED=true` ใน `.env` (ค่าตั้งต้นปิด; ใช้เฉพาะสาธิตบนเครื่อง local)
 - คำขอ POST/PATCH/DELETE (รวม login/logout) ต้องส่ง `Origin` ที่อนุญาต (`http://localhost:3000` หรือ `http://localhost:3001`) และ `X-CSRF-Protection: 1`
 - [api-examples.http](api-examples.http): ตัวอย่างทุก endpoint (VS Code REST Client) รันตามลำดับจะสร้างและลบ site `DOC-EX-001` เอง; status ในไฟล์ได้จากการรันจริง
@@ -124,6 +125,8 @@ workflow ใช้ `contents: read`, `actions/checkout@v4`, `actions/setup-node@
 - `/surveys.geojson` คืนสูงสุด 5000 จุดใหม่สุด; rate limit login คิดตาม client+email เพราะ API เห็น IP เดียวของ web proxy
 - HTTP loopback เท่านั้น ไม่ใช่ production HTTPS
 
+เอกสารเว็บ: [UI design system](gis-web/DESIGN.md) และ [Web architecture](gis-web/ARCHITECTURE.md)
+
 ## Assessment Deliverables
 
 | Item | ที่ส่งมอบ / วิธีตรวจ |
@@ -134,7 +137,7 @@ workflow ใช้ `contents: read`, `actions/checkout@v4`, `actions/setup-node@
 | 4.4 API docs + examples | `/docs` ตาม API Usage และ [api-examples.http](api-examples.http) |
 | 4.5 Tests | [status unit](gis-api/src/sites/site-status.spec.ts), [validation unit](gis-api/src/sites/dto/create-site.dto.spec.ts), [OUTSIDE_SITE integration](gis-api/test/surveys.e2e-spec.ts), [VERSION_CONFLICT integration](gis-api/test/sites-write.e2e-spec.ts); คำสั่งอยู่ใน Test |
 | 4.6 Import report | [import_report.csv](reports/import_report.csv) จากขั้น 2; จำนวนและวิธีรันซ้ำอยู่ใน Seed Import |
-| 4.7 Design | [DESIGN.md](DESIGN.md) ตอบ a geometry/SRID/index, b invalid/missing CRS, c concurrent edits, d วิธีส่ง 500,000 polygons ไปหน้าเว็บให้แสดงภายใน 2 วินาที (โจทย์ถามแนวทาง; การทำ vector tiles จริงเป็นข้อ Senior ที่เลื่อนไว้), e งานที่ยังไม่ทำและแผนอีก 1 วัน; ตรวจแล้ว 2 หน้า A4 (Chrome print, 11pt, ขอบ 20 mm) |
+| 4.7 Design | [UI design system ของเว็บ](gis-web/DESIGN.md); [DESIGN.md](DESIGN.md) ตอบ a geometry/SRID/index, b invalid/missing CRS, c concurrent edits, d วิธีส่ง 500,000 polygons ไปหน้าเว็บให้แสดงภายใน 2 วินาที (โจทย์ถามแนวทาง; การทำ vector tiles จริงเป็นข้อ Senior ที่เลื่อนไว้), e งานที่ยังไม่ทำและแผนอีก 1 วัน; ตรวจแล้ว 2 หน้า A4 (Chrome print, 11pt, ขอบ 20 mm) |
 | 9.5 CI | [GitHub Actions](.github/workflows/ci.yml) รัน test และ build image เมื่อ push/PR ตาม CI; hosted run ของ revision ที่ส่งยัง Pending |
 
 PDF ข้อสอบและรายงานส่งต่องาน Codex เก็บนอก public repository; ประวัติ provider ก่อน DEC-15 อยู่ใน dated evidence ของ WORK-STATUS

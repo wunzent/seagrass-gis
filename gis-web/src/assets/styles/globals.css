@@ -617,6 +617,80 @@
   .login-panel label {
     font-size: 0.85rem;
   }
+  .demo-accounts {
+    list-style: none;
+    margin: 0 0 10px;
+    padding: 10px;
+    border-radius: 6px;
+    background: var(--primary-soft);
+    color: var(--text);
+    font-size: 0.85rem;
+  }
+  .demo-accounts button {
+    display: block;
+    width: 100%;
+    min-height: 44px;
+    padding: 6px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    text-align: left;
+    overflow-wrap: anywhere;
+  }
+  .demo-accounts .demo-value {
+    white-space: nowrap;
+  }
+  .demo-accounts button:hover:not(:disabled) {
+    text-decoration: underline;
+  }
+  .demo-accounts button:disabled {
+    opacity: 0.6;
+  }
+  .login-field {
+    position: relative;
+    margin: 6px 0 8px;
+  }
+  .login-field label {
+    position: absolute;
+    top: 0;
+    left: 10px;
+    transform: translateY(-50%);
+    padding: 0 4px;
+    background: var(--bg);
+    z-index: 1;
+  }
+  .login-field:focus-within label {
+    color: var(--primary);
+  }
+  .login-field:has(input:disabled) label {
+    background: var(--surface);
+  }
+  .login-field input:focus-visible {
+    outline-color: var(--primary);
+  }
+  .login-field-icon,
+  .password-toggle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    color: var(--text-muted);
+  }
+  .login-field-icon {
+    pointer-events: none;
+  }
+  .password-toggle {
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+  }
+  .password-toggle:hover:not(:disabled) {
+    color: var(--primary);
+    background: var(--primary-soft);
+  }
   .login-panel input {
     width: 100%;
     min-width: 0;
@@ -624,8 +698,7 @@
     border: 1px solid var(--field-border);
     border-radius: 6px;
     background: var(--bg);
-    padding: 8px 10px;
-    margin-bottom: 8px;
+    padding: 8px 44px 8px 10px;
   }
   .login-panel input:disabled {
     background: var(--surface);

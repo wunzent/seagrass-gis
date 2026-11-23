@@ -6,15 +6,15 @@ Web ระบบติดตามแหล่งหญ้าทะเล (Next.
 
 clone `https://github.com/wunzent/seagrass-gis.git` เพียงครั้งเดียว; รัน `docker compose up -d --build --wait` จาก repository root ซึ่ง build จาก `./gis-api` และ `./gis-web` ดู [Local Development](../docs/swc/LOCAL-DEVELOPMENT.md)
 
-## Layout
+## Architecture
 
-```text
-src/app/         page.tsx (แผนที่), login/, health/, api/ (proxy ไป gis-api), globals.css
-src/components/  map-workspace, site-map, login-form, session-provider, session-controls, ui/
-src/lib/         map-state, proxy, session, sites
-scripts/         copy-maplibre-worker.mjs, next-env.mjs (โหลด .env ก่อนเรียก Next CLI)
-test/            *.test.mjs (node --test)
-```
+ดู [ARCHITECTURE](ARCHITECTURE.md) สำหรับ layer rules, folder map และ flow จริง; [DESIGN](DESIGN.md) เป็น UI design system ส่วน [root DESIGN](../DESIGN.md) ตอบแนวทางระบบตาม assessment
+
+- app: routes/layouts; guards: session visibility เดิม
+- features/map และ features/auth: UI, hooks และ orchestration
+- services: REST transport; stores: session/shared map state ผ่าน useSyncExternalStore
+- components/ui: UI แสดงผล; lib: pure helpers/types และ server proxy
+- scripts: Tailwind/worker/env; test: unit + architecture boundaries
 
 ## Host Development
 
@@ -29,14 +29,14 @@ npm run dev
 `.env` (ignored) ตั้ง `PORT=3003` เพื่อไม่ชน Docker web ที่ 3000 ตรวจ health ที่ `http://localhost:3003/health` และเปิดแผนที่ที่ `http://localhost:3003/`
 `API_INTERNAL_URL` (ฝั่ง server เท่านั้น): `http://localhost:3002` สำหรับ host API (default) หรือ `http://localhost:3001` สำหรับ Docker API; Compose ตั้ง `http://api:3001` ถ้าใช้ host web กับ Docker API ต้องให้ `PUBLIC_WEB_ORIGIN` ของ API ตรง `http://localhost:3003` ไม่เช่นนั้น login จะได้ CSRF error
 
-| Script                                        | ใช้ทำอะไร                                                        |
-| --------------------------------------------- | ---------------------------------------------------------------- |
-| `npm run dev` / `npm run build` / `npm start` | สร้าง `src/app/tailwind.css` + copy MapLibre worker แล้วรัน Next |
-| `npm run styles`                              | compile Tailwind ใหม่หลังแก้ CSS/class ระหว่าง dev               |
-| `npm run typecheck`                           | `tsc --noEmit`                                                   |
-| `npm run lint`                                | ESLint (`eslint-config-next` core-web-vitals + typescript)       |
-| `npm run format` / `npm run format:check`     | Prettier                                                         |
-| `npm run test:unit`                           | unit tests ใน `test/`                                            |
+| Script                                        | ใช้ทำอะไร                                                                  |
+| --------------------------------------------- | -------------------------------------------------------------------------- |
+| `npm run dev` / `npm run build` / `npm start` | สร้าง `src/assets/styles/tailwind.css` + copy MapLibre worker แล้วรัน Next |
+| `npm run styles`                              | compile Tailwind ใหม่หลังแก้ CSS/class ระหว่าง dev                         |
+| `npm run typecheck`                           | `tsc --noEmit`                                                             |
+| `npm run lint`                                | ESLint (`eslint-config-next` core-web-vitals + typescript)                 |
+| `npm run format` / `npm run format:check`     | Prettier                                                                   |
+| `npm run test:unit`                           | unit tests ใน `test/`                                                      |
 
 ## Behaviour
 
@@ -53,4 +53,6 @@ npm run dev
 
 [GitHub Actions](../.github/workflows/ci.yml) ที่ root รันทุก branch push และ pull request: `web-test` รัน format, lint, unit, build, typecheck แล้ว `web-image` build ด้วย `docker build --pull ./gis-web` ใช้ Node22.18.0, `npm ci --ignore-scripts` และ npm cache ตาม lockfile; ไม่ push image; รอตรวจ hosted run ของ revision ปัจจุบัน
 
-หน้า /login แสดงปุ่ม Viewer, Editor และ Admin สำหรับบัญชีสาธิตเฉพาะเมื่อ API ตั้ง DEMO_LOGIN_ENABLED=true และ discovery สำเร็จ เมื่อปิดหรือเรียก API ไม่สำเร็จจะแสดงเฉพาะฟอร์ม email/password เดิม ปุ่มส่งเฉพาะ role โดยไม่มีรหัสผ่านใน web code
+หน้า /login แสดงปุ่ม Viewer, Editor และ Admin สำหรับบัญชีสาธิตเฉพาะเมื่อ API ตั้ง DEMO_LOGIN_ENABLED=true และ discovery สำเร็จ เมื่อปิดหรือเรียก API ไม่สำเร็จจะซ่อนเฉพาะปุ่ม role; ปุ่มเหล่านี้ส่งเฉพาะ role ตามเดิม ฟอร์มมีบัญชีสาธิตสามรายการจาก src/lib/demo-accounts.ts ที่ตรงกับค่าตั้งต้นใน .env.example กดรายการเพื่อกรอกโดยไม่ส่ง และเริ่มด้วย Admin; ปุ่มตาสลับแสดง/ซ่อนรหัสผ่าน
+
+Style/font/icon อยู่ใน `src/assets/`: `styles/globals.css`, generated `styles/tailwind.css`, `styles/maplibre.css`, `fonts/fonts.ts`, `icons/login-icons.tsx` โดย layout import assets เหล่านี้

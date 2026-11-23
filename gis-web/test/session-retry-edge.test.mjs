@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createSession } from '../src/lib/session.ts';
+import { createSessionService } from '../src/services/session-service.ts';
+import { createSessionStore } from '../src/stores/session-store.ts';
+const createSession = (options) => {
+  const sink = createSessionStore(options.now);
+  return { ...sink, ...createSessionService(sink, options) };
+};
 
 test('a logout 429 retry firing 1 ms early does not strand pending logout', async () => {
   let now = 1000,

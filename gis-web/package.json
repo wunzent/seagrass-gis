@@ -7,7 +7,7 @@
     "node": ">=22.18.0"
   },
   "scripts": {
-    "styles": "tailwindcss -i ./src/app/globals.css -o ./src/app/tailwind.css --content \"./src/**/*.{ts,tsx}\" --minify",
+    "styles": "tailwindcss -i ./src/assets/styles/globals.css -o ./src/assets/styles/tailwind.css --content \"./src/**/*.{ts,tsx}\" --minify",
     "dev": "npm run styles && node scripts/copy-maplibre-worker.mjs && node scripts/next-env.mjs dev --hostname 0.0.0.0",
     "build": "npm run styles && node scripts/copy-maplibre-worker.mjs && next build",
     "start": "node scripts/next-env.mjs start --hostname 0.0.0.0",

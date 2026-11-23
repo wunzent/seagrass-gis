@@ -18,6 +18,7 @@ export type ListState = { filters: Filters; page: number };
 export type Bbox = [number, number, number, number];
 export const emptyFilters: Filters = { province: '', status: '', q: '' };
 export const PAGE_SIZE = 20;
+export const ROUNDS_PAGE_SIZE = 100;
 
 export function filterState(state: ListState, change: Partial<Filters>): ListState {
   const filters = { ...state.filters, ...change };

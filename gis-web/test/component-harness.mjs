@@ -1,10 +1,19 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import pathModule from 'node:path';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 
 // Run component effects with explicit renders and mocked browser/network boundaries.
-export function componentHarness(path, mocks = {}, globals = {}) {
+export function componentHarness(path, mocks = {}, globals = {}, { inlineFixtures = [] } = {}) {
+  const usedMocks = new Set();
+  const mock = (target) => {
+    if (mocks[target] === undefined) throw new Error(`Undefined mock for ${target}`);
+    usedMocks.add(target);
+    return mocks[target];
+  };
+  const inlineFiles = new Set(inlineFixtures.map((file) => pathModule.resolve(file)));
   const slots = [];
   let cursor = 0;
   let effects = [];
@@ -40,6 +49,7 @@ export function componentHarness(path, mocks = {}, globals = {}) {
     },
   };
   react.useLayoutEffect = react.useEffect;
+  react.useSyncExternalStore = (_subscribe, getSnapshot) => getSnapshot();
   const file = new URL(path, import.meta.url);
   const require = createRequire(file);
   const exports = {};
@@ -97,17 +107,39 @@ export function componentHarness(path, mocks = {}, globals = {}) {
     current.children = children.map((child, i) => reconcile(child, current.children?.[i], current));
     return current;
   };
-  const jsx = (type, props, key) => ({ type, props, key });
-  const code = ts.transpileModule(readFileSync(file, 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 },
-  }).outputText;
-  const load = (name) => {
-    if (name === 'react') return react;
-    if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx, Fragment: 'fragment' };
-    if (name in mocks) return mocks[name];
-    return require(name.startsWith('.') ? `${name}.ts` : name);
+  const jsx = (type, props, key) =>
+    typeof type === 'function' && type.inlineFixture ? type(props) : { type, props, key };
+  const modules = new Map();
+  const evaluate = (filePath, entry = false) => {
+    if (modules.has(filePath)) return modules.get(filePath);
+    const result = entry ? exports : {};
+    modules.set(filePath, result);
+    const code = ts.transpileModule(readFileSync(filePath, 'utf8'), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 },
+    }).outputText;
+    const load = (name) => {
+      if (name === 'react') return react;
+      if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx, Fragment: 'fragment' };
+      if (!name.startsWith('.') && Object.hasOwn(mocks, name)) return mock(name);
+      if (name.startsWith('.')) {
+        const base = pathModule.resolve(pathModule.dirname(filePath), name);
+        const target = [base, base + '.ts', base + '.tsx'].find((candidate) => existsSync(candidate));
+        if (!target) throw new Error(`Cannot resolve ${JSON.stringify(name)} from ${filePath}`);
+        if (Object.hasOwn(mocks, target)) return mock(target);
+        if (target.endsWith('.ts') && !/from ['"]react['"]/.test(readFileSync(target, 'utf8'))) return require(target);
+        const loaded = evaluate(target);
+        if (inlineFiles.has(target))
+          for (const value of Object.values(loaded)) if (typeof value === 'function') value.inlineFixture = true;
+        return loaded;
+      }
+      return require(name);
+    };
+    runInNewContext(code, { exports: result, require: load, console, Error, ...globals });
+    return result;
   };
-  runInNewContext(code, { exports, require: load, console, Error, ...globals });
+  evaluate(fileURLToPath(file), true);
+  for (const target of Object.keys(mocks))
+    if (pathModule.isAbsolute(target) && !usedMocks.has(target)) throw new Error(`Unused absolute mock: ${target}`);
   return {
     exports,
     host: (node) => hosts.get(node),

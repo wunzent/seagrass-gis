@@ -1,24 +1,24 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   Map as MapLibreMap,
   NavigationControl,
   ScaleControl,
   setWorkerUrl,
+  type ExpressionSpecification,
+  type GeoJSONSource,
   type MapGeoJSONFeature,
   type PointLike,
-  type GeoJSONSource,
-  type ExpressionSpecification,
 } from 'maplibre-gl';
-import { debounce, POINT_STROKE, POINT_FILL, SITE_OUTLINE, statuses, validBbox, type Bbox } from '../lib/map-state';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { debounce, POINT_FILL, POINT_STROKE, SITE_OUTLINE, statuses, validBbox, type Bbox } from '../../lib/map-state';
 import {
   geometryBounds,
   type ProvinceCollection,
-  type SurveysGeoJSON,
   type SiteFeature,
   type SitesGeoJSON,
-} from '../lib/sites';
+  type SurveysGeoJSON,
+} from '../../lib/sites';
 
 // Served from public/ by scripts/copy-maplibre-worker.mjs; the default URL is relative to the bundled chunk and 404s.
 setWorkerUrl('/maplibre/maplibre-gl-worker.mjs');

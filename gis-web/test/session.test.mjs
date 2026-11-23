@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createSession, validateLogin, publicData, loginMessage } from '../src/lib/session.ts';
+import { createSessionService, validateLogin, publicData, loginMessage } from '../src/services/session-service.ts';
+import { createSessionStore } from '../src/stores/session-store.ts';
+const createSession = (options) => {
+  const sink = createSessionStore(options.now);
+  return { ...sink, ...createSessionService(sink, options) };
+};
 
 const safe = (id = 'a', expires_at = new Date(10000).toISOString()) => ({
   user: { id, email: `${id}@demo.local`, role: 'viewer', secret: 'discard' },

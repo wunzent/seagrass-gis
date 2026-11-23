@@ -4,6 +4,8 @@
 
 ## Architecture
 
+UI design system: [gis-web/DESIGN.md](gis-web/DESIGN.md) กำหนดธีมและ component tokens ของเว็บ
+
 repository เดียว `wunzent/seagrass-gis` branch `main`; clone `https://github.com/wunzent/seagrass-gis.git` แล้วรัน Compose จาก root; CI ใช้ GitHub Actions ที่ `.github/workflows/ci.yml`
 
 `gis-web` (Next.js, MapLibre) → proxy `/api/*` → `gis-api` (NestJS, `pg`) → PostgreSQL 16 + PostGIS 3.5 รันด้วย Docker Compose บนเครื่อง local (loopback เท่านั้น) API รัน migrations แบบ versioned/checksum และ importer ก่อนรับ HTTP ไม่มี schema synchronize

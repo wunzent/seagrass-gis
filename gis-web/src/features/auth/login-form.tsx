@@ -3,10 +3,12 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Button } from './ui/button';
-import { useSession } from './session-provider';
+import { Button } from '../../components/ui/button';
+import { useSession } from '../../stores/session-context';
 import { SessionControls } from './session-controls';
-import { validateLogin, type DemoRole } from '../lib/session';
+import { validateLogin, type DemoRole } from '../../lib/session';
+import { ADMIN_DEMO_ACCOUNT, DEMO_ACCOUNTS } from '../../lib/demo-accounts';
+import { EyeIcon, MailIcon } from '../../assets/icons/login-icons';
 
 const demoAccounts: { role: DemoRole; label: string; description: string }[] = [
   { role: 'viewer', label: 'Viewer', description: 'อ่านข้อมูล และเห็นผู้บันทึก' },
@@ -14,11 +16,12 @@ const demoAccounts: { role: DemoRole; label: string; description: string }[] = [
   { role: 'admin', label: 'Admin', description: 'จัดการแหล่งทั้งหมด' },
 ];
 
-export function LoginForm() {
+export function LoginForm({ guest }: { guest?: boolean } = {}) {
   const router = useRouter();
   const { store, session, phase, busy, logoutPending, error } = useSession();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState<string>(ADMIN_DEMO_ACCOUNT.email);
+  const [password, setPassword] = useState<string>(ADMIN_DEMO_ACCOUNT.password);
+  const [showPassword, setShowPassword] = useState(false);
   const [fields, setFields] = useState({ email: '', password: '' });
   const [roles, setRoles] = useState<DemoRole[] | null>(null);
   const [pendingRole, setPendingRole] = useState<DemoRole | null>(null);
@@ -64,11 +67,7 @@ export function LoginForm() {
         <h1 id="login-heading">เข้าสู่ระบบ</h1>
         <p className="subtitle">เข้าสู่ระบบด้วยบัญชีที่ได้รับ หรือกลับไปดูข้อมูลสาธารณะ</p>
         {session || logoutPending || phase === 'checking' ? <SessionControls /> : null}
-        {session ? (
-          <Link className="session-link" href="/">
-            กลับไปแผนที่
-          </Link>
-        ) : (
+        {(guest ?? !session) ? (
           <>
             {roles && roles.length > 0 && (
               <div className="demo-login" role="group" aria-labelledby="demo-heading" aria-busy={pendingRole !== null}>
@@ -93,6 +92,31 @@ export function LoginForm() {
               </div>
             )}
             <form onSubmit={submit} noValidate aria-busy={busy === 'login'}>
+              <ul className="demo-accounts" aria-label="บัญชีสาธิตสำหรับกรอกฟอร์ม">
+                {DEMO_ACCOUNTS.map((account) => (
+                  <li key={account.role}>
+                    <button
+                      type="button"
+                      disabled={Boolean(busy) || logoutPending || phase === 'checking'}
+                      onClick={() => {
+                        setEmail(account.email);
+                        setPassword(account.password);
+                        setFields({ email: '', password: '' });
+                      }}
+                    >
+                      <span className="sr-only">ใช้บัญชีสาธิต </span>
+                      {account.label} Email:{' '}
+                      <span className="demo-value">
+                        <strong>{account.email}</strong>
+                      </span>{' '}
+                      / Pass:{' '}
+                      <span className="demo-value">
+                        <strong>{account.password}</strong>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
               <div
                 ref={summary}
                 tabIndex={-1}
@@ -101,40 +125,58 @@ export function LoginForm() {
               >
                 {!logoutPending && error}
               </div>
-              <label htmlFor="email">อีเมล</label>
-              <input
-                ref={emailInput}
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="username"
-                inputMode="email"
-                required
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                aria-invalid={Boolean(fields.email)}
-                aria-describedby={fields.email ? 'email-error' : undefined}
-                disabled={Boolean(busy)}
-              />
+              <div className="login-field">
+                <label htmlFor="email">Email</label>
+                <input
+                  ref={emailInput}
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="username"
+                  inputMode="email"
+                  required
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  aria-invalid={Boolean(fields.email)}
+                  aria-describedby={fields.email ? 'email-error' : undefined}
+                  disabled={Boolean(busy)}
+                />
+                <span className="login-field-icon">
+                  <MailIcon />
+                </span>
+              </div>
               {fields.email && (
                 <p className="field-error" id="email-error">
                   {fields.email}
                 </p>
               )}
-              <label htmlFor="password">รหัสผ่าน</label>
-              <input
-                ref={passwordInput}
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                aria-invalid={Boolean(fields.password)}
-                aria-describedby={fields.password ? 'password-error' : undefined}
-                disabled={Boolean(busy)}
-              />
+              <div className="login-field">
+                <label htmlFor="password">Password</label>
+                <input
+                  ref={passwordInput}
+                  id="password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  aria-invalid={Boolean(fields.password)}
+                  aria-describedby={fields.password ? 'password-error' : undefined}
+                  disabled={Boolean(busy)}
+                />
+                <button
+                  className="password-toggle"
+                  type="button"
+                  aria-label="แสดงรหัสผ่าน"
+                  aria-pressed={showPassword}
+                  aria-controls="password"
+                  disabled={Boolean(busy)}
+                  onClick={() => setShowPassword((visible) => !visible)}
+                >
+                  <EyeIcon visible={showPassword} />
+                </button>
+              </div>
               {fields.password && (
                 <p className="field-error" id="password-error">
                   {fields.password}
@@ -148,6 +190,10 @@ export function LoginForm() {
               </Link>
             </form>
           </>
+        ) : (
+          <Link className="session-link" href="/">
+            กลับไปแผนที่
+          </Link>
         )}
       </section>
     </main>
