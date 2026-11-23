@@ -4,6 +4,8 @@
 
 ## Architecture
 
+repository เดียว `wunzent/seagrass-gis` branch `main`; clone `https://github.com/wunzent/seagrass-gis.git` แล้วรัน Compose จาก root; CI ใช้ GitHub Actions ที่ `.github/workflows/ci.yml`
+
 `gis-web` (Next.js, MapLibre) → proxy `/api/*` → `gis-api` (NestJS, `pg`) → PostgreSQL 16 + PostGIS 3.5 รันด้วย Docker Compose บนเครื่อง local (loopback เท่านั้น) API รัน migrations แบบ versioned/checksum และ importer ก่อนรับ HTTP ไม่มี schema synchronize
 
 ## Geometry, SRID and Indexes
@@ -36,9 +38,9 @@
 
 คำนวณตอนอ่าน ไม่เก็บใน DB: ใช้ AVG(`cover_percent`) ของทุก survey ในวันที่สำรวจล่าสุด (MAX `surveyed_on`) ของ site ไม่ปัดก่อนเทียบ: ≥75 `very_good`, ≥50 `good`, ≥25 `fair`, <25 `poor`, ไม่มี survey `no_data` จึงอัปเดตทันทีหลังเขียน survey
 
-## Strategy for 500k Polygons (Proposal — not implemented or benchmarked)
+## Strategy for 500k Polygons within 2 Seconds (Proposal — not implemented or benchmarked)
 
-ปัจจุบันมี 27 sites; แนวทางต่อไปนี้เป็นข้อเสนอ ยังไม่มีผลวัด
+ปัจจุบันมี 27 sites; เป้าหมาย 2 วินาทีสำหรับ 500,000 polygons ต้องใช้ tiles ตาม viewport/zoom และวัดผลจริง แนวทางต่อไปนี้เป็นข้อเสนอ ยังไม่มีผลวัด
 
 1. คง bbox query + GiST และบังคับ bbox ทุกคำขอแผนที่ (ทำแล้วใน `/sites.geojson`, `/surveys.geojson`) เพิ่มเพดานจำนวน feature ต่อคำขอ
 2. Vector tiles (`ST_AsMVT` หรือ tile server) ตาม zoom แทน GeoJSON ก้อนใหญ่; ใช้ geometry ที่ simplify ล่วงหน้าต่อระดับ zoom (`ST_SimplifyPreserveTopology` เก็บเป็นคอลัมน์/ตารางแยก) และ full geometry เฉพาะ zoom สูงหรือ detail
@@ -48,6 +50,6 @@
 
 ## Remaining Work and Next-Day Plan
 
-- ทำแล้วเพิ่มเติม: GitLab pipeline ของ gis-api/gis-web ผ่าน, fresh code/security review ทุกงานแก้ครบ, owner pre-UAT, หน้าแผนที่ออกแบบใหม่ (popup แหล่งพร้อมประวัติสรุปรอบ, popup จุดสำรวจ, หน้าตาราง) และปุ่มเข้าสู่ระบบตาม role สำหรับสาธิต (`DEMO_LOGIN_ENABLED` ค่าตั้งต้นปิด)
+- ทำแล้วเพิ่มเติม: workflow GitHub Actions สำหรับ tests และ image builds พร้อม แต่ hosted run ยัง Pending; fresh code/security review ทุกงานแก้ครบ, owner pre-UAT, หน้าแผนที่ออกแบบใหม่ (popup แหล่งพร้อมประวัติสรุปรอบ, popup จุดสำรวจ, หน้าตาราง) และปุ่มเข้าสู่ระบบตาม role สำหรับสาธิต (`DEMO_LOGIN_ENABLED` ค่าตั้งต้นปิด)
 - ยังไม่ทำ: แนบรูปผลสำรวจ (ข้อเสริมขั้นที่ 4), Senior ขั้นที่ 3/6/7/8 (overlap, SURVEYS_OUTSIDE, reference UTM, layer list, URL state, วาด/แก้บนแผนที่, dashboard/export), ขั้นที่ 9 ข้ออื่นนอกจาก CI ดู [DEFERRED](docs/swc/DEFERRED.md)
 - ถ้ามีเวลาอีก 1 วัน: (1) ขั้นที่ 7 เพิ่ม/แก้/ลบผลสำรวจจาก popup บนแผนที่ (API พร้อมแล้ว เหลือ UI + Playwright) (2) layer list และเก็บสถานะใน URL (3) vector tiles ตามข้อเสนอด้านบนพร้อมวัดผล

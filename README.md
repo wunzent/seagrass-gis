@@ -1,6 +1,6 @@
 # GIS — ระบบติดตามแหล่งหญ้าทะเล
 
-Repository `wunzent/seagrass-gis` รวม `gis-api/` (NestJS), `gis-web/` (Next.js), เอกสาร, `docker-compose.yml`, `seed-data/`, `reports/`, [DESIGN](DESIGN.md) และ [api-examples.http](api-examples.http) ใช้ PostgreSQL/PostGIS และ GitHub Actions ตาม DEC-15
+Repository เดียว `wunzent/seagrass-gis` branch `main` รวม `gis-api/` (NestJS), `gis-web/` (Next.js), เอกสาร, `docker-compose.yml`, `seed-data/`, `reports/`, [DESIGN](DESIGN.md) และ [api-examples.http](api-examples.http) ใช้ PostgreSQL/PostGIS และ GitHub Actions ตาม DEC-15
 
 > **Data disclaimer**: ข้อมูลใน `seed-data/` เป็นข้อมูลจำลองสำหรับแบบทดสอบ ไม่ใช่ขอบเขตจังหวัด แหล่งหญ้าทะเล หรือผลสำรวจจริง ห้ามนำไปใช้ตัดสินใจ
 
@@ -9,7 +9,7 @@ Repository `wunzent/seagrass-gis` รวม `gis-api/` (NestJS), `gis-web/` (Nex
 clone repository เดียว แล้วรันคำสั่งจาก root:
 
 ```powershell
-git clone https://github.com/wunzent/seagrass-gis.git
+git clone --branch main https://github.com/wunzent/seagrass-gis.git
 cd seagrass-gis
 ```
 
@@ -37,7 +37,7 @@ PDF ข้อสอบเก็บไว้นอก public repository และ
 | 4 Surveys | CRUD survey, history, `/surveys.geojson`, `/provinces.geojson`, `/species` | real PostGIS e2e |
 | 5 Auth | `POST /auth/login` คืน JWT (`access_token`, 15 นาที) + HttpOnly cookie; ใช้ `Authorization: Bearer` หรือ cookie; me/logout, session revocation, CSRF สำหรับ cookie, roles viewer/editor/admin; ปุ่ม demo login ตาม role (`DEMO_LOGIN_ENABLED`, ค่าตั้งต้นปิด) | e2e (real PostGIS) + Docker smoke |
 | 6 Web | เมนู แผนที่ / ตารางแหล่งหญ้าทะเล; sidebar ตัวกรอง + รายการ; MapLibre polygons ตาม bbox (debounce), เส้นจังหวัด, จุดสำรวจ, legend; popup แหล่ง (รายละเอียด + ประวัติสรุปรอบ) และ popup จุดสำรวจ; login (ฟอร์ม + ปุ่ม role); loading/error/empty; 375px | unit + browser บน Docker (desktop และ 375px) |
-| 9.5 CI | `.github/workflows/ci.yml`: `api-test` → `api-image`, `web-test` → `web-image` | รอตรวจ hosted GitHub Actions ของ revision ที่ส่ง; ผล GitLab เดิมเป็นประวัติ |
+| 9.5 CI | `.github/workflows/ci.yml`: `api-test` → `api-image`, `web-test` → `web-image` | Pending — รอตรวจ hosted GitHub Actions ของ commit ล่าสุดของ `main` ที่ push แล้ว |
 
 ผลคำสั่งและตัวเลขจริงอยู่ที่ [WORK-STATUS](docs/WORK-STATUS.md); แผนและ spec ที่ [SWC](docs/swc/README.md); ขั้นตอนรับงานที่ [UAT](docs/swc/UAT.md) และชุดส่งมอบ [UAT Package](docs/swc/UAT-PACKAGE.md); งานที่เลื่อนออกที่ [DEFERRED](docs/swc/DEFERRED.md)
 
@@ -123,6 +123,21 @@ workflow ใช้ `contents: read`, `actions/checkout@v4`, `actions/setup-node@
 - Survey ไม่มี version: แก้พร้อมกันเป็น last-write-wins; หลัง admin ย้าย site อาจมี survey เดิมที่ห่างเกิน 50 m ค้างอยู่
 - `/surveys.geojson` คืนสูงสุด 5000 จุดใหม่สุด; rate limit login คิดตาม client+email เพราะ API เห็น IP เดียวของ web proxy
 - HTTP loopback เท่านั้น ไม่ใช่ production HTTPS
+
+## Assessment Deliverables
+
+| Item | ที่ส่งมอบ / วิธีตรวจ |
+|---|---|
+| 4.1 Source + commits | repository นี้มี [API](gis-api/README.md) และ [Web](gis-web/README.md); ประวัติรวมเป็น timeline เดียวของ commits `step-N:` ตาม DEC-15 ตรวจจาก root ด้วย `git log --oneline` |
+| 4.2 Compose + environment | [docker-compose.yml](docker-compose.yml) เปิด db/api/web และ import อัตโนมัติด้วยคำสั่งเดียวใน Run; [.env.example](.env.example) เป็นค่า demo-only |
+| 4.3 README | Run, Test, Current Status และ Demo Accounts ระบุวิธีเปิด/ทดสอบ ขั้นที่ทำเสร็จ และบัญชี viewer/editor/admin |
+| 4.4 API docs + examples | `/docs` ตาม API Usage และ [api-examples.http](api-examples.http) |
+| 4.5 Tests | [status unit](gis-api/src/sites/site-status.spec.ts), [validation unit](gis-api/src/sites/dto/create-site.dto.spec.ts), [OUTSIDE_SITE integration](gis-api/test/surveys.e2e-spec.ts), [VERSION_CONFLICT integration](gis-api/test/sites-write.e2e-spec.ts); คำสั่งอยู่ใน Test |
+| 4.6 Import report | [import_report.csv](reports/import_report.csv) จากขั้น 2; จำนวนและวิธีรันซ้ำอยู่ใน Seed Import |
+| 4.7 Design | [DESIGN.md](DESIGN.md) ตอบ a geometry/SRID/index, b invalid/missing CRS, c concurrent edits, d แนวทาง 500,000 polygons/เป้าหมาย 2 วินาที (ยังไม่ benchmark), e งานที่ยังไม่ทำและแผนอีก 1 วัน; เอกสารสรุปสำหรับอ่านภายใน 2 หน้า |
+| 9.5 CI | [GitHub Actions](.github/workflows/ci.yml) รัน test และ build image เมื่อ push/PR ตาม CI; hosted run ของ revision ที่ส่งยัง Pending |
+
+PDF ข้อสอบและรายงานส่งต่องาน Codex เก็บนอก public repository; ประวัติ provider ก่อน DEC-15 อยู่ใน dated evidence ของ WORK-STATUS
 
 ## Continue Work
 

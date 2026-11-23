@@ -1,4 +1,4 @@
-// Bright survey marks follow gis-docs page-map-wireframe v0.3.
+// Bright survey marks follow docs/swc/FE/SWC/seagrass/page-map-wireframe.md v0.3.
 export const POINT_STROKE = '#0077B6';
 export const POINT_FILL = '#FFFFFF';
 export const SITE_OUTLINE = '#1B2A3A';

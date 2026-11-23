@@ -1,6 +1,6 @@
 # gis-web
 
-Web ระบบติดตามแหล่งหญ้าทะเล (Next.js + React, Tailwind CSS, shadcn/ui Button, MapLibre GL) อยู่ใน monorepo `wunzent/seagrass-gis`; เอกสาร SWC, Docker Compose, seed-data, [DESIGN](../DESIGN.md) และ [api-examples.http](../api-examples.http) อยู่ที่ root
+Web ระบบติดตามแหล่งหญ้าทะเล (Next.js + React, Tailwind CSS, shadcn/ui Button, MapLibre GL) อยู่ใน repository เดียว `wunzent/seagrass-gis` branch `main`; เอกสาร SWC, Docker Compose, seed-data, [DESIGN](../DESIGN.md) และ [api-examples.http](../api-examples.http) อยู่ที่ root
 
 ## Workspace
 
