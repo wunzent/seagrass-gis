@@ -1,10 +1,10 @@
 # gis-web
 
-Web ระบบติดตามแหล่งหญ้าทะเล (Next.js + React, Tailwind CSS, shadcn/ui Button, MapLibre GL) เอกสาร SWC, Docker Compose และ seed-data อยู่ใน [gis-docs](https://gitlab.com/gis450547/gis-docs)
+Web ระบบติดตามแหล่งหญ้าทะเล (Next.js + React, Tailwind CSS, shadcn/ui Button, MapLibre GL) อยู่ใน monorepo `wunzent/seagrass-gis`; เอกสาร SWC, Docker Compose, seed-data, [DESIGN](../DESIGN.md) และ [api-examples.http](../api-examples.http) อยู่ที่ root
 
 ## Workspace
 
-clone `gis-api`, `gis-web`, `gis-docs` ไว้ในโฟลเดอร์เดียวกัน; Compose ใน `gis-docs` build จาก `../gis-web` ดูขั้นตอนเต็มที่ `gis-docs/docs/swc/LOCAL-DEVELOPMENT.md`
+clone `https://github.com/wunzent/seagrass-gis.git` เพียงครั้งเดียว; รัน `docker compose up -d --build --wait` จาก repository root ซึ่ง build จาก `./gis-api` และ `./gis-web` ดู [Local Development](../docs/swc/LOCAL-DEVELOPMENT.md)
 
 ## Layout
 
@@ -17,6 +17,8 @@ test/            *.test.mjs (node --test)
 ```
 
 ## Host Development
+
+รันคำสั่งต่อไปนี้จาก `gis-web/`:
 
 ```powershell
 if (-not (Test-Path .env)) { Copy-Item .env.example .env }
@@ -45,10 +47,10 @@ npm run dev
 - ยังไม่มี UI เขียนข้อมูล (Step 7 deferred)
 - พื้นหลังใช้ OpenStreetMap raster tiles (ต้องมีอินเทอร์เน็ตและ WebGL) สำหรับ demo เท่านั้น ก่อนใช้งานจริงต้องเลือกผู้ให้บริการและปฏิบัติตาม [OSM tile usage policy](https://operations.osmfoundation.org/policies/tiles/); ถ้าแผนที่เปิดไม่ได้ ตารางและรายละเอียดยังใช้ได้
 
-หลักฐาน browser (Docker, desktop และ 375px) และรายงาน Codex ดู `gis-docs/docs/WORK-STATUS.md` และ `gis-docs/docs/handoff/`
+หลักฐาน browser (Docker, desktop และ 375px) และรายงาน Codex ดู [WORK-STATUS](../docs/WORK-STATUS.md) และ [handoff](../docs/handoff/)
 
 ## CI
 
-`.gitlab-ci.yml` มี 3 jobs ตามลำดับ: `test` (node 22.18.0; `npm ci`, `format:check`, `lint`, `test:unit`, `build`, `typecheck`) → `docker-image` (build Dockerfile ด้วย dind) → `secret_detection` (GitLab template) จำลอง job `test` ใน Docker ผ่านแล้ว; ผล hosted pipeline ยังไม่ได้ตรวจ
+[GitHub Actions](../.github/workflows/ci.yml) ที่ root รันทุก branch push และ pull request: `web-test` รัน format, lint, unit, build, typecheck แล้ว `web-image` build ด้วย `docker build --pull ./gis-web` ใช้ Node22.18.0, `npm ci --ignore-scripts` และ npm cache ตาม lockfile; ไม่ push image; รอตรวจ hosted run ของ revision ปัจจุบัน
 
 หน้า /login แสดงปุ่ม Viewer, Editor และ Admin สำหรับบัญชีสาธิตเฉพาะเมื่อ API ตั้ง DEMO_LOGIN_ENABLED=true และ discovery สำเร็จ เมื่อปิดหรือเรียก API ไม่สำเร็จจะแสดงเฉพาะฟอร์ม email/password เดิม ปุ่มส่งเฉพาะ role โดยไม่มีรหัสผ่านใน web code

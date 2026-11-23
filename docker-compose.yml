@@ -22,7 +22,7 @@ services:
 
   api:
     build:
-      context: ../gis-api
+      context: ./gis-api
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-gis}:${POSTGRES_PASSWORD:-gis-local-demo-only}@db:5432/${POSTGRES_DB:-gis}
       PORT: 3001
@@ -63,7 +63,7 @@ services:
 
   web:
     build:
-      context: ../gis-web
+      context: ./gis-web
     environment:
       API_INTERNAL_URL: http://api:3001
       PORT: 3000

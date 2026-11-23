@@ -1,25 +1,31 @@
 # GIS — ระบบติดตามแหล่งหญ้าทะเล
 
-Repository นี้ (`gis-docs`) เก็บเอกสาร, `docker-compose.yml`, `seed-data/`, `reports/`, [DESIGN](DESIGN.md) และ [api-examples.http](api-examples.http); โค้ดแยกอยู่ใน GitLab repositories `gis-api` (NestJS) และ `gis-web` (Next.js) ใช้ PostgreSQL/PostGIS และ GitLab CI
+Repository `wunzent/seagrass-gis` รวม `gis-api/` (NestJS), `gis-web/` (Next.js), เอกสาร, `docker-compose.yml`, `seed-data/`, `reports/`, [DESIGN](DESIGN.md) และ [api-examples.http](api-examples.http) ใช้ PostgreSQL/PostGIS และ GitHub Actions ตาม DEC-15
 
 > **Data disclaimer**: ข้อมูลใน `seed-data/` เป็นข้อมูลจำลองสำหรับแบบทดสอบ ไม่ใช่ขอบเขตจังหวัด แหล่งหญ้าทะเล หรือผลสำรวจจริง ห้ามนำไปใช้ตัดสินใจ
 
 ## Workspace Layout
 
-clone ทั้งสาม repository ไว้ในโฟลเดอร์เดียวกัน เพราะ Compose build จาก `../gis-api` และ `../gis-web`:
+clone repository เดียว แล้วรันคำสั่งจาก root:
 
 ```powershell
-git clone -b feat/seagrass-monitoring https://gitlab.com/gis450547/gis-api.git
-git clone -b feat/seagrass-monitoring https://gitlab.com/gis450547/gis-web.git
-git clone -b feat/seagrass-monitoring https://gitlab.com/gis450547/gis-docs.git
+git clone https://github.com/wunzent/seagrass-gis.git
+cd seagrass-gis
 ```
 
 ```text
 seagrass-gis/
-├── gis-api/    NestJS API + migrations + api-docs/ + .gitlab-ci.yml
-├── gis-web/    Next.js web + .gitlab-ci.yml
-└── gis-docs/   docs/, docker-compose.yml, seed-data/, reports/ (รันคำสั่ง Compose จากที่นี่)
+├── gis-api/              NestJS API + migrations + api-docs/
+├── gis-web/              Next.js web
+├── .github/workflows/ci.yml
+├── docker-compose.yml   รัน Compose จาก root
+├── .env.example
+├── docs/
+├── seed-data/
+└── reports/
 ```
+
+PDF ข้อสอบเก็บไว้นอก public repository และไม่อยู่ในประวัติ commit (DEC-15)
 
 ## Current Status
 
@@ -31,7 +37,7 @@ seagrass-gis/
 | 4 Surveys | CRUD survey, history, `/surveys.geojson`, `/provinces.geojson`, `/species` | real PostGIS e2e |
 | 5 Auth | `POST /auth/login` คืน JWT (`access_token`, 15 นาที) + HttpOnly cookie; ใช้ `Authorization: Bearer` หรือ cookie; me/logout, session revocation, CSRF สำหรับ cookie, roles viewer/editor/admin; ปุ่ม demo login ตาม role (`DEMO_LOGIN_ENABLED`, ค่าตั้งต้นปิด) | e2e (real PostGIS) + Docker smoke |
 | 6 Web | เมนู แผนที่ / ตารางแหล่งหญ้าทะเล; sidebar ตัวกรอง + รายการ; MapLibre polygons ตาม bbox (debounce), เส้นจังหวัด, จุดสำรวจ, legend; popup แหล่ง (รายละเอียด + ประวัติสรุปรอบ) และ popup จุดสำรวจ; login (ฟอร์ม + ปุ่ม role); loading/error/empty; 375px | unit + browser บน Docker (desktop และ 375px) |
-| 9.5 CI | `.gitlab-ci.yml` ใน gis-api/gis-web: `test` → `docker-image` → `secret_detection` | hosted GitLab pipeline ของ gis-api/gis-web ผ่าน (owner-reported 2026-11-22); gis-docs ไม่มี pipeline |
+| 9.5 CI | `.github/workflows/ci.yml`: `api-test` → `api-image`, `web-test` → `web-image` | รอตรวจ hosted GitHub Actions ของ revision ที่ส่ง; ผล GitLab เดิมเป็นประวัติ |
 
 ผลคำสั่งและตัวเลขจริงอยู่ที่ [WORK-STATUS](docs/WORK-STATUS.md); แผนและ spec ที่ [SWC](docs/swc/README.md); ขั้นตอนรับงานที่ [UAT](docs/swc/UAT.md) และชุดส่งมอบ [UAT Package](docs/swc/UAT-PACKAGE.md); งานที่เลื่อนออกที่ [DEFERRED](docs/swc/DEFERRED.md)
 
@@ -40,11 +46,12 @@ seagrass-gis/
 ต้องมี Docker Desktop (Linux engine) และ Docker Compose
 
 ```powershell
-cd gis-docs
+# รันจาก repository root
+# Copy-Item .env.example .env  # optional: ใช้เมื่อต้องการปรับค่า demo
 docker compose up --build -d --wait
 ```
 
-ไม่ต้องสร้าง `gis-docs/.env` ก่อนเปิดครั้งแรก: Compose มีค่า default แบบ demo-only (ดู [.env.example](.env.example)) API รัน migrations แล้ว import seed ก่อนรับ HTTP ไม่มี schema synchronize; named volume `seagrass-gis_postgres_data` เก็บข้อมูลข้าม restart อย่าลบ volume เพื่อแก้ startup error
+ไม่ต้องสร้าง `.env` ก่อนเปิดครั้งแรก: Compose มีค่า default แบบ demo-only (ดู [.env.example](.env.example)) API รัน migrations แล้ว import seed ก่อนรับ HTTP ไม่มี schema synchronize; named volume `seagrass-gis_postgres_data` เก็บข้อมูลข้าม restart อย่าลบ volume เพื่อแก้ startup error
 
 | Service | Local endpoint |
 |---|---|
@@ -66,12 +73,12 @@ API สร้างบัญชีสาธิตตอน start จาก `DEMO
 | `editor@demo.local` | editor | `editor-demo-only` | แก้ชื่อ site, เพิ่ม/แก้/ลบ survey |
 | `admin@demo.local` | admin | `admin-demo-only` | ทุกอย่างของ editor + สร้าง/แก้ geometry/ลบ site |
 
-เปลี่ยนได้ด้วย `DEMO_*_PASSWORD` และ `JWT_SECRET` ใน `gis-docs/.env` สิทธิ์ละเอียดดู [USER-MATRIX](docs/swc/BE/USER-MATRIX.md)
+เปลี่ยนได้ด้วย `DEMO_*_PASSWORD` และ `JWT_SECRET` ใน `.env` สิทธิ์ละเอียดดู [USER-MATRIX](docs/swc/BE/USER-MATRIX.md)
 
 ## API Usage
 
 - `POST /auth/login` คืน JWT (15 นาที) ใน `access_token` ตามโจทย์ข้อ 5.1 และตั้ง HttpOnly cookie `gis_access`; เรียก API ได้ด้วย `Authorization: Bearer <access_token>` (ไม่ต้องใช้ CSRF header) หรือ cookie (ต้องใช้ CSRF header); logout revoke session ฝั่ง server; ไม่มี refresh token
-- ปุ่มเข้าสู่ระบบตาม role (Viewer/Editor/Admin) บนหน้า `/login` แสดงเมื่อตั้ง `DEMO_LOGIN_ENABLED=true` ใน `gis-docs/.env` (ค่าตั้งต้นปิด; ใช้เฉพาะสาธิตบนเครื่อง local)
+- ปุ่มเข้าสู่ระบบตาม role (Viewer/Editor/Admin) บนหน้า `/login` แสดงเมื่อตั้ง `DEMO_LOGIN_ENABLED=true` ใน `.env` (ค่าตั้งต้นปิด; ใช้เฉพาะสาธิตบนเครื่อง local)
 - คำขอ POST/PATCH/DELETE (รวม login/logout) ต้องส่ง `Origin` ที่อนุญาต (`http://localhost:3000` หรือ `http://localhost:3001`) และ `X-CSRF-Protection: 1`
 - [api-examples.http](api-examples.http): ตัวอย่างทุก endpoint (VS Code REST Client) รันตามลำดับจะสร้างและลบ site `DOC-EX-001` เอง; status ในไฟล์ได้จากการรันจริง
 - Swagger UI: login ผ่าน `POST /auth/login` ในหน้า `/docs` ก่อนใช้ write; ทุกคำขอเขียนต้องเลือก `X-CSRF-Protection` = `1` และกรอกช่อง `Origin` เป็น `http://localhost:3001` (browser ส่ง Origin จริงของหน้าเอง) (Swagger บังคับกรอกทั้งสองช่อง; interceptor เติม `X-CSRF-Protection` ให้คำขอเขียนอยู่แล้ว)
@@ -93,10 +100,20 @@ docker compose exec api npm run import
 |---|---|
 | `gis-api/` | `npm ci --ignore-scripts`, `npm run format:check`, `npm run build`, `npm run test:unit`, `npm run test:import:unit` |
 | `gis-api/` (ต้องมี PostGIS แยก) | `npm run test:integration` กับ `DATABASE_URL` ที่ชื่อฐานเป็น `*_test`; `npm run test:import:integration` กับ `IMPORT_TEST_DATABASE_URL` (ฐานแยกอีกตัว) |
-| `gis-web/` | `npm ci --ignore-scripts`, `npm run format:check`, `npm run test:unit`, `npm run build`, `npm run typecheck` |
-| `gis-docs/` | `docker compose config --quiet`, `curl.exe --fail http://localhost:3001/health` |
+| `gis-web/` | `npm ci --ignore-scripts`, `npm run format:check`, `npm run lint`, `npm run test:unit`, `npm run build`, `npm run typecheck` |
+| root | `docker compose config --quiet`, `curl.exe --fail http://localhost:3001/health` |
 
 Integration tests ล้างตาราง จึงปฏิเสธฐานที่ชื่อไม่มีคำว่า `test`; ห้ามชี้ไปฐาน `gis` ที่ใช้งาน รายละเอียดต่อแอปดู README ของ `gis-api` และ `gis-web`; `npm run format` จัดรูปแบบโค้ดด้วย Prettier
+
+## CI
+
+[GitHub Actions](.github/workflows/ci.yml) รันทุก branch push และ pull request พร้อมยกเลิก run เก่าของ ref เดียวกัน ใช้ Node22.18.0 และ npm cache ตาม lockfile ของแต่ละแอป:
+
+- `api-test`: `npm ci --ignore-scripts`, format, build, unit/integration และ import unit/integration กับ PostGIS สองฐานแยกกัน
+- `web-test`: `npm ci --ignore-scripts`, format, lint, unit, build, typecheck
+- `api-image` / `web-image`: รอ test job ของแอปนั้น แล้ว `docker build --pull` โดยไม่ push image
+
+workflow ใช้ `contents: read`, `actions/checkout@v4`, `actions/setup-node@v4`; ใช้ GitHub push protection สำหรับ public repo โดยไม่เพิ่ม third-party secret scanner ผล hosted run ของ revision ปัจจุบันยังต้องตรวจจริงก่อนปิด CI gate
 
 ## Known Limitations
 

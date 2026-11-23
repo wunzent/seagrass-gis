@@ -1,10 +1,10 @@
 # gis-api
 
-API ระบบติดตามแหล่งหญ้าทะเล (NestJS + PostgreSQL/PostGIS, `pg` ไม่มี ORM) เอกสาร SWC, Docker Compose, seed-data, [DESIGN](https://gitlab.com/gis450547/gis-docs/-/blob/feat/seagrass-monitoring/DESIGN.md) และ `api-examples.http` อยู่ใน [gis-docs](https://gitlab.com/gis450547/gis-docs)
+API ระบบติดตามแหล่งหญ้าทะเล (NestJS + PostgreSQL/PostGIS, `pg` ไม่มี ORM) อยู่ใน monorepo `wunzent/seagrass-gis`; เอกสาร SWC, Docker Compose, seed-data, [DESIGN](../DESIGN.md) และ [api-examples.http](../api-examples.http) อยู่ที่ root
 
 ## Workspace
 
-clone `gis-api`, `gis-web`, `gis-docs` ไว้ในโฟลเดอร์เดียวกัน; Compose ใน `gis-docs` build จาก `../gis-api` ดูขั้นตอนเต็มที่ `gis-docs/docs/swc/LOCAL-DEVELOPMENT.md`
+clone `https://github.com/wunzent/seagrass-gis.git` เพียงครั้งเดียว; รัน `docker compose up -d --build --wait` จาก repository root ซึ่ง build จาก `./gis-api` และ `./gis-web` ดู [Local Development](../docs/swc/LOCAL-DEVELOPMENT.md)
 
 ## Layout
 
@@ -23,6 +23,8 @@ Unit specs (`*.spec.ts`) อยู่ข้างไฟล์ที่ทดส�
 
 ## Host Development
 
+รันคำสั่งต่อไปนี้จาก `gis-api/`:
+
 ```powershell
 if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 npm ci --ignore-scripts
@@ -30,7 +32,7 @@ npm run build
 npm start
 ```
 
-`.env` (ignored) ตั้ง `PORT=3002`, `DATABASE_URL` ไป PostGIS ของ Compose ที่ `localhost:54329`, `SEED_DATA_DIR=../gis-docs/seed-data`, `IMPORT_REPORT_DIR=../gis-docs/reports`, `JWT_SECRET`, `PUBLIC_WEB_ORIGIN`, `API_DOCS_ORIGIN` และ `DEMO_*_PASSWORD` ค่าใน `.env.example` เป็น demo-only ตรวจที่ `http://localhost:3002/health` และ Swagger ที่ `/docs`
+`.env` (ignored) ตั้ง `PORT=3002`, `DATABASE_URL` ไป PostGIS ของ Compose ที่ `localhost:54329`, `SEED_DATA_DIR=../seed-data`, `IMPORT_REPORT_DIR=../reports`, `JWT_SECRET`, `PUBLIC_WEB_ORIGIN`, `API_DOCS_ORIGIN` และ `DEMO_*_PASSWORD` ค่าใน `.env.example` เป็น demo-only ตรวจที่ `http://localhost:3002/health` และ Swagger ที่ `/docs`
 
 | Script                                    | ใช้ทำอะไร                                                                     |
 | ----------------------------------------- | ----------------------------------------------------------------------------- |
@@ -70,7 +72,7 @@ Integration suites ล้างตาราง จึงยอมรับเฉ
 
 ## CI
 
-`.gitlab-ci.yml` มี 3 jobs ตามลำดับ: `test` (node 22.18.0 + PostGIS service สองตัว `db`/`db-import`; `npm ci`, `format:check`, `build`, unit, integration, import unit, import integration) → `docker-image` (build Dockerfile ด้วย dind) → `secret_detection` (GitLab template) จำลอง job `test` ใน Docker ผ่านแล้ว; ผล hosted pipeline ยังไม่ได้ตรวจ
+[GitHub Actions](../.github/workflows/ci.yml) ที่ root รันทุก branch push และ pull request: `api-test` ใช้ PostGIS สองฐานแยก `gis_test`/`gis_import_test`; format, build, unit, integration, import unit และ import integration แล้ว `api-image` build ด้วย `docker build --pull ./gis-api` ใช้ Node22.18.0, `npm ci --ignore-scripts` และ npm cache ตาม lockfile; ไม่ push image; รอตรวจ hosted run ของ revision ปัจจุบัน
 
 ## JWT และ Bearer (DEC-14)
 
