@@ -10,14 +10,6 @@ const DEMO = [
   { email: 'admin@demo.local', role: 'admin', env: 'DEMO_ADMIN_PASSWORD' },
 ] as const;
 
-/** Demo passwords are owner-chosen local values with no length rule; an unset variable skips that account. */
-export function assertDemoPasswords(env: NodeJS.ProcessEnv) {
-  for (const demo of DEMO) {
-    const password = env[demo.env];
-    if (password !== undefined && typeof password !== 'string') throw new Error(`${demo.env} must be text`);
-  }
-}
-
 /**
  * Local demo accounts (deployment-managed, no signup API). A password comes only from the environment;
  * an account whose variable is unset is left untouched. Existing hashes are replaced only when the password changed;

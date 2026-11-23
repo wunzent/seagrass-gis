@@ -1,6 +1,6 @@
 import { createApp } from './app.module';
 import { readAuthConfig, readConfig } from './core/config/config';
-import { assertDemoPasswords, seedDemoUsers } from './core/database/seeders/demo-users';
+import { seedDemoUsers } from './core/database/seeders/demo-users';
 import { createPool, migrate } from './core/database/connection';
 import { importSeed } from './core/database/seeders/seed-import';
 import { AppLogger } from './core/logger/app-logger';
@@ -13,7 +13,6 @@ async function main() {
   try {
     config = readConfig(process.env);
     auth = readAuthConfig(process.env);
-    assertDemoPasswords(process.env);
   } catch (error) {
     logger.error(`API startup failed: ${(error as Error).message}`);
     throw error;

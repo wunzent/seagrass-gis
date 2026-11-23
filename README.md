@@ -72,6 +72,8 @@ API สร้างบัญชีสาธิตตอน start จาก `DEMO
 
 กล่องบัญชีสาธิตในหน้า `/login` แสดงรหัสผ่านจาก `DEMO_VIEWER_PASSWORD`/`DEMO_EDITOR_PASSWORD`/`DEMO_ADMIN_PASSWORD` ใน `.env` ชุดเดียวกับที่ API ใช้สร้างบัญชี (ถ้าไม่ตั้งหรือเว้นว่างจะใช้ค่า default ข้างบน) หลังแก้ `.env` ให้รัน `docker compose up -d` เพื่อ restart api/web ให้ใช้ค่าใหม่
 
+ค่า default เมื่อไม่ตั้งหรือเว้นว่างใช้ได้เฉพาะตอนรันด้วย Compose; ถ้ารัน API บนเครื่องโดยตรงแล้วไม่ตั้งตัวแปร บัญชีนั้นจะไม่ถูกสร้าง และ `next dev` อ่านค่าจาก `gis-web/.env*` ไม่ใช่ `.env` ที่ root
+
 ## API Usage
 
 - `POST /auth/login` คืน JWT (15 นาที) ใน `access_token` ตามโจทย์ข้อ 5.1 และตั้ง HttpOnly cookie `gis_access`; เรียก API ได้ด้วย `Authorization: Bearer <access_token>` (ไม่ต้องใช้ CSRF header) หรือ cookie (ต้องใช้ CSRF header); logout revoke session ฝั่ง server; ไม่มี refresh token

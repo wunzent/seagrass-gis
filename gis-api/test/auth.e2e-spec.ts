@@ -462,6 +462,18 @@ describe('auth (real PostGIS)', () => {
     }
   });
 
+  it('the demo-user seeder accepts short owner-chosen passwords', async () => {
+    try {
+      expect(await seedDemoUsers(pool, { DEMO_VIEWER_PASSWORD: 'v' })).toEqual(['viewer@demo.local']);
+      expect((await login('viewer@demo.local', 'v')).status).toBe(200);
+    } finally {
+      await pool.query(`UPDATE users SET password_hash = $2, role = 'viewer' WHERE id = $1`, [
+        USERS.viewer,
+        await hashPassword('viewer-pass'),
+      ]);
+    }
+  });
+
   it('the demo-user seeder changes the hash and revokes sessions atomically', async () => {
     const cookie = cookieOf(await login('viewer@demo.local', 'viewer-pass'));
     // Same pool, but the session revoke fails inside any transaction client (and on the pool itself).
