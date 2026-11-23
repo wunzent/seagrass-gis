@@ -52,6 +52,6 @@ repository เดียว `wunzent/seagrass-gis` branch `main`; clone `https://
 
 ## Remaining Work and Next-Day Plan
 
-- ทำแล้วเพิ่มเติม: workflow GitHub Actions สำหรับ tests และ image builds พร้อม แต่ hosted run ยัง Pending; fresh code/security review ทุกงานแก้ครบ, owner pre-UAT, หน้าแผนที่ออกแบบใหม่ (popup แหล่งพร้อมประวัติสรุปรอบ, popup จุดสำรวจ, หน้าตาราง) และปุ่มเข้าสู่ระบบตาม role สำหรับสาธิต (`DEMO_LOGIN_ENABLED` ค่าตั้งต้นปิด)
-- ยังไม่ทำ: แนบรูปผลสำรวจ (ข้อเสริมขั้นที่ 4), Senior ขั้นที่ 3/6/7/8 (overlap, SURVEYS_OUTSIDE, reference UTM, layer list, URL state, วาด/แก้บนแผนที่, dashboard/export), ขั้นที่ 9 ข้ออื่นนอกจาก CI
-- ถ้ามีเวลาอีก 1 วัน: (1) ขั้นที่ 7 เพิ่ม/แก้/ลบผลสำรวจจาก popup บนแผนที่ (API พร้อมแล้ว เหลือ UI + Playwright) (2) layer list และเก็บสถานะใน URL (3) vector tiles ตามข้อเสนอด้านบนพร้อมวัดผล
+- ขอบเขต: ขั้นที่ 1–6 และขั้นที่ 9 ข้อ CI (GitHub Actions); งานระดับ Senior (ขั้นที่ 7–8 และงานเพิ่มท้ายขั้นที่ 3 กับ 6) ไม่อยู่ในขอบเขต. ทำเพิ่ม: popup แหล่งพร้อมประวัติสรุปรอบ, popup จุดสำรวจ, หน้าตาราง และปุ่มเข้าสู่ระบบตาม role สำหรับสาธิต (`DEMO_LOGIN_ENABLED` ค่าตั้งต้นปิด)
+- ยังไม่ทำ: แนบรูปผลสำรวจ (ข้อเสริมขั้นที่ 4) และขั้นที่ 9 ข้ออื่นนอกจาก CI
+- ถ้ามีเวลาอีก 1 วัน: (1) แนบรูปผลสำรวจ jpg/png ไม่เกิน 5 MB เก็บใน volume (2) E2E test ของหน้าแผนที่ ตาราง และ login (3) vector tiles ตามข้อเสนอด้านบนพร้อมวัดผล (ขั้นที่ 9 ข้อ 1)

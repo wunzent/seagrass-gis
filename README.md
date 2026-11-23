@@ -34,7 +34,7 @@ seagrass-gis/
 | 4 Surveys | CRUD survey, history, `/surveys.geojson`, `/provinces.geojson`, `/species` | real PostGIS e2e |
 | 5 Auth | `POST /auth/login` คืน JWT (`access_token`, 15 นาที) + HttpOnly cookie; ใช้ `Authorization: Bearer` หรือ cookie; me/logout, session revocation, CSRF สำหรับ cookie, roles viewer/editor/admin; ปุ่ม demo login ตาม role (`DEMO_LOGIN_ENABLED`, ค่าตั้งต้นปิด) | e2e (real PostGIS) + Docker smoke |
 | 6 Web | เมนู แผนที่ / ตารางแหล่งหญ้าทะเล; sidebar ตัวกรอง + รายการ; MapLibre polygons ตาม bbox (debounce), เส้นจังหวัด, จุดสำรวจ, legend; popup แหล่ง (รายละเอียด + ประวัติสรุปรอบ) และ popup จุดสำรวจ; login (ฟอร์ม + ปุ่ม role); loading/error/empty; 375px | unit + browser บน Docker (desktop และ 375px) |
-| 9.5 CI | `.github/workflows/ci.yml`: `api-test` → `api-image`, `web-test` → `web-image` | Pending — รอตรวจ hosted GitHub Actions ของ commit ล่าสุดของ `main` ที่ push แล้ว |
+| 9.5 CI | `.github/workflows/ci.yml`: `api-test` → `api-image`, `web-test` → `web-image` | GitHub Actions ผ่านบน `main` |
 
 ## Run
 
@@ -199,12 +199,12 @@ npm run dev
 - `web-test`: `npm ci --ignore-scripts`, format, lint, unit, build, typecheck
 - `api-image` / `web-image`: รอ test job ของแอปนั้น แล้ว `docker build --pull` โดยไม่ push image
 
-workflow ใช้ `contents: read`, `actions/checkout@v4`, `actions/setup-node@v4`; ใช้ GitHub push protection สำหรับ public repo โดยไม่เพิ่ม third-party secret scanner ผล hosted run ของ revision ปัจจุบันยังต้องตรวจจริงก่อนปิด CI gate
+workflow ใช้ `contents: read`, `actions/checkout@v4`, `actions/setup-node@v4`; ใช้ GitHub push protection สำหรับ public repo โดยไม่เพิ่ม third-party secret scanner
 
 ## Known Limitations
 
-- ยังไม่มี UI สำหรับเขียนข้อมูล (วาด polygon, เพิ่ม survey บนแผนที่ เป็น Step 7 ที่เลื่อนออก) การเขียนทำผ่าน API/Swagger/`.http`
-- `seed-data/seagrass_large_utm.zip` (UTM) ยังไม่ import; ไม่มีการแปลง CRS; งาน Senior และ optional อื่นยังไม่ทำ
+- ยังไม่มี UI สำหรับเขียนข้อมูล (วาด polygon, เพิ่ม survey บนแผนที่ เป็นงานระดับ Senior ซึ่งไม่อยู่ในขอบเขต) การเขียนทำผ่าน API/Swagger/`.http`
+- `seed-data/seagrass_large_utm.zip` (UTM) ยังไม่ import; ไม่มีการแปลง CRS; งานระดับ Senior ไม่อยู่ในขอบเขต; ขั้นที่ 9 ทำข้อ CI
 - แผนที่พื้นหลังใช้ OpenStreetMap tiles (ต้องมีอินเทอร์เน็ตและ WebGL) สำหรับ demo เท่านั้น
 - Survey ไม่มี version: แก้พร้อมกันเป็น last-write-wins; หลัง admin ย้าย site อาจมี survey เดิมที่ห่างเกิน 50 m ค้างอยู่
 - `/surveys.geojson` คืนสูงสุด 5000 จุดใหม่สุด; rate limit login คิดตาม client+email เพราะ API เห็น IP เดียวของ web proxy
@@ -222,5 +222,5 @@ workflow ใช้ `contents: read`, `actions/checkout@v4`, `actions/setup-node@
 | 4.4 API docs + examples | `/docs` ตาม API Usage และ [api-examples.http](api-examples.http) |
 | 4.5 Tests | [status unit](gis-api/src/sites/site-status.spec.ts), [validation unit](gis-api/src/sites/dto/create-site.dto.spec.ts), [OUTSIDE_SITE integration](gis-api/test/surveys.e2e-spec.ts), [VERSION_CONFLICT integration](gis-api/test/sites-write.e2e-spec.ts); คำสั่งอยู่ใน Test |
 | 4.6 Import report | [import_report.csv](reports/import_report.csv) จากขั้น 2; จำนวนและวิธีรันซ้ำอยู่ใน Seed Import |
-| 4.7 Design | [UI design system ของเว็บ](gis-web/DESIGN.md); [DESIGN.md](DESIGN.md) ตอบ a geometry/SRID/index, b invalid/missing CRS, c concurrent edits, d วิธีส่ง 500,000 polygons ไปหน้าเว็บให้แสดงภายใน 2 วินาที (โจทย์ถามแนวทาง; การทำ vector tiles จริงเป็นข้อ Senior ที่เลื่อนไว้), e งานที่ยังไม่ทำและแผนอีก 1 วัน; ตรวจแล้ว 2 หน้า A4 (Chrome print, 11pt, ขอบ 20 mm) |
-| 9.5 CI | [GitHub Actions](.github/workflows/ci.yml) รัน test และ build image เมื่อ push/PR ตาม CI; hosted run ของ revision ที่ส่งยัง Pending |
+| 4.7 Design | [UI design system ของเว็บ](gis-web/DESIGN.md); [DESIGN.md](DESIGN.md) ตอบ a geometry/SRID/index, b invalid/missing CRS, c concurrent edits, d วิธีส่ง 500,000 polygons ไปหน้าเว็บให้แสดงภายใน 2 วินาที (โจทย์ถามแนวทาง; vector tiles จริงเป็นขั้นที่ 9 ข้อเลือกทำ), e งานที่ยังไม่ทำและแผนอีก 1 วัน; ตรวจแล้ว 2 หน้า A4 (Chrome print, 11pt, ขอบ 20 mm) |
+| 9.5 CI | [GitHub Actions](.github/workflows/ci.yml) รัน test และ build image เมื่อ push/PR ตาม CI; run บน `main` ผ่าน |
