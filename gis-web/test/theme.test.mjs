@@ -42,7 +42,8 @@ test('login account and outlined-field styles use theme tokens and touch-sized c
   assert.match(css, /\.demo-accounts\s*\{[^}]*background: var\(--primary-soft\)[^}]*color: var\(--text\)/);
   assert.match(css, /\.demo-accounts\s*\{[^}]*font-size: 13px;/);
   assert.doesNotMatch(css, /\.demo-accounts\s*\{[^}]*font-size: 0\.85rem/);
-  assert.match(css, /\.demo-accounts button\s*\{[^}]*min-height: 44px[^}]*overflow-wrap: anywhere/);
+  assert.match(css, /\.demo-accounts button\s*\{[^}]*overflow-wrap: anywhere/);
+  assert.doesNotMatch(css, /\.demo-accounts button\s*\{[^}]*min-height/);
   assert.match(css, /\.login-field label\s*\{[^}]*transform: translateY\(-50%\)/);
   assert.match(css, /\.login-field input:focus-visible\s*\{[^}]*outline-color: var\(--primary\)/);
   assert.match(css, /\.password-toggle\s*\{[^}]*width: 44px;[^}]*height: 44px;/);

@@ -629,7 +629,6 @@
   .demo-accounts button {
     display: block;
     width: 100%;
-    min-height: 44px;
     padding: 6px;
     border: 0;
     border-radius: 6px;
