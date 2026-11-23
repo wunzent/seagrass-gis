@@ -1,3 +1,2 @@
 # Keep owner-provided seed inputs byte-for-byte across checkouts.
 seed-data/** -text
-seed-data.zip -text

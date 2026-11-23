@@ -1,6 +1,6 @@
 # GIS — ระบบติดตามแหล่งหญ้าทะเล
 
-Repository เดียว `wunzent/seagrass-gis` branch `main` รวม `gis-api/` (NestJS), `gis-web/` (Next.js), เอกสาร, `docker-compose.yml`, `seed-data/`, `reports/`, [DESIGN](DESIGN.md) และ [api-examples.http](api-examples.http) ใช้ PostgreSQL/PostGIS และ GitHub Actions ตาม DEC-15
+Repository เดียว `wunzent/seagrass-gis` branch `main` รวม `gis-api/` (NestJS), `gis-web/` (Next.js), เอกสาร, `docker-compose.yml`, `seed-data/`, `reports/`, [DESIGN](DESIGN.md) และ [api-examples.http](api-examples.http) ใช้ PostgreSQL/PostGIS และ GitHub Actions
 
 > **Data disclaimer**: ข้อมูลใน `seed-data/` เป็นข้อมูลจำลองสำหรับแบบทดสอบ ไม่ใช่ขอบเขตจังหวัด แหล่งหญ้าทะเล หรือผลสำรวจจริง ห้ามนำไปใช้ตัดสินใจ
 
@@ -20,12 +20,9 @@ seagrass-gis/
 ├── .github/workflows/ci.yml
 ├── docker-compose.yml   รัน Compose จาก root
 ├── .env.example
-├── docs/
 ├── seed-data/
 └── reports/
 ```
-
-PDF ข้อสอบเก็บไว้นอก public repository และไม่อยู่ในประวัติ commit (DEC-15)
 
 ## Current Status
 
@@ -38,8 +35,6 @@ PDF ข้อสอบเก็บไว้นอก public repository และ
 | 5 Auth | `POST /auth/login` คืน JWT (`access_token`, 15 นาที) + HttpOnly cookie; ใช้ `Authorization: Bearer` หรือ cookie; me/logout, session revocation, CSRF สำหรับ cookie, roles viewer/editor/admin; ปุ่ม demo login ตาม role (`DEMO_LOGIN_ENABLED`, ค่าตั้งต้นปิด) | e2e (real PostGIS) + Docker smoke |
 | 6 Web | เมนู แผนที่ / ตารางแหล่งหญ้าทะเล; sidebar ตัวกรอง + รายการ; MapLibre polygons ตาม bbox (debounce), เส้นจังหวัด, จุดสำรวจ, legend; popup แหล่ง (รายละเอียด + ประวัติสรุปรอบ) และ popup จุดสำรวจ; login (ฟอร์ม + ปุ่ม role); loading/error/empty; 375px | unit + browser บน Docker (desktop และ 375px) |
 | 9.5 CI | `.github/workflows/ci.yml`: `api-test` → `api-image`, `web-test` → `web-image` | Pending — รอตรวจ hosted GitHub Actions ของ commit ล่าสุดของ `main` ที่ push แล้ว |
-
-ผลคำสั่งและตัวเลขจริงอยู่ที่ [WORK-STATUS](docs/WORK-STATUS.md); แผนและ spec ที่ [SWC](docs/swc/README.md); ขั้นตอนรับงานที่ [UAT](docs/swc/UAT.md) และชุดส่งมอบ [UAT Package](docs/swc/UAT-PACKAGE.md); งานที่เลื่อนออกที่ [DEFERRED](docs/swc/DEFERRED.md)
 
 ## Run
 
@@ -61,7 +56,7 @@ docker compose up --build -d --wait
 | Swagger UI | http://localhost:3001/docs (spec: `/docs/openapi.json`, `/docs/openapi.yaml`) |
 | Database | `127.0.0.1:54329`, database/user `gis` |
 
-ทุก port ผูกกับ loopback เท่านั้น ห้ามเปิดบริการนี้ออกอินเทอร์เน็ตด้วยค่า demo การรัน API/Web บน host (port 3002/3003) ดู [Local Development](docs/swc/LOCAL-DEVELOPMENT.md)
+ทุก port ผูกกับ loopback เท่านั้น ห้ามเปิดบริการนี้ออกอินเทอร์เน็ตด้วยค่า demo การรัน API/Web บน host (port 3002/3003)
 
 ## Demo Accounts (local-only)
 
@@ -73,7 +68,7 @@ API สร้างบัญชีสาธิตตอน start จาก `DEMO
 | `editor@demo.local` | editor | `editor-demo-only` | แก้ชื่อ site, เพิ่ม/แก้/ลบ survey |
 | `admin@demo.local` | admin | `admin-demo-only` | ทุกอย่างของ editor + สร้าง/แก้ geometry/ลบ site |
 
-เปลี่ยนได้ด้วย `DEMO_*_PASSWORD` และ `JWT_SECRET` ใน `.env` สิทธิ์ละเอียดดู [USER-MATRIX](docs/swc/BE/USER-MATRIX.md)
+เปลี่ยนได้ด้วย `DEMO_*_PASSWORD` และ `JWT_SECRET` ใน `.env`
 
 ## API Usage
 
@@ -83,7 +78,7 @@ API สร้างบัญชีสาธิตตอน start จาก `DEMO
 - คำขอ POST/PATCH/DELETE (รวม login/logout) ต้องส่ง `Origin` ที่อนุญาต (`http://localhost:3000` หรือ `http://localhost:3001`) และ `X-CSRF-Protection: 1`
 - [api-examples.http](api-examples.http): ตัวอย่างทุก endpoint (VS Code REST Client) รันตามลำดับจะสร้างและลบ site `DOC-EX-001` เอง; status ในไฟล์ได้จากการรันจริง
 - Swagger UI: login ผ่าน `POST /auth/login` ในหน้า `/docs` ก่อนใช้ write; ทุกคำขอเขียนต้องเลือก `X-CSRF-Protection` = `1` และกรอกช่อง `Origin` เป็น `http://localhost:3001` (browser ส่ง Origin จริงของหน้าเอง) (Swagger บังคับกรอกทั้งสองช่อง; interceptor เติม `X-CSRF-Protection` ให้คำขอเขียนอยู่แล้ว)
-- Spec แยกไฟล์อยู่ใน `gis-api/api-docs/` (generate ด้วย `npm run docs:generate`) รายการ endpoint: [API-ENDPOINTS](docs/swc/BE/API-ENDPOINTS.md)
+- Spec แยกไฟล์อยู่ใน `gis-api/api-docs/` (generate ด้วย `npm run docs:generate`) รายการ endpoint ดูใน Swagger UI (http://localhost:3001/docs)
 
 ## Seed Import
 
@@ -93,7 +88,7 @@ API startup เรียก importer หลัง migrations; อ่าน `seed
 docker compose exec api npm run import
 ```
 
-รันซ้ำข้าม key เดิม ไม่ overwrite การแก้ไขผ่าน API และไม่ฟื้น site ที่ลบ ผลรอบแรก: 339 records รับ 310 / ปฏิเสธ 29; เก็บ provinces 3, species 6, sites 27, surveys 274 (สำเนา [import_report.initial.csv](reports/import_report.initial.csv)) รายงานปัจจุบันถูกแทนทุกครั้งที่รัน; ใช้ row index เริ่ม 1 สำหรับ feature/array และ physical line เริ่ม 2 สำหรับ CSV รายละเอียด [Step2 import SWC](docs/swc/BE/step-2-import.md)
+รันซ้ำข้าม key เดิม ไม่ overwrite การแก้ไขผ่าน API และไม่ฟื้น site ที่ลบ ผลรอบแรก: 339 records รับ 310 / ปฏิเสธ 29; เก็บ provinces 3, species 6, sites 27, surveys 274 (สำเนา [import_report.initial.csv](reports/import_report.initial.csv)) รายงานปัจจุบันถูกแทนทุกครั้งที่รัน; ใช้ row index เริ่ม 1 สำหรับ feature/array และ physical line เริ่ม 2 สำหรับ CSV
 
 ## Test
 
@@ -104,7 +99,97 @@ docker compose exec api npm run import
 | `gis-web/` | `npm ci --ignore-scripts`, `npm run format:check`, `npm run lint`, `npm run test:unit`, `npm run build`, `npm run typecheck` |
 | root | `docker compose config --quiet`, `curl.exe --fail http://localhost:3001/health` |
 
-Integration tests ล้างตาราง จึงปฏิเสธฐานที่ชื่อไม่มีคำว่า `test`; ห้ามชี้ไปฐาน `gis` ที่ใช้งาน รายละเอียดต่อแอปดู README ของ `gis-api` และ `gis-web`; `npm run format` จัดรูปแบบโค้ดด้วย Prettier
+Integration tests ล้างตาราง จึงปฏิเสธฐานที่ชื่อไม่มีคำว่า `test`; ห้ามชี้ไปฐาน `gis` ที่ใช้งาน รายละเอียดต่อแอปดู [API (gis-api)](#api-gis-api) และ [Web (gis-web)](#web-gis-web); `npm run format` จัดรูปแบบโค้ดด้วย Prettier
+
+## API (gis-api)
+
+NestJS + PostgreSQL/PostGIS (`pg` ไม่มี ORM) โครงสร้างหลัก:
+
+```text
+gis-api/
+├── migrations/     SQL migrations แบบ versioned + checksum (รันก่อนเปิด HTTP)
+├── api-docs/       OpenAPI ที่ generate จากโค้ด (openapi.yaml, paths/, components/)
+├── src/
+│   ├── core/       config, database, seeders (importer), logger
+│   ├── shared/     decorators, dto, errors, filters, openapi, pipes, types, validators
+│   ├── auth/ sites/ surveys/ lookups/ health/   feature modules
+│   └── main.ts migrate.ts import.ts docs.ts     entry points
+└── test/           *.e2e-spec.ts (real PostGIS), helpers.ts
+```
+
+Unit specs (`*.spec.ts`) อยู่ข้างไฟล์ที่ทดสอบใน `src/`
+
+รันบน host จาก `gis-api/` (ต้องมี PostGIS ของ Compose ที่ `localhost:54329`):
+
+```powershell
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+npm ci --ignore-scripts
+npm run build
+npm start
+```
+
+`.env` (ignored) ตั้ง `PORT=3002`, `DATABASE_URL`, `SEED_DATA_DIR=../seed-data`, `IMPORT_REPORT_DIR=../reports`, `JWT_SECRET`, `PUBLIC_WEB_ORIGIN`, `API_DOCS_ORIGIN` และ `DEMO_*_PASSWORD` (ค่าใน `.env.example` เป็น demo-only) ตรวจที่ `http://localhost:3002/health`
+
+| Script | ใช้ทำอะไร |
+|---|---|
+| `npm run build` / `npm start` | compile ด้วย Nest CLI แล้วรัน `dist/main.js` (migrate + import แล้วเปิด HTTP) |
+| `npm run start:dev` | watch mode |
+| `npm run migrate` / `npm run import` | รัน migrations หรือ importer แยก |
+| `npm run docs:generate` | build แล้วเขียน `api-docs/` ใหม่จาก decorators |
+| `npm run format` / `npm run format:check` | Prettier |
+| `npm test` หรือ `npm run test:unit` | unit specs ใน `src/` ไม่ใช้ DB |
+| `npm run test:integration` | e2e กับ PostGIS จริง ยกเว้น import; ต้องตั้ง `DATABASE_URL` |
+| `npm run test:import:unit` | importer unit |
+| `npm run test:import:integration` | importer กับ PostGIS จริง; ต้องตั้ง `IMPORT_TEST_DATABASE_URL` ไปฐานแยกจาก API suites (ไม่ตั้ง → exit 1) |
+
+Jest รันโหมด ESM (`node --experimental-vm-modules`) ต้องรันจาก `gis-api/` Integration suites ยอมรับเฉพาะฐานที่ชื่อมีคำว่า `test` เป็นคำเต็ม เช่น `gis_api_test`, `gis_import_test` (`test/helpers.ts`)
+
+Auth และ session:
+
+- ทั้ง `POST /auth/login` และ `POST /auth/demo-login` คืน `{access_token, token_type:"Bearer", user, expires_in:900, expires_at}` พร้อม HttpOnly cookie `gis_access`; session ฝั่ง server ไม่ต่ออายุเมื่ออ่านข้อมูล และห้าม log token
+- เมื่อมี `Authorization: Bearer` จะใช้ header ก่อน cookie แม้ header ผิดรูป (ไม่ fallback ไป cookie); public reads ตอบข้อมูล anonymous ส่วน protected endpoints ตอบ 401
+- Write ที่ใช้ Bearer ไม่ต้องส่ง Origin/`X-CSRF-Protection` แต่ยังตรวจ role และสิทธิ์ราย field; ถ้าใช้ cookie ต้องส่งทั้งสองเสมอ และ `login`/`demo-login`/`logout` ตรวจ CSRF ทุกกรณี
+- login ทั้งสองแบบเพิกถอน session เดิมจาก cookie และ Bearer พร้อมสร้าง session ใหม่ใน transaction เดียวกัน; logout เลือก session จาก header ก่อน ถ้า Bearer ใช้ไม่ได้จะตอบ 204 โดยไม่ล้าง cookie
+- Demo login: `GET /auth/demo-login` คืนรายการ role; `POST /auth/demo-login` รับเฉพาะ `{ "role": "viewer" | "editor" | "admin" }` ไม่รับรหัสผ่าน ใช้ rate limiter แยก key `demo:<role>` (ค่าเริ่มต้น 10 ครั้ง/15 นาที นับเฉพาะความล้มเหลว) และตอบ `Cache-Control: no-store` ถ้า `DEMO_LOGIN_ENABLED` ไม่ใช่ `true` (ตัวพิมพ์เล็ก) ทั้งสอง endpoint ตอบ 404 `NOT_FOUND` ก่อนตรวจ CSRF/body ให้คงเป็น `false` นอกเครื่อง local เพราะเมื่อเปิดผู้เข้าถึง API จะเข้าเป็น admin ได้
+- Swagger `/docs` มีทั้ง cookie และ Bearer security; เว็บใช้ cookie อย่างเดียวและเก็บเฉพาะ safe user กับ expiry
+
+กฎ status ใช้ `src/sites/site-status.ts` เป็นแหล่ง thresholds ร่วมกับ SQL CASE: 75 → very_good, 50 → good, 25 → fair, ต่ำกว่า 25 → poor, null → no_data เปรียบเทียบค่าเฉลี่ยของ survey ทั้งหมดในวันล่าสุดโดยไม่ปัดเศษก่อน; ปัดเฉพาะค่าที่แสดง
+
+## Web (gis-web)
+
+Next.js + React, Tailwind CSS, shadcn/ui Button, MapLibre GL ดู [ARCHITECTURE](gis-web/ARCHITECTURE.md) สำหรับ layer rules, folder map และ flow จริง; [gis-web/DESIGN.md](gis-web/DESIGN.md) เป็น UI design system ส่วน [DESIGN.md](DESIGN.md) ที่ root ตอบแนวทางระบบ
+
+- `app`: routes/layouts; `guards`: session visibility; `features/map` และ `features/auth`: UI, hooks, orchestration
+- `services`: REST transport; `stores`: session/shared map state ผ่าน `useSyncExternalStore`
+- `components/ui`: UI แสดงผล; `lib`: pure helpers/types และ server proxy; `scripts`: Tailwind/worker/env; `test`: unit + architecture boundaries
+- Style/font/icon อยู่ใน `src/assets/` (`styles/globals.css`, generated `styles/tailwind.css`, `styles/maplibre.css`, `fonts/fonts.ts`, `icons/login-icons.tsx`)
+
+รันบน host จาก `gis-web/`:
+
+```powershell
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+npm ci --ignore-scripts
+npm run dev
+```
+
+`.env` (ignored) ตั้ง `PORT=3003` เพื่อไม่ชน Docker web ที่ 3000 ตรวจ health ที่ `http://localhost:3003/health` `API_INTERNAL_URL` (ฝั่ง server เท่านั้น): `http://localhost:3002` สำหรับ host API (default) หรือ `http://localhost:3001` สำหรับ Docker API; Compose ตั้ง `http://api:3001` ถ้าใช้ host web กับ Docker API ต้องให้ `PUBLIC_WEB_ORIGIN` ของ API ตรง `http://localhost:3003` ไม่เช่นนั้น login จะได้ CSRF error
+
+| Script | ใช้ทำอะไร |
+|---|---|
+| `npm run dev` / `npm run build` / `npm start` | สร้าง `src/assets/styles/tailwind.css` + copy MapLibre worker แล้วรัน Next |
+| `npm run styles` | compile Tailwind ใหม่หลังแก้ CSS/class ระหว่าง dev |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run lint` | ESLint (`eslint-config-next` core-web-vitals + typescript) |
+| `npm run format` / `npm run format:check` | Prettier |
+| `npm run test:unit` | unit tests ใน `test/` |
+
+พฤติกรรมสำคัญ:
+
+- Browser เรียก relative `/api/*`; proxy ตัด `/api`, ส่ง Cookie/Set-Cookie และ CSRF headers, ไม่ cache, ไม่เปิด CORS; JavaScript ไม่อ่านหรือเก็บ JWT และไม่ forward `Authorization` จาก browser
+- proxy ลบ `access_token` และ `token_type` จาก JSON response ที่สำเร็จของ `POST /api/auth/login` และ `/api/auth/demo-login` โดยคง user/expiry และ Set-Cookie
+- หน้า `/`: ตัวกรองจังหวัด/สถานะ/คำค้น, ตารางหน้าละ 20, polygons ตาม bbox, province outlines, survey points, legend 5 สถานะ, รายละเอียดและประวัติการสำรวจหน้าละ 5; mobile สลับแผนที่/รายการ
+- `/login`: เริ่มหน้าเรียก `/api/auth/me` (401 = anonymous); ปุ่ม Viewer/Editor/Admin แสดงเมื่อ API ตั้ง `DEMO_LOGIN_ENABLED=true` และ discovery สำเร็จ (ไม่เช่นนั้นซ่อนเฉพาะปุ่ม role); ฟอร์มมีบัญชีสาธิตจาก `src/lib/demo-accounts.ts` ที่ตรงกับ `.env.example` กดเพื่อกรอกโดยไม่ส่ง
+- พื้นหลังใช้ OpenStreetMap raster tiles สำหรับ demo เท่านั้น ก่อนใช้งานจริงต้องเลือกผู้ให้บริการและปฏิบัติตาม [OSM tile usage policy](https://operations.osmfoundation.org/policies/tiles/); ถ้าแผนที่เปิดไม่ได้ ตารางและรายละเอียดยังใช้ได้
 
 ## CI
 
@@ -119,7 +204,7 @@ workflow ใช้ `contents: read`, `actions/checkout@v4`, `actions/setup-node@
 ## Known Limitations
 
 - ยังไม่มี UI สำหรับเขียนข้อมูล (วาด polygon, เพิ่ม survey บนแผนที่ เป็น Step 7 ที่เลื่อนออก) การเขียนทำผ่าน API/Swagger/`.http`
-- `seed-data/seagrass_large_utm.zip` (UTM) ยังไม่ import; ไม่มีการแปลง CRS; งาน Senior และ optional อื่นอยู่ใน [DEFERRED](docs/swc/DEFERRED.md)
+- `seed-data/seagrass_large_utm.zip` (UTM) ยังไม่ import; ไม่มีการแปลง CRS; งาน Senior และ optional อื่นยังไม่ทำ
 - แผนที่พื้นหลังใช้ OpenStreetMap tiles (ต้องมีอินเทอร์เน็ตและ WebGL) สำหรับ demo เท่านั้น
 - Survey ไม่มี version: แก้พร้อมกันเป็น last-write-wins; หลัง admin ย้าย site อาจมี survey เดิมที่ห่างเกิน 50 m ค้างอยู่
 - `/surveys.geojson` คืนสูงสุด 5000 จุดใหม่สุด; rate limit login คิดตาม client+email เพราะ API เห็น IP เดียวของ web proxy
@@ -131,17 +216,11 @@ workflow ใช้ `contents: read`, `actions/checkout@v4`, `actions/setup-node@
 
 | Item | ที่ส่งมอบ / วิธีตรวจ |
 |---|---|
-| 4.1 Source + commits | repository นี้มี [API](gis-api/README.md) และ [Web](gis-web/README.md); ประวัติรวมเป็น timeline เดียวของ commits `step-N:` ตาม DEC-15 ตรวจจาก root ด้วย `git log --oneline` |
+| 4.1 Source + commits | repository นี้มี [gis-api/](gis-api/) และ [gis-web/](gis-web/); ประวัติรวมเป็น timeline เดียวของ commits `step-N:` ตรวจจาก root ด้วย `git log --oneline` |
 | 4.2 Compose + environment | [docker-compose.yml](docker-compose.yml) เปิด db/api/web และ import อัตโนมัติด้วยคำสั่งเดียวใน Run; [.env.example](.env.example) เป็นค่า demo-only |
-| 4.3 README | Run, Test, Current Status และ Demo Accounts ระบุวิธีเปิด/ทดสอบ ขั้นที่ทำเสร็จ และบัญชี viewer/editor/admin |
+| 4.3 README | README นี้ (Run, Test, API (gis-api), Web (gis-web), Current Status และ Demo Accounts) ระบุวิธีเปิด/ทดสอบ ขั้นที่ทำเสร็จ และบัญชี viewer/editor/admin |
 | 4.4 API docs + examples | `/docs` ตาม API Usage และ [api-examples.http](api-examples.http) |
 | 4.5 Tests | [status unit](gis-api/src/sites/site-status.spec.ts), [validation unit](gis-api/src/sites/dto/create-site.dto.spec.ts), [OUTSIDE_SITE integration](gis-api/test/surveys.e2e-spec.ts), [VERSION_CONFLICT integration](gis-api/test/sites-write.e2e-spec.ts); คำสั่งอยู่ใน Test |
 | 4.6 Import report | [import_report.csv](reports/import_report.csv) จากขั้น 2; จำนวนและวิธีรันซ้ำอยู่ใน Seed Import |
 | 4.7 Design | [UI design system ของเว็บ](gis-web/DESIGN.md); [DESIGN.md](DESIGN.md) ตอบ a geometry/SRID/index, b invalid/missing CRS, c concurrent edits, d วิธีส่ง 500,000 polygons ไปหน้าเว็บให้แสดงภายใน 2 วินาที (โจทย์ถามแนวทาง; การทำ vector tiles จริงเป็นข้อ Senior ที่เลื่อนไว้), e งานที่ยังไม่ทำและแผนอีก 1 วัน; ตรวจแล้ว 2 หน้า A4 (Chrome print, 11pt, ขอบ 20 mm) |
 | 9.5 CI | [GitHub Actions](.github/workflows/ci.yml) รัน test และ build image เมื่อ push/PR ตาม CI; hosted run ของ revision ที่ส่งยัง Pending |
-
-PDF ข้อสอบและรายงานส่งต่องาน Codex เก็บนอก public repository; ประวัติ provider ก่อน DEC-15 อยู่ใน dated evidence ของ WORK-STATUS
-
-## Continue Work
-
-อ่าน [AGENTS.md](AGENTS.md) และ [docs/WORK-STATUS.md](docs/WORK-STATUS.md) ก่อนทำงานต่อ บันทึก `.honeyguide/` เป็น local workflow ที่ไม่ commit

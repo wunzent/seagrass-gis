@@ -2,7 +2,7 @@
 
 ## Layers
 
-โครงสร้างรักษา DOM, copy, URL/options, abort/retry, focus และ identity generation เดิม ธีมอยู่ที่ [DESIGN](DESIGN.md) และ contract อยู่ใน [Shared SWC](../docs/swc/FE/SWC/seagrass/shared.md)
+โครงสร้างรักษา DOM, copy, URL/options, abort/retry, focus และ identity generation เดิม ธีมอยู่ที่ [DESIGN](DESIGN.md)
 
 ```mermaid
 flowchart LR
@@ -96,7 +96,7 @@ LoginForm → facade.demoRoles/demoLogin ที่เป็น session-service a
 3. Feature เรียก service action หรือ useResource(key, load, retry, slice), อ่าน snapshot จาก store; local form/error/focus อยู่กับ feature และ shared UI อยู่ components/ui
 4. ใช้ RequireRole กำหนด editor/admin ตาม API matrix สำหรับ control; server ยังตรวจ authorization
 5. Page compose feature + SessionRoute ตาม visibility ที่ต้องการ โดยไม่มี fetch/business state หรือ redirect โดยปริยาย
-6. เพิ่ม tests URL/transport, store lifecycle, role/error/loading/focus และ negative boundaries โดยไม่ลด assertions เดิม; รัน gates/browser desktop/375px และอัปเดต SWC/DESIGN ตามการเปลี่ยนจริง
+6. เพิ่ม tests URL/transport, store lifecycle, role/error/loading/focus และ negative boundaries โดยไม่ลด assertions เดิม; รัน gates/browser desktop/375px และอัปเดต DESIGN ตามการเปลี่ยนจริง
 
 ## Test harness
 

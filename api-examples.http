@@ -289,7 +289,7 @@ POST {{api}}/auth/logout
 Origin: {{origin}}
 X-CSRF-Protection: 1
 
-### DEC-14: login คืน JWT ใน access_token (และตั้ง cookie เหมือนเดิม)
+### login คืน JWT ใน access_token (และตั้ง cookie เหมือนเดิม)
 # @name tokenLogin
 # expect: 200
 POST {{api}}/auth/login

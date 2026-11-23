@@ -14,9 +14,6 @@ test-results/
 *.log
 *.tsbuildinfo
 
-# Local agent workflow records, not delivery artifacts
-.honeyguide/
-
 # Local runtime data and temporary files
 tmp/
 .DS_Store
