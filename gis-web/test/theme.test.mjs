@@ -40,6 +40,8 @@ test('bright surfaces use defined tokens, including opaque popups and selected r
 test('login account and outlined-field styles use theme tokens and touch-sized controls', () => {
   const css = readFileSync(new URL('../src/assets/styles/globals.css', import.meta.url), 'utf8');
   assert.match(css, /\.demo-accounts\s*\{[^}]*background: var\(--primary-soft\)[^}]*color: var\(--text\)/);
+  assert.match(css, /\.demo-accounts\s*\{[^}]*font-size: 13px;/);
+  assert.doesNotMatch(css, /\.demo-accounts\s*\{[^}]*font-size: 0\.85rem/);
   assert.match(css, /\.demo-accounts button\s*\{[^}]*min-height: 44px[^}]*overflow-wrap: anywhere/);
   assert.match(css, /\.login-field label\s*\{[^}]*transform: translateY\(-50%\)/);
   assert.match(css, /\.login-field input:focus-visible\s*\{[^}]*outline-color: var\(--primary\)/);

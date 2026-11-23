@@ -7,7 +7,7 @@ import { Button } from '../../components/ui/button';
 import { useSession } from '../../stores/session-context';
 import { SessionControls } from './session-controls';
 import { validateLogin, type DemoRole } from '../../lib/session';
-import { ADMIN_DEMO_ACCOUNT, DEMO_ACCOUNTS } from '../../lib/demo-accounts';
+import { adminDemoAccount, DEMO_ACCOUNTS, type DemoAccount } from '../../lib/demo-accounts';
 import { EyeIcon, MailIcon } from '../../assets/icons/login-icons';
 
 const demoAccounts: { role: DemoRole; label: string; description: string }[] = [
@@ -16,11 +16,14 @@ const demoAccounts: { role: DemoRole; label: string; description: string }[] = [
   { role: 'admin', label: 'Admin', description: 'จัดการแหล่งทั้งหมด' },
 ];
 
-export function LoginForm({ guest }: { guest?: boolean } = {}) {
+export function LoginForm({
+  guest,
+  accounts = DEMO_ACCOUNTS,
+}: { guest?: boolean; accounts?: readonly DemoAccount[] } = {}) {
   const router = useRouter();
   const { store, session, phase, busy, logoutPending, error } = useSession();
-  const [email, setEmail] = useState<string>(ADMIN_DEMO_ACCOUNT.email);
-  const [password, setPassword] = useState<string>(ADMIN_DEMO_ACCOUNT.password);
+  const [email, setEmail] = useState<string>(() => adminDemoAccount(accounts).email);
+  const [password, setPassword] = useState<string>(() => adminDemoAccount(accounts).password);
   const [showPassword, setShowPassword] = useState(false);
   const [fields, setFields] = useState({ email: '', password: '' });
   const [roles, setRoles] = useState<DemoRole[] | null>(null);
@@ -93,7 +96,7 @@ export function LoginForm({ guest }: { guest?: boolean } = {}) {
             )}
             <form onSubmit={submit} noValidate aria-busy={busy === 'login'}>
               <ul className="demo-accounts" aria-label="บัญชีสาธิตสำหรับกรอกฟอร์ม">
-                {DEMO_ACCOUNTS.map((account) => (
+                {accounts.map((account) => (
                   <li key={account.role}>
                     <button
                       type="button"

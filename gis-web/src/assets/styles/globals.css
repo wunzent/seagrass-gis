@@ -624,7 +624,7 @@
     border-radius: 6px;
     background: var(--primary-soft);
     color: var(--text);
-    font-size: 0.85rem;
+    font-size: 13px;
   }
   .demo-accounts button {
     display: block;

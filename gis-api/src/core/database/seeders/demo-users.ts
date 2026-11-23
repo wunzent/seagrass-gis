@@ -10,11 +10,11 @@ const DEMO = [
   { email: 'admin@demo.local', role: 'admin', env: 'DEMO_ADMIN_PASSWORD' },
 ] as const;
 
-/** Fails fast (before DB work) when a configured demo password is too short; names the variable only. */
+/** Demo passwords are owner-chosen local values with no length rule; an unset variable skips that account. */
 export function assertDemoPasswords(env: NodeJS.ProcessEnv) {
   for (const demo of DEMO) {
     const password = env[demo.env];
-    if (password && password.length < 8) throw new Error(`${demo.env} must be at least 8 characters`);
+    if (password !== undefined && typeof password !== 'string') throw new Error(`${demo.env} must be text`);
   }
 }
 
@@ -29,7 +29,6 @@ export async function seedDemoUsers(db: DatabaseQuery, env: NodeJS.ProcessEnv) {
   for (const demo of DEMO) {
     const password = env[demo.env];
     if (!password) continue;
-    if (password.length < 8) throw new Error(`${demo.env} must be at least 8 characters`);
     const existing = await users.findByEmail(demo.email);
     if (existing && existing.role === demo.role && (await verifyPassword(password, existing.password_hash))) continue;
     const passwordHash = await hashPassword(password);

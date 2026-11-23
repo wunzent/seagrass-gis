@@ -48,17 +48,56 @@ test('home wires every session slot to its matching view inside MapWorkspace', (
   }
 });
 
+const loginPage = (env) =>
+  componentHarness(
+    '../src/app/login/page.tsx',
+    {
+      [source('features/auth/login-form.tsx')]: { LoginForm: 'login' },
+      [source('guards/session-guard.tsx')]: { SessionRoute: 'route' },
+    },
+    { process: { env } },
+  );
+
 test('login wires checking to default form and account/guest to opposite visibility', () => {
-  const h = componentHarness('../src/app/login/page.tsx', {
-    [source('features/auth/login-form.tsx')]: { LoginForm: 'login' },
-    [source('guards/session-guard.tsx')]: { SessionRoute: 'route' },
-  });
+  const h = loginPage({});
   const page = h.render(() => h.exports.default());
   assert.equal(page.type, 'route');
   for (const slot of ['checking', 'account', 'guest']) assert.equal(page.props[slot].type, 'login');
   assert.equal(page.props.checking.props.guest, undefined);
   assert.equal(page.props.account.props.guest, false);
   assert.equal(page.props.guest.props.guest, true);
+});
+
+test('login renders per request and passes env demo accounts to every LoginForm slot', () => {
+  const h = loginPage({ DEMO_VIEWER_PASSWORD: 'viewer-from-env', DEMO_ADMIN_PASSWORD: 'admin-from-env' });
+  assert.equal(h.exports.dynamic, 'force-dynamic');
+  const page = h.render(() => h.exports.default());
+  const expected = [
+    ['viewer', 'viewer-from-env'],
+    ['editor', 'editor-demo-only'],
+    ['admin', 'admin-from-env'],
+  ];
+  for (const slot of ['checking', 'account', 'guest'])
+    assert.deepEqual(
+      page.props[slot].props.accounts.map((account) => [account.role, account.password]),
+      expected,
+    );
+});
+
+test('login falls back to the .env.example demo passwords when DEMO_*_PASSWORD is unset or empty', () => {
+  for (const env of [{}, { DEMO_VIEWER_PASSWORD: '', DEMO_EDITOR_PASSWORD: '', DEMO_ADMIN_PASSWORD: '' }]) {
+    const h = loginPage(env);
+    const page = h.render(() => h.exports.default());
+    for (const slot of ['checking', 'account', 'guest'])
+      assert.deepEqual(
+        page.props[slot].props.accounts.map((account) => [account.email, account.password]),
+        [
+          ['viewer@demo.local', 'viewer-demo-only'],
+          ['editor@demo.local', 'editor-demo-only'],
+          ['admin@demo.local', 'admin-demo-only'],
+        ],
+      );
+  }
 });
 
 test('SessionProvider injects writable sink but exposes a stable read-only facade with service actions', () => {

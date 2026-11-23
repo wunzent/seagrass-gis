@@ -70,6 +70,8 @@ API สร้างบัญชีสาธิตตอน start จาก `DEMO
 
 เปลี่ยนได้ด้วย `DEMO_*_PASSWORD` และ `JWT_SECRET` ใน `.env`
 
+กล่องบัญชีสาธิตในหน้า `/login` แสดงรหัสผ่านจาก `DEMO_VIEWER_PASSWORD`/`DEMO_EDITOR_PASSWORD`/`DEMO_ADMIN_PASSWORD` ใน `.env` ชุดเดียวกับที่ API ใช้สร้างบัญชี (ถ้าไม่ตั้งหรือเว้นว่างจะใช้ค่า default ข้างบน) หลังแก้ `.env` ให้รัน `docker compose up -d` เพื่อ restart api/web ให้ใช้ค่าใหม่
+
 ## API Usage
 
 - `POST /auth/login` คืน JWT (15 นาที) ใน `access_token` ตามโจทย์ข้อ 5.1 และตั้ง HttpOnly cookie `gis_access`; เรียก API ได้ด้วย `Authorization: Bearer <access_token>` (ไม่ต้องใช้ CSRF header) หรือ cookie (ต้องใช้ CSRF header); logout revoke session ฝั่ง server; ไม่มี refresh token
@@ -188,7 +190,7 @@ npm run dev
 - Browser เรียก relative `/api/*`; proxy ตัด `/api`, ส่ง Cookie/Set-Cookie และ CSRF headers, ไม่ cache, ไม่เปิด CORS; JavaScript ไม่อ่านหรือเก็บ JWT และไม่ forward `Authorization` จาก browser
 - proxy ลบ `access_token` และ `token_type` จาก JSON response ที่สำเร็จของ `POST /api/auth/login` และ `/api/auth/demo-login` โดยคง user/expiry และ Set-Cookie
 - หน้า `/`: ตัวกรองจังหวัด/สถานะ/คำค้น, ตารางหน้าละ 20, polygons ตาม bbox, province outlines, survey points, legend 5 สถานะ, รายละเอียดและประวัติการสำรวจหน้าละ 5; mobile สลับแผนที่/รายการ
-- `/login`: เริ่มหน้าเรียก `/api/auth/me` (401 = anonymous); ปุ่ม Viewer/Editor/Admin แสดงเมื่อ API ตั้ง `DEMO_LOGIN_ENABLED=true` และ discovery สำเร็จ (ไม่เช่นนั้นซ่อนเฉพาะปุ่ม role); ฟอร์มมีบัญชีสาธิตจาก `src/lib/demo-accounts.ts` ที่ตรงกับ `.env.example` กดเพื่อกรอกโดยไม่ส่ง
+- `/login`: เริ่มหน้าเรียก `/api/auth/me` (401 = anonymous); ปุ่ม Viewer/Editor/Admin แสดงเมื่อ API ตั้ง `DEMO_LOGIN_ENABLED=true` และ discovery สำเร็จ (ไม่เช่นนั้นซ่อนเฉพาะปุ่ม role); ฟอร์มมีบัญชีสาธิตที่หน้า server อ่านจาก `DEMO_*_PASSWORD` ตอน request ผ่าน `src/lib/demo-accounts.ts` (fallback เป็นค่าใน `.env.example`) กดเพื่อกรอกโดยไม่ส่ง
 - พื้นหลังใช้ OpenStreetMap raster tiles สำหรับ demo เท่านั้น ก่อนใช้งานจริงต้องเลือกผู้ให้บริการและปฏิบัติตาม [OSM tile usage policy](https://operations.osmfoundation.org/policies/tiles/); ถ้าแผนที่เปิดไม่ได้ ตารางและรายละเอียดยังใช้ได้
 
 ## CI

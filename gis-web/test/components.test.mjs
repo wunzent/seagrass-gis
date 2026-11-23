@@ -21,7 +21,7 @@ const componentHarness = (entry, mocks, globals) => createComponentHarness(entry
 
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 
-function loginHarness(roles) {
+function loginHarness(roles, props) {
   const calls = [];
   const state = {
     session: null,
@@ -44,7 +44,7 @@ function loginHarness(roles) {
     [sourceFile('features/auth/session-controls.tsx')]: { SessionControls: 'controls' },
     [sourceFile('stores/session-context.tsx')]: { useSession: () => state },
   });
-  return { state, calls, render: () => nodes(h.render(() => h.exports.LoginForm())) };
+  return { state, calls, render: () => nodes(h.render(() => h.exports.LoginForm(props))) };
 }
 
 test('filling a demo account clears both field errors without submitting', async () => {
@@ -187,6 +187,69 @@ test('login fields start with admin demo values; selecting every account only fi
     assert.equal(inputs()[1].props.value, account.password);
     assert.deepEqual(h.calls, []);
   }
+});
+
+test('demoAccounts builds the three accounts from DEMO_*_PASSWORD and falls back when unset or empty', async () => {
+  const { demoAccounts, DEMO_ACCOUNTS, ADMIN_DEMO_ACCOUNT } = await import('../src/lib/demo-accounts.ts');
+  const defaults = ['viewer-demo-only', 'editor-demo-only', 'admin-demo-only'];
+  assert.deepEqual(
+    DEMO_ACCOUNTS.map((account) => [account.role, account.label, account.email, account.password]),
+    [
+      ['viewer', 'Viewer', 'viewer@demo.local', defaults[0]],
+      ['editor', 'Editor', 'editor@demo.local', defaults[1]],
+      ['admin', 'Admin', 'admin@demo.local', defaults[2]],
+    ],
+  );
+  assert.equal(ADMIN_DEMO_ACCOUNT.role, 'admin');
+  assert.equal(ADMIN_DEMO_ACCOUNT.password, defaults[2]);
+  for (const env of [undefined, {}, { DEMO_VIEWER_PASSWORD: '', DEMO_EDITOR_PASSWORD: '', DEMO_ADMIN_PASSWORD: '' }])
+    assert.deepEqual(
+      demoAccounts(env).map((account) => account.password),
+      defaults,
+    );
+  const custom = demoAccounts({
+    DEMO_VIEWER_PASSWORD: 'viewer-from-env',
+    DEMO_EDITOR_PASSWORD: '',
+    DEMO_ADMIN_PASSWORD: 'admin-from-env',
+    OTHER: 'ignored',
+  });
+  assert.deepEqual(
+    custom.map((account) => [account.email, account.password]),
+    [
+      ['viewer@demo.local', 'viewer-from-env'],
+      ['editor@demo.local', defaults[1]],
+      ['admin@demo.local', 'admin-from-env'],
+    ],
+  );
+});
+
+test('login form renders the accounts prop in the box and prefills the admin account from it', () => {
+  const accounts = [
+    { role: 'viewer', label: 'Viewer', email: 'viewer@demo.local', password: 'viewer-from-env' },
+    { role: 'editor', label: 'Editor', email: 'editor@demo.local', password: 'editor-from-env' },
+    { role: 'admin', label: 'Admin', email: 'admin@demo.local', password: 'admin-from-env' },
+  ];
+  const h = loginHarness(null, { guest: true, accounts });
+  const inputs = () => h.render().filter((n) => n.type === 'input');
+  assert.equal(inputs()[0].props.value, 'admin@demo.local');
+  assert.equal(inputs()[1].props.value, 'admin-from-env');
+  const list = h.render().find((n) => n.type === 'ul' && n.props.className === 'demo-accounts');
+  const items = nodes(list).filter((n) => n.type === 'li');
+  assert.equal(items.length, 3);
+  assert.deepEqual(
+    items.map((item) =>
+      nodes(item)
+        .filter((n) => n.type === 'strong')
+        .map((n) => n.props.children),
+    ),
+    accounts.map((account) => [account.email, account.password]),
+  );
+  assert.equal(JSON.stringify(h.render().map((n) => n.props.children)).includes('-demo-only'), false);
+  nodes(h.render().find((n) => n.props.className === 'demo-accounts'))
+    .find((n) => n.type === 'button')
+    .props.onClick();
+  assert.equal(inputs()[0].props.value, 'viewer@demo.local');
+  assert.equal(inputs()[1].props.value, 'viewer-from-env');
 });
 
 test('password visibility toggles type and accessible pressed label without submitting or losing values', () => {
