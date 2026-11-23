@@ -134,7 +134,7 @@ workflow ใช้ `contents: read`, `actions/checkout@v4`, `actions/setup-node@
 | 4.4 API docs + examples | `/docs` ตาม API Usage และ [api-examples.http](api-examples.http) |
 | 4.5 Tests | [status unit](gis-api/src/sites/site-status.spec.ts), [validation unit](gis-api/src/sites/dto/create-site.dto.spec.ts), [OUTSIDE_SITE integration](gis-api/test/surveys.e2e-spec.ts), [VERSION_CONFLICT integration](gis-api/test/sites-write.e2e-spec.ts); คำสั่งอยู่ใน Test |
 | 4.6 Import report | [import_report.csv](reports/import_report.csv) จากขั้น 2; จำนวนและวิธีรันซ้ำอยู่ใน Seed Import |
-| 4.7 Design | [DESIGN.md](DESIGN.md) ตอบ a geometry/SRID/index, b invalid/missing CRS, c concurrent edits, d แนวทาง 500,000 polygons/เป้าหมาย 2 วินาที (ยังไม่ benchmark), e งานที่ยังไม่ทำและแผนอีก 1 วัน; เอกสารสรุปสำหรับอ่านภายใน 2 หน้า |
+| 4.7 Design | [DESIGN.md](DESIGN.md) ตอบ a geometry/SRID/index, b invalid/missing CRS, c concurrent edits, d วิธีส่ง 500,000 polygons ไปหน้าเว็บให้แสดงภายใน 2 วินาที (โจทย์ถามแนวทาง; การทำ vector tiles จริงเป็นข้อ Senior ที่เลื่อนไว้), e งานที่ยังไม่ทำและแผนอีก 1 วัน; ตรวจแล้ว 2 หน้า A4 (Chrome print, 11pt, ขอบ 20 mm) |
 | 9.5 CI | [GitHub Actions](.github/workflows/ci.yml) รัน test และ build image เมื่อ push/PR ตาม CI; hosted run ของ revision ที่ส่งยัง Pending |
 
 PDF ข้อสอบและรายงานส่งต่องาน Codex เก็บนอก public repository; ประวัติ provider ก่อน DEC-15 อยู่ใน dated evidence ของ WORK-STATUS
