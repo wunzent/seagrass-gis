@@ -329,6 +329,16 @@ describe('auth (real PostGIS)', () => {
       now,
     );
     expect((await me(`gis_access=${unknownSession}`)).status).toBe(401);
+    // Signed claims that are not UUIDs are rejected before the uuid-typed session lookup (401, not a database error).
+    for (const subject of [
+      { sub: USERS.viewer, sid: 'not-a-uuid' },
+      { sub: 'not-a-uuid', sid: '00000000-0000-4000-8000-00000000dead' },
+    ]) {
+      const malformed = signAccessToken(subject, SECRET, now);
+      expect((await me(`gis_access=${malformed}`)).status).toBe(401);
+      const bearer = await fetch(`${base}/auth/me`, { headers: { Authorization: `Bearer ${malformed}` } });
+      expect(bearer.status).toBe(401);
+    }
     const res = await me('gis_access=abc.def.ghi');
     expect(res.headers.get('set-cookie') ?? '').toMatch(/^gis_access=; Max-Age=0/);
     // Session owned by another user: sid valid, sub swapped.

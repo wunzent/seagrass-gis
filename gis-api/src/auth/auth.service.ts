@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
+import { isUUID } from 'class-validator';
 import { AUTH_CONFIG, LOGIN_LIMITER } from './auth.constants';
 import { LoginRateLimiter } from './utils/login-rate-limiter';
 import { AuthConfig } from '../core/config/config';
@@ -16,7 +17,6 @@ import {
 } from './utils/crypto';
 import { ApiError } from '../shared/errors/api-error';
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const invalidCredentials = () => new ApiError(401, 'INVALID_CREDENTIALS', 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
 
 @Injectable()
@@ -30,7 +30,7 @@ export class AuthService {
 
   private claims(token: string | undefined) {
     const claims = token ? verifyAccessToken(token, this.config.jwtSecret) : null;
-    return claims && UUID.test(claims.sid) && UUID.test(claims.sub) ? claims : null;
+    return claims && isUUID(claims.sid) && isUUID(claims.sub) ? claims : null;
   }
 
   /** Signature/claims first, then an active DB session owned by `sub`; the role is read from the current user row. */
