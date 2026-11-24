@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { filterState, listQuery, mapQuery, validBbox, latestRequest, debounce } from '../src/lib/map-state.ts';
+import {
+  filterState,
+  listQuery,
+  mapQuery,
+  validBbox,
+  latestRequest,
+  debounce,
+  VIEWPORT_DEBOUNCE_MS,
+} from '../src/lib/map-state.ts';
+import { readFileSync } from 'node:fs';
 
 test('filter change resets pagination and gives list/map identical filter snapshot', () => {
   const state = filterState(
@@ -63,4 +72,11 @@ test('debounce commits only latest snapshot at 300ms and cleanup cancels it', (t
   action.cancel();
   t.mock.timers.tick(300);
   assert.deepEqual(values, ['new']);
+});
+
+test('map viewport requests wait 600ms after the map stops moving', () => {
+  assert.equal(VIEWPORT_DEBOUNCE_MS, 600);
+  const source = readFileSync(new URL('../src/features/map/site-map.tsx', import.meta.url), 'utf8');
+  assert.match(source, /const updateViewport = debounce\([\s\S]*?\}, VIEWPORT_DEBOUNCE_MS\);/);
+  assert.match(source, /instance\.on\('moveend'/);
 });

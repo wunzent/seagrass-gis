@@ -78,6 +78,8 @@ export function latestRequest() {
     },
   };
 }
+/** Wait after the map stops moving before asking the API for the new bbox, so quick successive pans send one request. */
+export const VIEWPORT_DEBOUNCE_MS = 600;
 export function debounce<T>(callback: (value: T) => void, delay = 300) {
   let timer: ReturnType<typeof setTimeout> | undefined;
   return {

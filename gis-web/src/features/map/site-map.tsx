@@ -11,7 +11,16 @@ import {
   type PointLike,
 } from 'maplibre-gl';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { debounce, POINT_FILL, POINT_STROKE, SITE_OUTLINE, statuses, validBbox, type Bbox } from '../../lib/map-state';
+import {
+  debounce,
+  VIEWPORT_DEBOUNCE_MS,
+  POINT_FILL,
+  POINT_STROKE,
+  SITE_OUTLINE,
+  statuses,
+  validBbox,
+  type Bbox,
+} from '../../lib/map-state';
 import {
   geometryBounds,
   type ProvinceCollection,
@@ -140,7 +149,7 @@ export default function SiteMap({
         Math.min(90, bounds.getNorth()),
       ];
       if (validBbox(bbox)) callbacks.current.onViewport(bbox);
-    });
+    }, VIEWPORT_DEBOUNCE_MS);
     let instance: MapLibreMap;
     const erroredTiles = new Set<string>();
     try {
