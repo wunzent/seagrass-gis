@@ -2,19 +2,13 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { Button } from '../../components/ui/button';
 import { useSession } from '../../stores/session-context';
 import { SessionControls } from './session-controls';
-import { validateLogin, type DemoRole } from '../../lib/session';
+import { validateLogin } from '../../lib/session';
 import { adminDemoAccount, DEMO_ACCOUNTS, type DemoAccount } from '../../lib/demo-accounts';
 import { EyeIcon, MailIcon } from '../../assets/icons/login-icons';
-
-const demoAccounts: { role: DemoRole; label: string; description: string }[] = [
-  { role: 'viewer', label: 'Viewer', description: 'อ่านข้อมูล และเห็นผู้บันทึก' },
-  { role: 'editor', label: 'Editor', description: 'แก้ชื่อแหล่ง และจัดการ survey' },
-  { role: 'admin', label: 'Admin', description: 'จัดการแหล่งทั้งหมด' },
-];
 
 export function LoginForm({
   guest,
@@ -26,29 +20,9 @@ export function LoginForm({
   const [password, setPassword] = useState<string>(() => adminDemoAccount(accounts).password);
   const [showPassword, setShowPassword] = useState(false);
   const [fields, setFields] = useState({ email: '', password: '' });
-  const [roles, setRoles] = useState<DemoRole[] | null>(null);
-  const [pendingRole, setPendingRole] = useState<DemoRole | null>(null);
-  useEffect(() => {
-    let active = true;
-    void store.demoRoles().then((available) => {
-      if (active) setRoles(available);
-    });
-    return () => {
-      active = false;
-    };
-  }, [store]);
   const summary = useRef<HTMLDivElement>(null);
   const emailInput = useRef<HTMLInputElement>(null);
   const passwordInput = useRef<HTMLInputElement>(null);
-  async function demoLogin(role: DemoRole) {
-    if (busy || logoutPending || phase === 'checking') return;
-    setPendingRole(role);
-    const success = await store.demoLogin(role);
-    setPendingRole(null);
-    setPassword('');
-    if (success) router.replace('/');
-    else summary.current?.focus();
-  }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const invalid = validateLogin(email, password);
@@ -72,28 +46,6 @@ export function LoginForm({
         {session || logoutPending || phase === 'checking' ? <SessionControls /> : null}
         {(guest ?? !session) ? (
           <>
-            {roles && roles.length > 0 && (
-              <div className="demo-login" role="group" aria-labelledby="demo-heading" aria-busy={pendingRole !== null}>
-                <h2 id="demo-heading">บัญชีสาธิต กดเพื่อเข้าสู่ระบบทันที</h2>
-                {demoAccounts
-                  .filter(({ role }) => roles.includes(role))
-                  .map(({ role, label, description }) => (
-                    <Button
-                      key={role}
-                      type="button"
-                      variant="outline"
-                      className="demo-login-button"
-                      aria-label={label}
-                      disabled={Boolean(busy) || logoutPending || phase === 'checking'}
-                      onClick={() => demoLogin(role)}
-                    >
-                      <span>{pendingRole === role ? 'กำลังเข้าสู่ระบบ…' : label}</span>
-                      <span>{description}</span>
-                    </Button>
-                  ))}
-                <p className="demo-divider">หรือกรอกเอง</p>
-              </div>
-            )}
             <form onSubmit={submit} noValidate aria-busy={busy === 'login'}>
               <ul className="demo-accounts" aria-label="บัญชีสาธิตสำหรับกรอกฟอร์ม">
                 {accounts.map((account) => (

@@ -20,6 +20,7 @@ export const tokenOf = (request: Pick<HttpRequest, 'headers'>) => {
 };
 
 const SAFE_METHODS = new Set(['GET', 'HEAD']);
+export const AUTH_SESSION_HEADER = 'X-Auth-Session';
 
 /** Header credentials take precedence, including malformed ones. Only cookie failures on safe methods clear cookies. */
 @Injectable()
@@ -30,6 +31,9 @@ export class AuthMiddleware implements NestMiddleware {
       const token = tokenOf(request);
       request.auth = await this.auth.authenticate(token);
       request.authSource = request.auth ? (hasAuthorization(request) ? 'bearer' : 'cookie') : undefined;
+      // A token was sent but its session is gone (expired, revoked, forged): every response says so, so the web can drop
+      // the identity it remembers from login without polling /auth/me. Public reads still answer anonymously.
+      if (token && !request.auth) response.setHeader(AUTH_SESSION_HEADER, 'invalid');
       if (!hasAuthorization(request) && token && !request.auth && SAFE_METHODS.has(request.method))
         response.setHeader('Set-Cookie', clearedAccessCookie(this.auth.config.cookieSecure));
       next();

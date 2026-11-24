@@ -12,8 +12,6 @@ import { ApiCsrfHeaders } from '../shared/decorators/api-csrf-headers.decorator'
 import { ApiErrorResponse } from '../shared/decorators/api-error-response.decorator';
 import { cookieTokenOf, hasAuthorization, tokenOf } from './middleware/auth.middleware';
 import { CsrfGuard } from './guards/csrf.guard';
-import { DemoLoginGuard } from './guards/demo-login.guard';
-import { DEMO_ROLES, DemoLoginDto, DemoLoginRolesDto } from './dto/demo-login.dto';
 import { unauthorized } from './guards/roles.guard';
 import { AuthService } from './auth.service';
 import { accessCookie, clearedAccessCookie } from './utils/cookies';
@@ -33,53 +31,6 @@ const CSRF_HEADERS: MethodDecorator = (target, key, descriptor) => {
 @Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
-
-  @Get('demo-login')
-  @ApiOperation({ summary: 'แสดง role สำหรับ demo quick login เมื่อเปิดใช้งาน' })
-  @ApiOkResponse({ type: DemoLoginRolesDto })
-  @ApiErrorResponse(404, ['NOT_FOUND'])
-  @Header('Cache-Control', 'no-store')
-  @UseGuards(DemoLoginGuard)
-  demoRoles(): DemoLoginRolesDto {
-    return { roles: DEMO_ROLES };
-  }
-
-  @Post('demo-login')
-  @ApiOperation({ summary: 'เข้าสู่ระบบด้วย demo role เมื่อเปิดใช้งาน; ปิดแล้วตอบ 404' })
-  @CSRF_HEADERS
-  @ApiBody({ type: DemoLoginDto })
-  @ApiOkResponse({
-    type: LoginResponseDto,
-    headers: {
-      'Set-Cookie': {
-        schema: { type: 'string' },
-        description: 'gis_access=<JWT>; Max-Age=900; Path=/; HttpOnly; SameSite=Lax',
-      },
-    },
-  })
-  @ApiErrorResponse(400, ['VALIDATION_ERROR'])
-  @ApiErrorResponse(401, ['INVALID_CREDENTIALS'])
-  @ApiErrorResponse(404, ['NOT_FOUND'])
-  @ApiErrorResponse(429, ['AUTH_RATE_LIMITED'])
-  @ApiErrorResponse(503, ['SERVICE_UNAVAILABLE'])
-  @HttpCode(200)
-  @Header('Cache-Control', 'no-store')
-  @UseGuards(DemoLoginGuard, CsrfGuard)
-  async demoLogin(
-    @Req() request: HttpRequest,
-    @Res({ passthrough: true }) response: HttpResponse,
-    @JsonBody() body: DemoLoginDto,
-  ): Promise<LoginResponseDto> {
-    const result = await this.auth.demoLogin(body.role, cookieTokenOf(request), tokenOf(request));
-    response.setHeader('Set-Cookie', accessCookie(result.token, ACCESS_TTL_SECONDS, this.auth.config.cookieSecure));
-    return {
-      access_token: result.token,
-      token_type: 'Bearer',
-      user: result.user,
-      expires_in: ACCESS_TTL_SECONDS,
-      expires_at: result.expiresAt.toISOString(),
-    };
-  }
 
   @Post('login')
   @ApiOperation({ summary: 'เข้าสู่ระบบ: คืน JWT ใน JSON และตั้ง HttpOnly cookie gis_access (JWT 15 นาที)' })

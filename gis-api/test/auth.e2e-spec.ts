@@ -305,6 +305,22 @@ describe('auth (real PostGIS)', () => {
     expect((await fetch(`${base}/auth/logout`, { method: 'POST', headers: csrf })).status).toBe(204);
   });
 
+  it('public reads flag a dead session with X-Auth-Session: invalid so the web can drop the remembered identity', async () => {
+    const cookie = cookieOf(await login('viewer@demo.local', 'viewer-pass'));
+    const live = await fetch(`${base}/species`, { headers: { Cookie: cookie } });
+    expect(live.status).toBe(200);
+    expect(live.headers.get('x-auth-session')).toBeNull();
+    const anonymous = await fetch(`${base}/species`);
+    expect(anonymous.headers.get('x-auth-session')).toBeNull();
+    await fetch(`${base}/auth/logout`, { method: 'POST', headers: { Cookie: cookie, ...csrf } });
+    const dead = await fetch(`${base}/species`, { headers: { Cookie: cookie } });
+    expect(dead.status).toBe(200); // public data still served anonymously
+    expect(dead.headers.get('x-auth-session')).toBe('invalid');
+    expect(dead.headers.get('set-cookie')).toBe('gis_access=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax');
+    const deadBearer = await fetch(`${base}/species`, { headers: { Authorization: `Bearer ${cookie.split('=')[1]}` } });
+    expect(deadBearer.headers.get('x-auth-session')).toBe('invalid');
+  });
+
   it('re-login revokes the previous session atomically', async () => {
     const first = cookieOf(await login('viewer@demo.local', 'viewer-pass'));
     const second = await login('viewer@demo.local', 'viewer-pass', { Cookie: first });

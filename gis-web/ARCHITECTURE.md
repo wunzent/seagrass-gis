@@ -57,7 +57,7 @@ src/components/ui/         button
 src/lib/                   map-state, map-format, sites, session, proxy, demo-accounts
 ```
 
-SessionProvider สร้าง session-store + createSessionService(sink, options) ต่อ mount แล้ว expose facade เฉพาะ getSnapshot/subscribe/isCurrent และ service actions โดยไม่เปิด setState ให้ features ที่คง identity ผ่าน useSession. Bootstrap me, focus/visibility resume, timers และ dispose คงเดิม. session-context เก็บแค่ context/subscription ไม่มี service wiring
+SessionProvider สร้าง session-store + createSessionService(sink, options) ต่อ mount แล้ว expose facade เฉพาะ getSnapshot/subscribe/isCurrent และ service actions โดยไม่เปิด setState ให้ features ที่คง identity ผ่าน useSession. ไม่เรียก /auth/me: ตอน mount อ่าน identity ที่จำไว้ตอน login (localStorage key gis-session เก็บเฉพาะ id/email/role/expires_at ไม่มี JWT) แล้วตั้ง timer เตือน 1 นาทีก่อนหมดและหมดอายุ; API ตรวจ session ทุกคำขอ ถ้า 401 หรือ response มี X-Auth-Session: invalid (http-client onSessionInvalid) จะล้าง identity และแจ้งหมดอายุ; storage event จากแท็บอื่นสั่ง restore ใหม่. ไม่มี focus/visibility listener; dispose ยกเลิก timers และ listener. session-context เก็บแค่ context/subscription ไม่มี service wiring
 
 MapContent สร้าง map-store ต่อ mount มี filters/view/bbox/popup และ resource slices provinces/list/sites/surveys/detail/history. useResource(key, load, retry, resource) subscribe slice ผ่าน useSyncExternalStore; slice ถือ identity key/retry/generation, latestRequest/AbortController และ response/error. Loader ref เปลี่ยนได้โดยไม่ fetch ซ้ำหาก key/retry/generation/session เดิม. MapWorkspace key ตาม session generation จึงทิ้ง selection/private payload เมื่อ identity เปลี่ยน
 
@@ -85,7 +85,7 @@ Page / ประกอบ SessionRoute ใน sessionControls slot ของ Map
 
 ### Role login
 
-LoginForm → facade.demoRoles/demoLogin ที่เป็น session-service actions → auth-service → http-client. Discovery GET auth/demo-login; POST ส่ง role อย่างเดียวพร้อม CSRF. Session-service คง state machine เดิม: busy/operation guard, parseSession allowlist id/email/role/expires_at, publish sink → useSession re-render → router.replace('/'). Store ไม่เรียก service. ไม่มี raw JWT หรือ client storage; expiry/focus/logout retry/429/original deadline คงเดิม
+LoginForm → facade.login ที่เป็น session-service action → auth-service → http-client; POST auth/login พร้อม CSRF. กล่องบัญชีสาธิตแค่กรอกฟอร์ม (ไม่มี demo-login endpoint). Session-service คง state machine เดิม: busy/operation guard, parseSession allowlist id/email/role/expires_at, publish sink → useSession re-render → router.replace('/'). Store ไม่เรียก service. ไม่มี raw JWT ใน state หรือ storage (เก็บเฉพาะ safe identity); logout retry/429/original deadline คงเดิม
 
 ## How to add a feature
 

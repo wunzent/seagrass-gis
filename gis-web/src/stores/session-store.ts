@@ -11,6 +11,7 @@ export function createSessionStore(now: () => number = Date.now) {
     error: '',
     errorSource: null,
     rateLimitedUntil: 0,
+    expiryNotice: null,
   });
   return {
     ...sink,

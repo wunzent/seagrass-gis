@@ -15,8 +15,24 @@ export class ApiError extends Error {
     this.status = status;
   }
 }
+const sessionInvalidListeners = new Set<() => void>();
+let sessionEpoch = 0;
+/** Called when a new identity is accepted; a marker on a request sent before that belongs to the old state. */
+export function markSessionChanged() {
+  sessionEpoch++;
+}
+/** Called when an API response says the cookie's session is gone (`X-Auth-Session: invalid`). Returns an unsubscribe. */
+export function onSessionInvalid(listener: () => void) {
+  sessionInvalidListeners.add(listener);
+  return () => {
+    sessionInvalidListeners.delete(listener);
+  };
+}
 export async function fetchJson<T>(url: string, signal: AbortSignal): Promise<T> {
+  const epoch = sessionEpoch;
   const response = await fetch(url, { credentials: 'same-origin', cache: 'no-store', signal });
+  if (response.headers.get('x-auth-session') === 'invalid' && epoch === sessionEpoch)
+    for (const listener of [...sessionInvalidListeners]) listener();
   if (!response.ok) throw new ApiError(response.status);
   return response.json();
 }

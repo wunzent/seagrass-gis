@@ -16,7 +16,6 @@ export interface AuthConfig {
   jwtSecret: string;
   allowedOrigins: string[];
   cookieSecure: boolean;
-  demoLoginEnabled?: boolean;
 }
 
 const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
@@ -45,7 +44,5 @@ export function readAuthConfig(env: NodeJS.ProcessEnv): AuthConfig {
     jwtSecret,
     allowedOrigins: [web.origin, docs.origin],
     cookieSecure: web.protocol === 'https:',
-    // Explicit opt-in only; the Docker image always runs NODE_ENV=production, so the flag is the single switch.
-    demoLoginEnabled: env.DEMO_LOGIN_ENABLED === 'true',
   };
 }

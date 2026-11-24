@@ -70,7 +70,8 @@ describe('Bearer credential selection', () => {
       const auth = { authenticate: async () => resolved, config: { cookieSecure: false } } as any;
       await new AuthMiddleware(auth).use(request, { setHeader: (key) => changed.push(key) }, () => {});
       expect(request.authSource).toBe(resolved ? 'bearer' : undefined);
-      expect(changed).toEqual([]);
+      // A dead Bearer token is flagged, but the cookie is never cleared because of a header failure.
+      expect(changed).toEqual(resolved ? [] : ['X-Auth-Session']);
     }
   });
 });

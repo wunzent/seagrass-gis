@@ -4,7 +4,7 @@ import { isUUID } from 'class-validator';
 import { AUTH_CONFIG, LOGIN_LIMITER } from './auth.constants';
 import { LoginRateLimiter } from './utils/login-rate-limiter';
 import { AuthConfig } from '../core/config/config';
-import { AuthenticatedContext, Role, SessionUser } from './entities/user.entity';
+import { AuthenticatedContext, SessionUser } from './entities/user.entity';
 import { SessionsRepository } from './sessions.repository';
 import { UsersRepository } from './users.repository';
 import {
@@ -62,16 +62,6 @@ export class AuthService {
     if (!user || !ok) throw invalidCredentials();
     const result = await this.createSession(user, previousToken, headerToken);
     this.limiter.succeed(throttleKey);
-    return result;
-  }
-
-  async demoLogin(role: Role, previousToken: string | undefined, headerToken?: string) {
-    const key = `demo:${role}`;
-    this.limiter.attempt(key);
-    const user = await this.users.findSessionUserByEmail(`${role}@demo.local`);
-    if (!user) throw invalidCredentials();
-    const result = await this.createSession(user, previousToken, headerToken);
-    this.limiter.succeed(key);
     return result;
   }
 

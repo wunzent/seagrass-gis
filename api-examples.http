@@ -303,7 +303,3 @@ Content-Type: application/json
 # expect: 200
 GET {{api}}/auth/me
 Authorization: Bearer {{tokenLogin.response.body.$.access_token}}
-
-### Demo quick login: 404 เมื่อ DEMO_LOGIN_ENABLED=false (ค่าตั้งต้น); 200 {roles} เมื่อเปิด
-# expect: 404
-GET {{api}}/auth/demo-login

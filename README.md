@@ -32,8 +32,8 @@ seagrass-gis/
 | 2 Import | importer อัตโนมัติตอน start + รันซ้ำได้, `reports/import_report.csv` | unit + real PostGIS integration |
 | 3 Site writes | POST/PATCH/DELETE `/sites` พร้อม optimistic locking (`version`) และ soft delete | real PostGIS e2e |
 | 4 Surveys | CRUD survey, history, `/surveys.geojson`, `/provinces.geojson`, `/species` | real PostGIS e2e |
-| 5 Auth | `POST /auth/login` คืน JWT (`access_token`, 15 นาที) + HttpOnly cookie; ใช้ `Authorization: Bearer` หรือ cookie; me/logout, session revocation, CSRF สำหรับ cookie, roles viewer/editor/admin; ปุ่ม demo login ตาม role (`DEMO_LOGIN_ENABLED`, ค่าตั้งต้นปิด) | e2e (real PostGIS) + Docker smoke |
-| 6 Web | เมนู แผนที่ / ตารางแหล่งหญ้าทะเล; sidebar ตัวกรอง + รายการ; MapLibre polygons ตาม bbox (debounce), เส้นจังหวัด, จุดสำรวจ, legend; popup แหล่ง (รายละเอียด + ประวัติสรุปรอบ) และ popup จุดสำรวจ; login (ฟอร์ม + ปุ่ม role); loading/error/empty; 375px | unit + browser บน Docker (desktop และ 375px) |
+| 5 Auth | `POST /auth/login` คืน JWT (`access_token`, 15 นาที) + HttpOnly cookie; ใช้ `Authorization: Bearer` หรือ cookie; API ตรวจ token + session ทุกคำขอ; me/logout, session revocation, CSRF สำหรับ cookie, roles viewer/editor/admin | e2e (real PostGIS) + Docker smoke |
+| 6 Web | เมนู แผนที่ / ตารางแหล่งหญ้าทะเล; sidebar ตัวกรอง + รายการ; MapLibre polygons ตาม bbox (debounce), เส้นจังหวัด, จุดสำรวจ, legend; popup แหล่ง (รายละเอียด + ประวัติสรุปรอบ) และ popup จุดสำรวจ; login (ฟอร์ม + กล่องบัญชีสาธิต), แจ้งเตือน session ใกล้หมด/หมดอายุ; loading/error/empty + หน้า loading/error/not-found; 375px | unit + browser บน Docker (desktop และ 375px) |
 | 9.5 CI | `.github/workflows/ci.yml`: `api-test` → `api-image`, `web-test` → `web-image` | GitHub Actions ผ่านบน `main` |
 
 ## Run
@@ -78,7 +78,6 @@ API สร้างบัญชีสาธิตตอน start จาก `DEMO
 
 - `POST /auth/login` คืน JWT (15 นาที) ใน `access_token` ตามโจทย์ข้อ 5.1 และตั้ง HttpOnly cookie `gis_access`; เรียก API ได้ด้วย `Authorization: Bearer <access_token>` (ไม่ต้องใช้ CSRF header) หรือ cookie (ต้องใช้ CSRF header); logout revoke session ฝั่ง server; ไม่มี refresh token
 - หน้า `/login` มีบัญชีสาธิตให้เลือกกรอก เริ่มด้วย Admin และมีปุ่มแสดง/ซ่อนรหัสผ่าน; styles/font/icons อยู่ `gis-web/src/assets/`
-- ปุ่มเข้าสู่ระบบตาม role (Viewer/Editor/Admin) บนหน้า `/login` แสดงเมื่อตั้ง `DEMO_LOGIN_ENABLED=true` ใน `.env` (ค่าตั้งต้นปิด; ใช้เฉพาะสาธิตบนเครื่อง local)
 - คำขอ POST/PATCH/DELETE (รวม login/logout) ต้องส่ง `Origin` ที่อนุญาต (`http://localhost:3000` หรือ `http://localhost:3001`) และ `X-CSRF-Protection: 1`
 - [api-examples.http](api-examples.http): ตัวอย่างทุก endpoint (VS Code REST Client) รันตามลำดับจะสร้างและลบ site `DOC-EX-001` เอง; status ในไฟล์ได้จากการรันจริง
 - Swagger UI: login ผ่าน `POST /auth/login` ในหน้า `/docs` ก่อนใช้ write; ทุกคำขอเขียนต้องเลือก `X-CSRF-Protection` = `1` และกรอกช่อง `Origin` เป็น `http://localhost:3001` (browser ส่ง Origin จริงของหน้าเอง) (Swagger บังคับกรอกทั้งสองช่อง; interceptor เติม `X-CSRF-Protection` ให้คำขอเขียนอยู่แล้ว)
@@ -150,11 +149,11 @@ Jest รันโหมด ESM (`node --experimental-vm-modules`) ต้อง�
 
 Auth และ session:
 
-- ทั้ง `POST /auth/login` และ `POST /auth/demo-login` คืน `{access_token, token_type:"Bearer", user, expires_in:900, expires_at}` พร้อม HttpOnly cookie `gis_access`; session ฝั่ง server ไม่ต่ออายุเมื่ออ่านข้อมูล และห้าม log token
+- `POST /auth/login` คืน `{access_token, token_type:"Bearer", user, expires_in:900, expires_at}` พร้อม HttpOnly cookie `gis_access`; session ฝั่ง server ไม่ต่ออายุเมื่ออ่านข้อมูล และห้าม log token
 - เมื่อมี `Authorization: Bearer` จะใช้ header ก่อน cookie แม้ header ผิดรูป (ไม่ fallback ไป cookie); public reads ตอบข้อมูล anonymous ส่วน protected endpoints ตอบ 401
-- Write ที่ใช้ Bearer ไม่ต้องส่ง Origin/`X-CSRF-Protection` แต่ยังตรวจ role และสิทธิ์ราย field; ถ้าใช้ cookie ต้องส่งทั้งสองเสมอ และ `login`/`demo-login`/`logout` ตรวจ CSRF ทุกกรณี
+- Write ที่ใช้ Bearer ไม่ต้องส่ง Origin/`X-CSRF-Protection` แต่ยังตรวจ role และสิทธิ์ราย field; ถ้าใช้ cookie ต้องส่งทั้งสองเสมอ และ `login`/`logout` ตรวจ CSRF ทุกกรณี
 - login ทั้งสองแบบเพิกถอน session เดิมจาก cookie และ Bearer พร้อมสร้าง session ใหม่ใน transaction เดียวกัน; logout เลือก session จาก header ก่อน ถ้า Bearer ใช้ไม่ได้จะตอบ 204 โดยไม่ล้าง cookie
-- Demo login: `GET /auth/demo-login` คืนรายการ role; `POST /auth/demo-login` รับเฉพาะ `{ "role": "viewer" | "editor" | "admin" }` ไม่รับรหัสผ่าน ใช้ rate limiter แยก key `demo:<role>` (ค่าเริ่มต้น 10 ครั้ง/15 นาที นับเฉพาะความล้มเหลว) และตอบ `Cache-Control: no-store` ถ้า `DEMO_LOGIN_ENABLED` ไม่ใช่ `true` (ตัวพิมพ์เล็ก) ทั้งสอง endpoint ตอบ 404 `NOT_FOUND` ก่อนตรวจ CSRF/body ให้คงเป็น `false` นอกเครื่อง local เพราะเมื่อเปิดผู้เข้าถึง API จะเข้าเป็น admin ได้
+- ทุกคำขอที่ส่ง token มา API ตรวจลายเซ็นและ session ใน DB ก่อนเสมอ ถ้า session หมดอายุหรือถูกยกเลิก: endpoint ที่ต้อง login ตอบ 401 ส่วน endpoint สาธารณะตอบข้อมูลแบบ anonymous พร้อม header `X-Auth-Session: invalid` (และล้าง cookie สำหรับ GET)
 - Swagger `/docs` มีทั้ง cookie และ Bearer security; เว็บใช้ cookie อย่างเดียวและเก็บเฉพาะ safe user กับ expiry
 
 กฎ status ใช้ `src/sites/site-status.ts` เป็นแหล่ง thresholds ร่วมกับ SQL CASE: 75 → very_good, 50 → good, 25 → fair, ต่ำกว่า 25 → poor, null → no_data เปรียบเทียบค่าเฉลี่ยของ survey ทั้งหมดในวันล่าสุดโดยไม่ปัดเศษก่อน; ปัดเฉพาะค่าที่แสดง
@@ -190,9 +189,10 @@ npm run dev
 พฤติกรรมสำคัญ:
 
 - Browser เรียก relative `/api/*`; proxy ตัด `/api`, ส่ง Cookie/Set-Cookie และ CSRF headers, ไม่ cache, ไม่เปิด CORS; JavaScript ไม่อ่านหรือเก็บ JWT และไม่ forward `Authorization` จาก browser
-- proxy ลบ `access_token` และ `token_type` จาก JSON response ที่สำเร็จของ `POST /api/auth/login` และ `/api/auth/demo-login` โดยคง user/expiry และ Set-Cookie
+- proxy ลบ `access_token` และ `token_type` จาก JSON response ที่สำเร็จของ `POST /api/auth/login` โดยคง user/expiry และ Set-Cookie; ส่ง `X-Auth-Session: invalid` ต่อให้ browser
 - หน้า `/`: ตัวกรองจังหวัด/สถานะ/คำค้น, ตารางหน้าละ 20, polygons ตาม bbox, province outlines, survey points, legend 5 สถานะ, รายละเอียดและประวัติการสำรวจหน้าละ 5; mobile สลับแผนที่/รายการ
-- `/login`: เริ่มหน้าเรียก `/api/auth/me` (401 = anonymous); ปุ่ม Viewer/Editor/Admin แสดงเมื่อ API ตั้ง `DEMO_LOGIN_ENABLED=true` และ discovery สำเร็จ (ไม่เช่นนั้นซ่อนเฉพาะปุ่ม role); ฟอร์มมีบัญชีสาธิตที่หน้า server อ่านจาก `DEMO_*_PASSWORD` ตอน request ผ่าน `src/lib/demo-accounts.ts` (fallback เป็นค่าใน `.env.example`) กดเพื่อกรอกโดยไม่ส่ง
+- Session ฝั่งเว็บไม่เรียก `/api/auth/me`: login แล้วจำเฉพาะ id/email/role/expires_at (ไม่มี JWT) ใน localStorage เพื่อแสดงชื่อและ role หลัง refresh; เตือน 1 นาทีก่อนหมดอายุและแจ้งเมื่อหมด; ถ้า API ตอบ 401 หรือ `X-Auth-Session: invalid` เว็บล้าง identity ทันที; แท็บอื่น login/logout แล้วอัปเดตตามผ่าน storage event
+- `/login`: ฟอร์มมีบัญชีสาธิตที่หน้า server อ่านจาก `DEMO_*_PASSWORD` ตอน request ผ่าน `src/lib/demo-accounts.ts` (fallback เป็นค่าใน `.env.example`) กดเพื่อกรอกโดยไม่ส่ง; ไม่มีปุ่ม login ตาม role
 - พื้นหลังใช้ OpenStreetMap raster tiles สำหรับ demo เท่านั้น ก่อนใช้งานจริงต้องเลือกผู้ให้บริการและปฏิบัติตาม [OSM tile usage policy](https://operations.osmfoundation.org/policies/tiles/); ถ้าแผนที่เปิดไม่ได้ ตารางและรายละเอียดยังใช้ได้
 
 ## CI

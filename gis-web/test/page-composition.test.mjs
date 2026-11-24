@@ -104,16 +104,12 @@ test('SessionProvider injects writable sink but exposes a stable read-only facad
   let sink,
     serviceSink,
     creates = 0,
-    restores = 0,
-    resumes = 0;
+    restores = 0;
   const listeners = new Map();
   const context = { Provider: 'provider' };
   const actions = {
     restore: async () => restores++,
-    resume: async () => resumes++,
     login() {},
-    demoRoles() {},
-    demoLogin() {},
     logout() {},
     unauthorized() {},
     dispose() {},
@@ -132,6 +128,7 @@ test('SessionProvider injects writable sink but exposes a stable read-only facad
           serviceSink = value;
           return actions;
         },
+        SESSION_STORAGE_KEY: 'gis-session',
       },
       [source('stores/session-context.tsx')]: { SessionContext: context },
     },
@@ -153,6 +150,13 @@ test('SessionProvider injects writable sink but exposes a stable read-only facad
   assert.equal(second.props.value, facade);
   assert.equal(creates, 1);
   assert.equal(restores, 1);
-  listeners.get('focus')();
-  assert.equal(resumes, 0);
+  // /auth/me runs once on load; afterwards the session is only re-checked by real API calls (401) and the expiry timer.
+  assert.equal(listeners.has('focus'), false);
+  assert.equal(listeners.has('visibilitychange'), false);
+  // Another tab logging in or out changes storage; only the session key (or a full clear) re-reads it.
+  listeners.get('storage')({ key: 'other' });
+  assert.equal(restores, 1);
+  listeners.get('storage')({ key: 'gis-session' });
+  listeners.get('storage')({ key: null });
+  assert.equal(restores, 3);
 });

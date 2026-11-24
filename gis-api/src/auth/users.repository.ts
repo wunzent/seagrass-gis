@@ -8,15 +8,6 @@ import { toDependencyError } from '../shared/errors/api-error';
 export class UsersRepository {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
 
-  async findSessionUserByEmail(email: string): Promise<SessionUser | null> {
-    try {
-      const { rows } = await this.db.query('SELECT id, email, role FROM users WHERE email = $1', [email]);
-      return (rows[0] as unknown as SessionUser | undefined) ?? null;
-    } catch (error) {
-      throw toDependencyError(error);
-    }
-  }
-
   async findByEmail(email: string): Promise<UserRecord | null> {
     try {
       const { rows } = await this.db.query('SELECT id, email, role, password_hash FROM users WHERE email = $1', [

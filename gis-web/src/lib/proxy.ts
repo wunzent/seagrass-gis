@@ -18,7 +18,7 @@ export function upstreamUrl(requestUrl: string, internalUrl: string): URL {
     throw new Error('Invalid proxy path');
   // Only the documented API resources are exposed through this application.
   if (
-    !/^\/(?:sites(?:\.geojson|\/[^/]+(?:\/surveys)?)?|auth\/(?:login|demo-login|me|logout)|provinces\.geojson|surveys\.geojson)$/.test(
+    !/^\/(?:sites(?:\.geojson|\/[^/]+(?:\/surveys)?)?|auth\/(?:login|me|logout)|provinces\.geojson|surveys\.geojson)$/.test(
       path,
     )
   )
@@ -107,10 +107,16 @@ export async function proxyRequest(request: Request, internalUrl: string, fetche
     if (contentType) responseHeaders.set('content-type', contentType);
     const retryAfter = upstream.headers.get('retry-after');
     if (retryAfter) responseHeaders.set('retry-after', retryAfter);
+    // The API marks responses to a dead session so the browser can forget the identity it remembered at login.
+    // A request without the cookie (expired, or cleared by a logout elsewhere on localhost) is marked the same way,
+    // because the API cannot tell it from an anonymous visitor.
+    const hasSessionCookie = /(?:^|;\s*)gis_access=[^;\s]/.test(request.headers.get('cookie') ?? '');
+    if (upstream.headers.get('x-auth-session') === 'invalid' || (request.method === 'GET' && !hasSessionCookie))
+      responseHeaders.set('x-auth-session', 'invalid');
     for (const cookie of upstream.headers.getSetCookie()) responseHeaders.append('set-cookie', cookie);
     if (
       request.method === 'POST' &&
-      ['/auth/login', '/auth/demo-login'].includes(target.pathname) &&
+      target.pathname === '/auth/login' &&
       upstream.ok &&
       /^application\/(?:[\w.-]+\+)?json(?:\s*;|$)/i.test(contentType ?? '')
     ) {

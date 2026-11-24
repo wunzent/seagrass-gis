@@ -78,14 +78,47 @@ test('upstream failure is sanitized and redirects are not followed', async () =>
   assert.equal(redirect.status, 502);
 });
 
-test('demo-login is proxied like the other auth routes', () => {
-  assert.equal(
-    upstreamUrl('http://web/api/auth/demo-login', 'http://api:3001/').href,
-    'http://api:3001/auth/demo-login',
-  );
+test('the removed demo-login route is no longer proxied', () => {
+  assert.throws(() => upstreamUrl('http://web/api/auth/demo-login', 'http://api:3001/'));
 });
 
-for (const path of ['login', 'demo-login']) {
+test('proxy forwards only the invalid-session marker from the API', async () => {
+  const withCookie = { headers: { cookie: 'gis_access=jwt' } };
+  for (const [value, expected] of [
+    ['invalid', 'invalid'],
+    ['other', null],
+    [null, null],
+  ]) {
+    const response = await proxyRequest(new Request('http://web/api/sites', withCookie), 'http://api:3001', async () =>
+      Response.json([], { headers: value ? { 'x-auth-session': value } : {} }),
+    );
+    assert.equal(response.headers.get('x-auth-session'), expected);
+  }
+});
+
+test('proxy marks requests that arrive without the session cookie (cleared elsewhere, e.g. Swagger logout)', async () => {
+  for (const [cookie, expected] of [
+    [null, 'invalid'],
+    ['other=1', 'invalid'],
+    ['gis_access=', 'invalid'],
+    ['other=1; gis_access=jwt', null],
+  ]) {
+    const init = cookie ? { headers: { cookie } } : {};
+    const response = await proxyRequest(new Request('http://web/api/sites', init), 'http://api:3001', async () =>
+      Response.json([]),
+    );
+    assert.equal(response.headers.get('x-auth-session'), expected, String(cookie));
+  }
+  // Login/logout POSTs naturally arrive without the cookie; only data reads are marked.
+  const login = await proxyRequest(
+    new Request('http://web/api/auth/login', { method: 'POST' }),
+    'http://api:3001',
+    async () => Response.json({}),
+  );
+  assert.equal(login.headers.get('x-auth-session'), null);
+});
+
+for (const path of ['login']) {
   test(`successful POST ${path} hides JWT fields while preserving session data and cookies`, async () => {
     const safe = { user: { id: 'user-id', role: 'viewer' }, expires_in: 900, expires_at: '2026-11-23T00:15:00Z' };
     const body = JSON.stringify({ ...safe, access_token: 'private-jwt', token_type: 'Bearer' });
@@ -111,9 +144,8 @@ for (const path of ['login', 'demo-login']) {
 test('proxy streams errors, other routes, GET auth and non-JSON login unchanged', async () => {
   for (const [path, method, status, type] of [
     ['auth/login', 'POST', 401, 'application/json'],
-    ['auth/demo-login', 'POST', 401, 'application/json'],
     ['sites', 'POST', 200, 'application/json'],
-    ['auth/demo-login', 'GET', 200, 'application/json'],
+    ['auth/me', 'GET', 200, 'application/json'],
     ['auth/login', 'POST', 200, 'text/plain'],
   ]) {
     const body = '{ "access_token": "unchanged", "token_type": "Bearer" }';

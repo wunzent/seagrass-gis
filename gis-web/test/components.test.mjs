@@ -29,13 +29,7 @@ function loginHarness(roles, props) {
     busy: null,
     logoutPending: false,
     error: '',
-    store: {
-      demoRoles: async () => roles,
-      demoLogin: async (role) => {
-        calls.push(role);
-        return true;
-      },
-    },
+    store: {},
   };
   const h = componentHarness('../src/features/auth/login-form.tsx', {
     'next/link': { default: 'a', __esModule: true },
@@ -67,78 +61,16 @@ test('filling a demo account clears both field errors without submitting', async
   assert.deepEqual(h.calls, []);
 });
 
-test('login demo buttons appear in role order with descriptions and Editor navigates home', async () => {
-  const h = loginHarness(['admin', 'viewer', 'editor']);
-  h.render();
-  await flush();
-  const tree = h.render();
-  const buttons = tree.filter((n) => n.type === 'button' && n.props.className === 'demo-login-button');
-  assert.equal(buttons.length, 3);
-  const copy = (button) =>
-    nodes(button)
-      .map((n) => n.props.children)
-      .flat()
-      .filter((c) => typeof c === 'string')
-      .join(' ');
-  for (const [i, role, description] of [
-    [0, 'Viewer', 'อ่านข้อมูล และเห็นผู้บันทึก'],
-    [1, 'Editor', 'แก้ชื่อแหล่ง และจัดการ survey'],
-    [2, 'Admin', 'จัดการแหล่งทั้งหมด'],
-  ]) {
-    assert.ok(copy(buttons[i]).includes(role));
-    assert.ok(copy(buttons[i]).includes(description));
-  }
-  assert.ok(tree.some((n) => n.props?.children === 'บัญชีสาธิต กดเพื่อเข้าสู่ระบบทันที'));
-  assert.ok(tree.some((n) => n.props?.children === 'หรือกรอกเอง'));
-  await buttons[1].props.onClick();
-  assert.deepEqual(h.calls, ['editor', '/']);
-  h.state.busy = 'login';
-  assert.ok(
-    h
-      .render()
-      .filter((n) => n.type === 'button')
-      .every((n) => n.props.disabled),
-  );
-});
-
-test('clicked demo role shows progress and group busy until login settles', async () => {
-  const h = loginHarness(['viewer', 'editor', 'admin']);
-  let resolve;
-  h.state.store.demoLogin = () =>
-    new Promise((done) => {
-      resolve = done;
-    });
-  h.render();
-  await flush();
-  const buttons = () => h.render().filter((n) => n.type === 'button' && n.props.className === 'demo-login-button');
-  const group = () => h.render().find((n) => n.props.role === 'group');
-  assert.equal(group().props['aria-busy'], false);
-  const pending = buttons()[1].props.onClick();
-  h.state.busy = 'login';
-  assert.equal(group().props['aria-busy'], true);
-  assert.equal(buttons()[1].props.children[0].props.children, 'กำลังเข้าสู่ระบบ…');
-  assert.equal(buttons()[1].props['aria-label'], 'Editor');
-  assert.equal(buttons()[0].props.children[0].props.children, 'Viewer');
-  assert.equal(buttons()[2].props.children[0].props.children, 'Admin');
-  assert.ok(
-    h
-      .render()
-      .filter((n) => n.type === 'button')
-      .every((n) => n.props.disabled),
-  );
-  resolve(true);
-  await pending;
-  h.state.busy = null;
-  assert.equal(group().props['aria-busy'], false);
-  assert.equal(buttons()[1].props.children[0].props.children, 'Editor');
-});
-
-test('unavailable demo roles leave the original form with no demo buttons or error', async () => {
+test('login page has no one-click role buttons; the form and demo credentials remain without an error', async () => {
   const h = loginHarness(null);
   h.render();
   await flush();
   const tree = h.render();
   assert.equal(tree.filter((n) => n.type === 'button' && n.props.className === 'demo-login-button').length, 0);
+  assert.equal(
+    tree.some((n) => n.props?.role === 'group'),
+    false,
+  );
   assert.equal(tree.filter((n) => n.type === 'button' && n.props.type === 'submit').length, 1);
   assert.equal(
     tree.some((n) => n.props?.role === 'alert'),
@@ -353,7 +285,7 @@ test('bright map preserves OSM paint and uses primary survey marks and selected 
   }
   assert.equal(map.layers.find((layer) => layer.id === 'selected').paint['line-color'], '#0077B6');
 });
-test('session restore error retries restore while retaining the signed-in controls', () => {
+test('a login error is left to the login form and never offers a restore retry in the account area', () => {
   let restores = 0,
     logouts = 0;
   const h = componentHarness('../src/features/auth/session-controls.tsx', {
@@ -365,17 +297,60 @@ test('session restore error retries restore while retaining the signed-in contro
         phase: 'ready',
         busy: null,
         logoutPending: false,
-        error: 'restore failed',
-        errorSource: 'restore',
+        error: 'login failed',
+        errorSource: 'login',
         store: { restore: () => restores++, logout: () => logouts++ },
       }),
     },
   });
-  const buttons = nodes(h.render(() => h.exports.SessionControls())).filter((node) => node.type === 'button');
-  assert.equal(buttons.at(-1).props.children, 'ตรวจสอบผู้ใช้อีกครั้ง');
-  buttons.at(-1).props.onClick();
-  assert.equal(restores, 1);
+  const tree = nodes(h.render(() => h.exports.SessionControls()));
+  assert.equal(
+    tree.some((node) => node.props?.className === 'session-notice'),
+    false,
+  );
+  const buttons = tree.filter((node) => node.type === 'button');
+  assert.deepEqual(
+    buttons.map((button) => button.props.children),
+    ['ออกจากระบบ'],
+  );
+  assert.equal(restores, 0);
   assert.equal(logouts, 0);
+});
+test('expiry notice warns before the end and offers sign-in after expiry, and can be dismissed', () => {
+  let dismissed = 0;
+  const state = {
+    phase: 'ready',
+    session: { user: { email: 'a@demo.local', role: 'viewer' } },
+    busy: null,
+    logoutPending: false,
+    error: '',
+    errorSource: null,
+    rateLimitedUntil: 0,
+    expiryNotice: 'soon',
+    store: { dismissNotice: () => dismissed++, logout() {} },
+  };
+  const h = componentHarness('../src/features/auth/session-controls.tsx', {
+    'next/link': { default: 'a', __esModule: true },
+    [sourceFile('components/ui/button.tsx')]: { Button: 'button' },
+    [sourceFile('stores/session-context.tsx')]: { useSession: () => state },
+  });
+  const notice = () =>
+    nodes(h.render(() => h.exports.SessionControls())).find((n) => n.props?.className === 'expiry-notice');
+  let box = notice();
+  assert.equal(box.props.role, 'status');
+  assert.match(textOf(box), /จะหมดอายุในอีก 1 นาที/);
+  state.session = null;
+  state.expiryNotice = 'expired';
+  box = notice();
+  assert.equal(box.props.role, 'alert');
+  assert.match(textOf(box), /หมดอายุแล้ว/);
+  assert.ok(nodes(box).some((n) => n.type === 'a' && n.props.href === '/login'));
+  nodes(box)
+    .find((n) => n.type === 'button')
+    .props.onClick();
+  assert.equal(dismissed, 1);
+  state.expiryNotice = null;
+  assert.equal(notice(), undefined);
 });
 test('logout retry shows the rate-limit wait and is disabled until the store retries', () => {
   const state = {

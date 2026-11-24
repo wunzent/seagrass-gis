@@ -6,7 +6,6 @@ import { AuthController } from './auth.controller';
 import { AuthMiddleware } from './middleware/auth.middleware';
 import { AuthService } from './auth.service';
 import { CsrfGuard } from './guards/csrf.guard';
-import { DemoLoginGuard } from './guards/demo-login.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { LoginRateLimiter } from './utils/login-rate-limiter';
 import { SessionsRepository } from './sessions.repository';
@@ -37,7 +36,6 @@ export class AuthModule implements NestModule {
         UsersRepository,
         SessionsRepository,
         CsrfGuard,
-        DemoLoginGuard,
         { provide: APP_GUARD, useClass: RolesGuard },
       ],
       exports: [AuthService, AUTH_CONFIG],
@@ -54,7 +52,6 @@ export class AuthModule implements NestModule {
         { path: 'docs{/*rest}', method: RequestMethod.ALL },
         { path: 'auth/login', method: RequestMethod.POST },
         { path: 'auth/logout', method: RequestMethod.POST },
-        { path: 'auth/demo-login', method: RequestMethod.ALL },
       )
       .forRoutes({ path: '{*rest}', method: RequestMethod.ALL });
   }

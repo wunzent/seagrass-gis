@@ -7,7 +7,7 @@ export function buildOpenApiDocument(app: INestApplication): OpenAPIObject {
   const config = new DocumentBuilder()
     .setTitle('Seagrass GIS API')
     .setDescription(
-      'API ติดตามแหล่งหญ้าทะเล; write endpoints ใช้ Bearer JWT หรือ HttpOnly cookie gis_access + Origin + X-CSRF-Protection: 1; login/demo-login/logout ตรวจ CSRF เสมอ',
+      'API ติดตามแหล่งหญ้าทะเล; write endpoints ใช้ Bearer JWT หรือ HttpOnly cookie gis_access + Origin + X-CSRF-Protection: 1; login/logout ตรวจ CSRF เสมอ',
     )
     .setVersion('0.1.0')
     .addCookieAuth('gis_access', { type: 'apiKey', in: 'cookie', name: 'gis_access' }, 'gis_access')

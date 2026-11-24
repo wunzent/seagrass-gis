@@ -44,7 +44,6 @@ describe('api docs', () => {
       expect(operations.map(([k]) => k).sort()).toEqual([
         'DELETE /sites/{code}',
         'DELETE /surveys/{id}',
-        'GET /auth/demo-login',
         'GET /auth/me',
         'GET /health',
         'GET /provinces.geojson',
@@ -56,7 +55,6 @@ describe('api docs', () => {
         'GET /surveys.geojson',
         'PATCH /sites/{code}',
         'PATCH /surveys/{id}',
-        'POST /auth/demo-login',
         'POST /auth/login',
         'POST /auth/logout',
         'POST /sites',
@@ -83,7 +81,7 @@ describe('api docs', () => {
       expect(spec.components.securitySchemes.gis_access.in).toBe('cookie');
       expect(spec.paths['/sites']).toBeTruthy();
       expect(spec.components.securitySchemes.bearer).toMatchObject({ type: 'http', scheme: 'bearer' });
-      for (const path of ['/auth/login', '/auth/demo-login', '/auth/logout']) {
+      for (const path of ['/auth/login', '/auth/logout']) {
         expect(
           spec.paths[path].post.parameters.filter((p: any) => p.in === 'header').every((p: any) => p.required),
         ).toBe(true);

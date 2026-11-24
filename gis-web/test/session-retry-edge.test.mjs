@@ -2,6 +2,18 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createSessionService } from '../src/services/session-service.ts';
 import { createSessionStore } from '../src/stores/session-store.ts';
+const remembered = (expires) => {
+  const value = JSON.stringify({
+    user: { id: 'a', email: 'a@demo.local', role: 'viewer' },
+    expires_at: new Date(expires).toISOString(),
+  });
+  const memory = new Map([['gis-session', value]]);
+  return {
+    getItem: (key) => memory.get(key) ?? null,
+    setItem: (key, v) => memory.set(key, v),
+    removeItem: (key) => memory.delete(key),
+  };
+};
 const createSession = (options) => {
   const sink = createSessionStore(options.now);
   return { ...sink, ...createSessionService(sink, options) };
@@ -19,13 +31,8 @@ test('a logout 429 retry firing 1 ms early does not strand pending logout', asyn
       return id;
     },
     cancel: (key) => jobs.delete(key),
-    fetcher: async (url) =>
-      url.endsWith('/me')
-        ? Response.json({
-            user: { id: 'a', email: 'a@demo.local', role: 'viewer' },
-            expires_at: new Date(200000).toISOString(),
-          })
-        : new Response(null, { status: ++calls === 1 ? 429 : 204, headers: { 'Retry-After': '90' } }),
+    storage: remembered(200000),
+    fetcher: async () => new Response(null, { status: ++calls === 1 ? 429 : 204, headers: { 'Retry-After': '90' } }),
   });
   await store.restore();
   await store.logout();
@@ -60,13 +67,8 @@ test('a pending logout retry receiving 403 remains private but releases at origi
       return id;
     },
     cancel: (key) => jobs.delete(key),
-    fetcher: async (url) =>
-      url.endsWith('/me')
-        ? Response.json({
-            user: { id: 'a', email: 'a@demo.local', role: 'viewer' },
-            expires_at: new Date(10000).toISOString(),
-          })
-        : new Response(null, { status: ++calls === 1 ? 503 : 403 }),
+    storage: remembered(10000),
+    fetcher: async () => new Response(null, { status: ++calls === 1 ? 503 : 403 }),
   });
   const advance = async (ms) => {
     now += ms;

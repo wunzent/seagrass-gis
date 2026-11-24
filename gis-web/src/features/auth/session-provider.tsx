@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { createSessionStore } from '../../stores/session-store.ts';
-import { createSessionService } from '../../services/session-service.ts';
+import { createSessionService, SESSION_STORAGE_KEY } from '../../services/session-service.ts';
 import { SessionContext } from '../../stores/session-context';
 
 export function SessionProvider({ children }: { children: ReactNode }) {
@@ -16,15 +16,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
   });
   useEffect(() => {
+    // No /auth/me: the identity remembered at login is shown, and the API checks the session on every call
+    // (401 or X-Auth-Session: invalid drops it). Another tab logging in or out updates this one through storage.
     void store.restore();
-    const resume = () => {
-      if (document.visibilityState === 'visible') void store.resume();
+    const sync = (event: StorageEvent) => {
+      if (event.key === null || event.key === SESSION_STORAGE_KEY) void store.restore();
     };
-    window.addEventListener('focus', resume);
-    document.addEventListener('visibilitychange', resume);
+    window.addEventListener('storage', sync);
     return () => {
-      window.removeEventListener('focus', resume);
-      document.removeEventListener('visibilitychange', resume);
+      window.removeEventListener('storage', sync);
       store.dispose();
     };
   }, [store]);

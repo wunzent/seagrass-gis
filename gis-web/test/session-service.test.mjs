@@ -14,12 +14,19 @@ test('session service publishes safe identity to its injected store and isolates
     now: () => 1000,
     schedule: () => undefined,
     cancel: () => {},
-    fetcher: async () =>
-      Response.json({
-        user: { id: 'a', email: 'a@demo.local', role: 'viewer', secret: 'discard' },
-        expires_at: new Date(10000).toISOString(),
-        access_token: 'discard',
-      }),
+    fetcher: async () => {
+      throw new Error('no request expected');
+    },
+    storage: {
+      getItem: () =>
+        JSON.stringify({
+          user: { id: 'a', email: 'a@demo.local', role: 'viewer', secret: 'discard' },
+          expires_at: new Date(10000).toISOString(),
+          access_token: 'discard',
+        }),
+      setItem() {},
+      removeItem() {},
+    },
   });
   await service.restore();
   assert.deepEqual(sink.getSnapshot().session.user, { id: 'a', email: 'a@demo.local', role: 'viewer' });
@@ -28,6 +35,6 @@ test('session service publishes safe identity to its injected store and isolates
   assert.equal(JSON.stringify(snapshots).includes('discard'), false);
   service.unauthorized();
   assert.equal(sink.getSnapshot().session, null);
-  assert.equal(snapshots.length, 3);
+  assert.equal(snapshots.length, 2); // restore from storage, then unauthorized
   service.dispose();
 });

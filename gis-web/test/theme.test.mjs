@@ -20,7 +20,7 @@ test('input and select borders use a dedicated token with at least 3:1 contrast 
     assert.match(block[2], /border: 1px solid var\(--field-border\)/);
   }
   assert.match(css, /--border:\s*#d0d7de;/i);
-  assert.match(css, /\.demo-divider\s*\{[^}]*border-bottom: 1px solid var\(--border\)/);
+  assert.doesNotMatch(css, /\.demo-login|\.demo-divider/);
 });
 
 test('disabled login inputs use the neutral surface', () => {

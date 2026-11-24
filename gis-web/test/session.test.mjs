@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createSessionService, validateLogin, publicData, loginMessage } from '../src/services/session-service.ts';
+import {
+  createSessionService,
+  validateLogin,
+  publicData,
+  loginMessage,
+  SESSION_STORAGE_KEY,
+} from '../src/services/session-service.ts';
+import { fetchJson } from '../src/services/http-client.ts';
 import { createSessionStore } from '../src/stores/session-store.ts';
 const createSession = (options) => {
   const sink = createSessionStore(options.now);
@@ -12,10 +19,22 @@ const safe = (id = 'a', expires_at = new Date(10000).toISOString()) => ({
   expires_at,
   access_token: 'discard',
 });
-function harness(fetcher) {
+const noRequest = async () => {
+  throw new Error('no request expected');
+};
+/** `stored` is what an earlier login left in browser storage (object, raw string, or absent). */
+function harness(fetcher = noRequest, { stored } = {}) {
   let now = 1000;
   const jobs = new Map();
   let id = 0;
+  const memory = new Map();
+  if (stored !== undefined)
+    memory.set(SESSION_STORAGE_KEY, typeof stored === 'string' ? stored : JSON.stringify(stored));
+  const storage = {
+    getItem: (key) => (memory.has(key) ? memory.get(key) : null),
+    setItem: (key, value) => memory.set(key, String(value)),
+    removeItem: (key) => memory.delete(key),
+  };
   const store = createSession({
     fetcher,
     now: () => now,
@@ -24,9 +43,11 @@ function harness(fetcher) {
       return id;
     },
     cancel: (key) => jobs.delete(key),
+    storage,
   });
   return {
     store,
+    memory,
     async advance(ms) {
       now += ms;
       for (const [key, job] of [...jobs])
@@ -41,145 +62,196 @@ function harness(fetcher) {
 }
 const json = (value) => Response.json(value);
 
-for (const status of [400, 401, 404]) {
-  test(`demo login ${status} uses a demo-specific error without email/password`, async () => {
-    const { store } = harness(async () => new Response(null, { status }));
-    assert.equal(await store.demoLogin('viewer'), false);
-    assert.equal(store.getSnapshot().error, 'เข้าสู่ระบบด้วยบัญชีสาธิตไม่สำเร็จ ลองใหม่หรือกรอกเอง');
-    assert.equal(store.getSnapshot().busy, null);
-    assert.equal(store.getSnapshot().errorSource, 'login');
-  });
-}
-
-test('demo roles discovery is same-origin no-store and silently unavailable on errors', async () => {
-  const roles = ['viewer', 'editor', 'admin'];
-  for (const result of [
-    json({ roles }),
-    new Response(null, { status: 404 }),
-    new Response(null, { status: 503 }),
-    new Error('offline'),
-  ]) {
-    const { store } = harness(async (url, init) => {
-      assert.equal(url, '/api/auth/demo-login');
-      assert.equal(init.method, 'GET');
-      assert.equal(init.credentials, 'same-origin');
-      assert.equal(init.cache, 'no-store');
-      if (result instanceof Error) throw result;
-      return result;
-    });
-    assert.deepEqual(await store.demoRoles(), result.status === 200 ? roles : null);
-    assert.equal(store.getSnapshot().error, '');
-  }
-});
-
-test('demo login posts only role with CSRF, shares busy guard and accepts safe session', async () => {
-  let reply;
-  let calls = 0;
-  const { store } = harness(async (url, init) => {
-    calls++;
-    assert.equal(url, '/api/auth/demo-login');
-    assert.equal(init.method, 'POST');
-    assert.equal(init.credentials, 'same-origin');
-    assert.equal(init.cache, 'no-store');
-    assert.equal(init.headers['Content-Type'], 'application/json');
-    assert.equal(init.headers['X-CSRF-Protection'], '1');
-    assert.deepEqual(JSON.parse(init.body), { role: 'editor' });
-    return new Promise((resolve) => {
-      reply = resolve;
-    });
-  });
-  const pending = store.demoLogin('editor');
-  assert.equal(store.getSnapshot().busy, 'login');
-  assert.equal(await store.demoLogin('admin'), false);
-  assert.equal(await store.login('a@demo.local', 'example'), false);
-  assert.equal(calls, 1);
-  const session = safe();
-  session.user.role = 'editor';
-  reply(json(session));
-  assert.equal(await pending, true);
-  assert.deepEqual(store.getSnapshot().session.user, { id: 'a', email: 'a@demo.local', role: 'editor' });
-  assert.equal(store.getSnapshot().busy, null);
-});
-
-test('demo login maps rejection and network errors through the existing login banner', async () => {
-  for (const status of [403, 429, 503, null]) {
-    const { store } = harness(async () => {
-      if (status === null) throw Error('offline');
-      return Response.json({ message: 'sensitive detail' }, { status });
-    });
-    assert.equal(await store.demoLogin('viewer'), false);
-    assert.equal(store.getSnapshot().error, loginMessage(status ?? 503));
-    assert.equal(store.getSnapshot().errorSource, 'login');
-    assert.equal(store.getSnapshot().busy, null);
-  }
-});
-
-test('restore allowlists safe session and sends same-origin no-store', async () => {
-  const { store } = harness(async (url, init) => {
-    assert.equal(url, '/api/auth/me');
-    assert.equal(init.credentials, 'same-origin');
-    assert.equal(init.cache, 'no-store');
-    return json(safe());
-  });
-  await store.restore();
-  assert.deepEqual(store.getSnapshot().session, {
+test('restore shows the remembered safe identity without any request', async () => {
+  const h = harness(noRequest, { stored: safe() });
+  assert.equal(h.store.getSnapshot().phase, 'checking');
+  await h.store.restore();
+  assert.deepEqual(h.store.getSnapshot().session, {
     user: { id: 'a', email: 'a@demo.local', role: 'viewer' },
     expires_at: safe().expires_at,
   });
+  assert.equal(h.store.getSnapshot().phase, 'ready');
+  assert.equal(h.memory.get(SESSION_STORAGE_KEY).includes('discard'), false);
+  h.store.dispose();
 });
-test('401 restores anonymous without banner; network failure is retryable', async () => {
-  let fail = false;
-  const { store } = harness(async () => {
-    if (fail) throw Error('private');
-    return new Response(null, { status: 401 });
-  });
-  await store.restore();
-  assert.equal(store.getSnapshot().session, null);
-  assert.equal(store.getSnapshot().error, '');
-  fail = true;
-  await store.restore();
-  assert.ok(store.getSnapshot().error);
-  assert.equal(store.getSnapshot().phase, 'ready');
+test('restore drops missing, corrupt, expired or unsafe remembered identities without a request', async () => {
+  const badRole = safe();
+  badRole.user.role = 'root';
+  for (const stored of [undefined, 'not json', safe('a', new Date(500).toISOString()), badRole]) {
+    const h = harness(noRequest, { stored });
+    await h.store.restore();
+    assert.equal(h.store.getSnapshot().session, null);
+    assert.equal(h.store.getSnapshot().phase, 'ready');
+    assert.equal(h.store.getSnapshot().error, '');
+    assert.equal(h.memory.has(SESSION_STORAGE_KEY), false);
+    h.store.dispose();
+  }
 });
-test('expiry timer invalidates generation without making another request', async () => {
-  let calls = 0;
-  const h = harness(async () => {
-    calls++;
-    return json(safe());
+test('login remembers only the safe identity; logout and a data 401 forget it', async () => {
+  const h = harness(async (url) =>
+    url.endsWith('/logout') ? new Response(null, { status: 204 }) : json(safe('a', new Date(121000).toISOString())),
+  );
+  assert.equal(await h.store.login('a@demo.local', 'secret-pass'), true);
+  const remembered = JSON.parse(h.memory.get(SESSION_STORAGE_KEY));
+  assert.deepEqual(remembered, {
+    user: { id: 'a', email: 'a@demo.local', role: 'viewer' },
+    expires_at: new Date(121000).toISOString(),
   });
+  await h.store.logout();
+  assert.equal(h.memory.has(SESSION_STORAGE_KEY), false);
+  await h.store.login('a@demo.local', 'secret-pass');
+  h.store.unauthorized();
+  assert.equal(h.memory.has(SESSION_STORAGE_KEY), false);
+  h.store.dispose();
+});
+test('X-Auth-Session: invalid on a data response drops a known identity; anonymous and disposed stores ignore it', async (t) => {
+  const marked = () => Response.json([], { headers: { 'x-auth-session': 'invalid' } });
+  t.mock.method(globalThis, 'fetch', async () => marked());
+  const anonymous = harness();
+  await anonymous.store.restore();
+  const generation = anonymous.store.getSnapshot().generation;
+  await fetchJson('/api/sites', new AbortController().signal);
+  assert.equal(anonymous.store.getSnapshot().generation, generation);
+  assert.equal(anonymous.store.getSnapshot().expiryNotice, null);
+  anonymous.store.dispose();
+
+  const known = harness(noRequest, { stored: safe('a', new Date(121000).toISOString()) });
+  await known.store.restore();
+  const before = known.store.getSnapshot().generation;
+  assert.deepEqual(await fetchJson('/api/sites', new AbortController().signal), []);
+  assert.equal(known.store.getSnapshot().session, null);
+  assert.ok(known.store.getSnapshot().generation > before);
+  assert.equal(known.store.getSnapshot().expiryNotice, 'expired');
+  assert.equal(known.memory.has(SESSION_STORAGE_KEY), false);
+  known.store.dispose();
+
+  const disposed = harness(noRequest, { stored: safe('a', new Date(121000).toISOString()) });
+  await disposed.store.restore();
+  disposed.store.dispose();
+  await fetchJson('/api/sites', new AbortController().signal);
+  assert.ok(disposed.store.getSnapshot().session);
+  // React StrictMode runs cleanup then the effect again: restore re-attaches the listener.
+  await disposed.store.restore();
+  await fetchJson('/api/sites', new AbortController().signal);
+  assert.equal(disposed.store.getSnapshot().session, null);
+  disposed.store.dispose();
+});
+test('a marker on a request sent before login does not drop the new login', async (t) => {
+  let reply;
+  t.mock.method(
+    globalThis,
+    'fetch',
+    () =>
+      new Promise((resolve) => {
+        reply = resolve;
+      }),
+  );
+  const h = harness(async () => json(safe('a', new Date(121000).toISOString())));
+  await h.store.restore();
+  const stale = fetchJson('/api/sites', new AbortController().signal);
+  assert.equal(await h.store.login('a@demo.local', 'secret-pass'), true);
+  reply(Response.json([], { headers: { 'x-auth-session': 'invalid' } }));
+  await stale;
+  assert.ok(h.store.getSnapshot().session);
+  assert.equal(h.store.getSnapshot().expiryNotice, null);
+  const fresh = fetchJson('/api/sites', new AbortController().signal);
+  reply(Response.json([], { headers: { 'x-auth-session': 'invalid' } }));
+  await fresh;
+  assert.equal(h.store.getSnapshot().session, null);
+  h.store.dispose();
+});
+test("dropping this tab's identity leaves another tab's newer login in storage", async () => {
+  const h = harness(noRequest, { stored: safe('a', new Date(121000).toISOString()) });
+  await h.store.restore();
+  const other = JSON.stringify(safe('b', new Date(500000).toISOString()));
+  h.memory.set(SESSION_STORAGE_KEY, other);
+  h.store.unauthorized();
+  assert.equal(h.store.getSnapshot().session, null);
+  assert.equal(h.memory.get(SESSION_STORAGE_KEY), other);
+  h.store.dispose();
+});
+test('a normal data response keeps the identity', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => Response.json([]));
+  const h = harness(noRequest, { stored: safe('a', new Date(121000).toISOString()) });
+  await h.store.restore();
+  await fetchJson('/api/sites', new AbortController().signal);
+  assert.ok(h.store.getSnapshot().session);
+  h.store.dispose();
+});
+test('expiry timer invalidates generation without making a request', async () => {
+  const h = harness(noRequest, { stored: safe() });
   await h.store.restore();
   const generation = h.store.getSnapshot().generation;
   await h.advance(9000);
   assert.equal(h.store.getSnapshot().session, null);
   assert.ok(h.store.getSnapshot().generation > generation);
-  assert.equal(calls, 1);
+  assert.equal(h.memory.has(SESSION_STORAGE_KEY), false);
 });
-test('late restore cannot resurrect identity after logout; CSRF post and 204 required', async () => {
-  let resolve;
-  const { store } = harness((url, init) =>
-    url.endsWith('/me')
-      ? new Promise((r) => {
-          resolve = r;
-        })
-      : (assert.equal(init.method, 'POST'),
-        assert.equal(init.headers['X-CSRF-Protection'], '1'),
-        Promise.resolve(new Response(null, { status: 204 }))),
+test('expiry notice warns one minute before and says expired at the deadline, without requests', async () => {
+  const h = harness(noRequest, { stored: safe('a', new Date(121000).toISOString()) });
+  await h.store.restore();
+  assert.equal(h.store.getSnapshot().expiryNotice, null);
+  await h.advance(59000);
+  assert.equal(h.store.getSnapshot().expiryNotice, null);
+  await h.advance(1000);
+  assert.equal(h.store.getSnapshot().expiryNotice, 'soon');
+  assert.ok(h.store.getSnapshot().session);
+  await h.advance(60000);
+  assert.equal(h.store.getSnapshot().session, null);
+  assert.equal(h.store.getSnapshot().expiryNotice, 'expired');
+  h.store.dismissNotice();
+  assert.equal(h.store.getSnapshot().expiryNotice, null);
+});
+test('a session with under a minute left warns at once; a new login clears the notice', async () => {
+  const h = harness(async () => json(safe('a', new Date(500000).toISOString())), { stored: safe() });
+  await h.store.restore();
+  assert.equal(h.store.getSnapshot().expiryNotice, 'soon');
+  await h.advance(9000);
+  assert.equal(h.store.getSnapshot().expiryNotice, 'expired');
+  assert.equal(await h.store.login('a@demo.local', 'secret-pass'), true);
+  assert.equal(h.store.getSnapshot().expiryNotice, null);
+});
+test('a 401 from a data request marks a known session expired; anonymous 401 shows nothing; logout shows nothing', async () => {
+  const later = safe('a', new Date(121000).toISOString());
+  const h = harness(async () => new Response(null, { status: 204 }), { stored: later });
+  h.store.unauthorized();
+  assert.equal(h.store.getSnapshot().expiryNotice, null);
+  h.memory.set(SESSION_STORAGE_KEY, JSON.stringify(later));
+  await h.store.restore();
+  h.store.unauthorized();
+  assert.equal(h.store.getSnapshot().session, null);
+  assert.equal(h.store.getSnapshot().expiryNotice, 'expired');
+  h.memory.set(SESSION_STORAGE_KEY, JSON.stringify(later));
+  await h.store.restore();
+  await h.store.logout();
+  assert.equal(h.store.getSnapshot().session, null);
+  assert.equal(h.store.getSnapshot().expiryNotice, null);
+});
+test('logout sends a CSRF POST and needs 204', async () => {
+  const h = harness(
+    async (url, init) => (
+      assert.ok(url.endsWith('/logout')),
+      assert.equal(init.method, 'POST'),
+      assert.equal(init.headers['X-CSRF-Protection'], '1'),
+      new Response(null, { status: 204 })
+    ),
+    { stored: safe() },
   );
-  const restore = store.restore();
-  await store.logout();
-  resolve(json(safe()));
-  await restore;
-  assert.equal(store.getSnapshot().session, null);
-  assert.equal(store.getSnapshot().logoutPending, false);
+  await h.store.restore();
+  await h.store.logout();
+  assert.equal(h.store.getSnapshot().session, null);
+  assert.equal(h.store.getSnapshot().logoutPending, false);
 });
 test('logout network/503 clears private state, blocks restore/login and retries to 204', async () => {
   let calls = 0;
-  const h = harness(async (url) => {
-    if (url.endsWith('/me')) return json(safe());
-    calls++;
-    if (calls === 1) throw Error('offline');
-    return new Response(null, { status: calls === 2 ? 503 : 204 });
-  });
+  const h = harness(
+    async () => {
+      calls++;
+      if (calls === 1) throw Error('offline');
+      return new Response(null, { status: calls === 2 ? 503 : 204 });
+    },
+    { stored: safe() },
+  );
   await h.store.restore();
   await h.store.logout();
   assert.equal(h.store.getSnapshot().session, null);
@@ -196,12 +268,12 @@ test('logout network/503 clears private state, blocks restore/login and retries 
   assert.equal(h.store.getSnapshot().logoutPending, false);
 });
 test('logout CSRF rejection preserves the session', async () => {
-  const { store } = harness(async (url) => (url.endsWith('/me') ? json(safe()) : new Response(null, { status: 403 })));
-  await store.restore();
-  await store.logout();
-  assert.equal(store.getSnapshot().session.user.id, 'a');
-  assert.equal(store.getSnapshot().logoutPending, false);
-  assert.equal(store.getSnapshot().errorSource, 'logout');
+  const h = harness(async () => new Response(null, { status: 403 }), { stored: safe() });
+  await h.store.restore();
+  await h.store.logout();
+  assert.equal(h.store.getSnapshot().session.user.id, 'a');
+  assert.equal(h.store.getSnapshot().logoutPending, false);
+  assert.equal(h.store.getSnapshot().errorSource, 'logout');
 });
 test('validation, duplicate login guard, safe error messages and identity switch', async () => {
   assert.ok(validateLogin('bad', '').email);
@@ -225,65 +297,24 @@ test('validation, duplicate login guard, safe error messages and identity switch
   assert.equal(await pending, true);
   assert.equal(store.getSnapshot().session.user.id, 'b');
 });
-test('focus revalidation clears stale identity on revoked session; expired response rejected', async () => {
-  let calls = 0;
-  const { store } = harness(async () => (++calls === 1 ? json(safe()) : new Response(null, { status: 401 })));
-  await store.restore();
-  await store.resume();
-  assert.equal(store.getSnapshot().session, null);
-  const h = harness(async () => json(safe('a', new Date(500).toISOString())));
+test('restoring a different remembered identity starts a new generation', async () => {
+  const h = harness(noRequest, { stored: safe() });
   await h.store.restore();
-  assert.equal(h.store.getSnapshot().session, null);
-});
-test('unchanged focus revalidation preserves identity, phase and generation while pending and refreshes expiry', async () => {
-  let reply;
-  let calls = 0;
-  const h = harness(() =>
-    ++calls === 1
-      ? Promise.resolve(json(safe()))
-      : new Promise((resolve) => {
-          reply = resolve;
-        }),
-  );
+  const generation = h.store.getSnapshot().generation;
   await h.store.restore();
-  const before = h.store.getSnapshot();
-  const pending = h.store.resume();
-  assert.equal(h.store.getSnapshot().session, before.session);
-  assert.equal(h.store.getSnapshot().phase, 'ready');
-  assert.equal(h.store.getSnapshot().generation, before.generation);
-  reply(json(safe('a', new Date(20000).toISOString())));
-  await pending;
-  assert.deepEqual(h.store.getSnapshot().session.user, before.session.user);
-  assert.equal(h.store.getSnapshot().generation, before.generation);
-  await h.advance(9000);
-  assert.ok(h.store.getSnapshot().session);
-  await h.advance(10000);
-  assert.equal(h.store.getSnapshot().session, null);
-});
-test('revalidation detects changes in id, email or role; repeated anonymous 401 keeps generation', async () => {
-  for (const user of [{ id: 'b' }, { email: 'new@demo.local' }, { role: 'admin' }]) {
-    let calls = 0;
+  assert.equal(h.store.getSnapshot().generation, generation);
+  for (const change of [{ id: 'b' }, { email: 'new@demo.local' }, { role: 'admin' }]) {
     const changed = safe();
-    Object.assign(changed.user, user);
-    const { store } = harness(async () => json(++calls === 1 ? safe() : changed));
-    await store.restore();
-    const generation = store.getSnapshot().generation;
-    await store.resume();
-    assert.equal(store.getSnapshot().generation, generation + 1);
-    assert.deepEqual(store.getSnapshot().session.user, {
-      id: changed.user.id,
-      email: changed.user.email,
-      role: changed.user.role,
-    });
+    Object.assign(changed.user, change);
+    h.memory.set(SESSION_STORAGE_KEY, JSON.stringify(changed));
+    const before = h.store.getSnapshot().generation;
+    await h.store.restore();
+    assert.equal(h.store.getSnapshot().generation, before + 1);
+    assert.equal(h.store.getSnapshot().session.user[Object.keys(change)[0]], Object.values(change)[0]);
   }
-  const { store } = harness(async () => new Response(null, { status: 401 }));
-  await store.restore();
-  const generation = store.getSnapshot().generation;
-  await store.resume();
-  assert.equal(store.getSnapshot().generation, generation);
 });
 test('identity guard rejects late private payloads at deadline and after identity change', async () => {
-  const h = harness(async () => json(safe()));
+  const h = harness(noRequest, { stored: safe() });
   await h.store.restore();
   const generation = h.store.getSnapshot().generation;
   assert.equal(h.store.isCurrent(generation), true);
@@ -304,31 +335,16 @@ test('login failure statuses use fixed messages without reflecting upstream cont
     assert.equal(store.getSnapshot().error.includes('sensitive'), false);
   }
 });
-test('overlapping restores and disposed requests cannot overwrite a newer identity', async () => {
-  const replies = [];
-  const { store } = harness(() => new Promise((resolve) => replies.push(resolve)));
-  const old = store.restore();
-  const fresh = store.restore();
-  replies[1](json(safe('b')));
-  await fresh;
-  replies[0](json(safe('a')));
-  await old;
-  assert.equal(store.getSnapshot().session.user.id, 'b');
-  const pending = store.restore();
-  store.dispose();
-  replies[2](json(safe('a')));
-  await pending;
-  assert.equal(store.getSnapshot().session.user.id, 'b');
-});
 test('late resource401 cannot cancel active logout before React effect cleanup', async () => {
   let resolve, logoutSignal;
-  const { store } = harness(async (url, init) =>
-    url.endsWith('/me')
-      ? json(safe())
-      : ((logoutSignal = init.signal),
-        new Promise((reply) => {
-          resolve = reply;
-        })),
+  const { store } = harness(
+    async (url, init) => (
+      (logoutSignal = init.signal),
+      new Promise((reply) => {
+        resolve = reply;
+      })
+    ),
+    { stored: safe() },
   );
   await store.restore();
   const generation = store.getSnapshot().generation;
@@ -342,32 +358,14 @@ test('late resource401 cannot cancel active logout before React effect cleanup',
   assert.equal(store.getSnapshot().logoutPending, true);
   assert.equal(store.getSnapshot().session, null);
 });
-test('transient focus failure keeps the established identity and generation', async () => {
-  let fail = false;
-  const { store } = harness(async () => {
-    if (fail) throw Error('offline');
-    return json(safe());
-  });
-  await store.restore();
-  const before = store.getSnapshot();
-  fail = true;
-  await store.resume();
-  assert.equal(store.getSnapshot().session, before.session);
-  assert.equal(store.getSnapshot().generation, before.generation);
-  assert.ok(store.getSnapshot().error);
-  assert.equal(store.getSnapshot().errorSource, 'restore');
-});
-test('logout backs off 3/6/12/24/30 seconds, focus does not bypass delay, and stops at original expiry', async () => {
+test('logout backs off 3/6/12/24/30 seconds and stops at original expiry', async () => {
   let calls = 0;
-  const h = harness(async (url) =>
-    url.endsWith('/me')
-      ? json(safe('a', new Date(110000).toISOString()))
-      : (calls++, new Response(null, { status: 503 })),
-  );
+  const h = harness(async () => (calls++, new Response(null, { status: 503 })), {
+    stored: safe('a', new Date(110000).toISOString()),
+  });
   const flush = () => new Promise((resolve) => setImmediate(resolve));
   await h.store.restore();
   await h.store.logout();
-  await h.store.resume();
   assert.equal(calls, 1);
   for (const delay of [3000, 6000, 12000, 24000, 30000, 30000]) {
     await h.advance(delay - 1);
@@ -386,11 +384,9 @@ test('logout backs off 3/6/12/24/30 seconds, focus does not bypass delay, and st
 });
 test('logout 429 waits longer and never retries beyond the cookie deadline', async () => {
   let calls = 0;
-  const h = harness(async (url) =>
-    url.endsWith('/me')
-      ? json(safe('a', new Date(200000).toISOString()))
-      : (calls++, new Response(null, { status: 429, headers: { 'Retry-After': '90' } })),
-  );
+  const h = harness(async () => (calls++, new Response(null, { status: 429, headers: { 'Retry-After': '90' } })), {
+    stored: safe('a', new Date(200000).toISOString()),
+  });
   await h.store.restore();
   await h.store.logout();
   assert.equal(h.store.getSnapshot().rateLimitedUntil, 91000);
@@ -411,13 +407,13 @@ test('logout 429 waits longer and never retries beyond the cookie deadline', asy
 
 test('logout respects HTTP-date Retry-After and retries at its deadline', async () => {
   let calls = 0;
-  const h = harness(async (url) =>
-    url.endsWith('/me')
-      ? json(safe('a', new Date(200000).toISOString()))
-      : new Response(null, {
-          status: ++calls === 1 ? 429 : 204,
-          headers: { 'Retry-After': new Date(121000).toUTCString() },
-        }),
+  const h = harness(
+    async () =>
+      new Response(null, {
+        status: ++calls === 1 ? 429 : 204,
+        headers: { 'Retry-After': new Date(121000).toUTCString() },
+      }),
+    { stored: safe('a', new Date(200000).toISOString()) },
   );
   await h.store.restore();
   await h.store.logout();
@@ -432,40 +428,38 @@ test('logout respects HTTP-date Retry-After and retries at its deadline', async 
   assert.equal(h.store.getSnapshot().errorSource, null);
 });
 
-test('dispose clears the retry handle so resume can continue a pending logout', async () => {
+test('dispose clears the retry handle so an explicit logout can continue a pending one', async () => {
   let calls = 0;
-  const h = harness(async (url) =>
-    url.endsWith('/me') ? json(safe()) : new Response(null, { status: ++calls === 1 ? 503 : 204 }),
-  );
+  const h = harness(async () => new Response(null, { status: ++calls === 1 ? 503 : 204 }), { stored: safe() });
   await h.store.restore();
   await h.store.logout();
   h.store.dispose();
   await h.advance(3000);
   assert.equal(calls, 1);
-  await h.store.resume();
+  await h.store.logout();
   assert.equal(calls, 2);
   assert.equal(h.store.getSnapshot().logoutPending, false);
 });
 
-for (const action of ['login', 'demoLogin']) {
-  test(`${action} ignores JWT response fields in every published snapshot and subsequent request`, async () => {
-    const snapshots = [];
-    const requests = [];
-    const marker = 'test-jwt-must-not-enter-web-state';
-    const { store } = harness(async (url, init) => {
-      requests.push({ url, init });
-      return json({ ...safe(), access_token: marker, token_type: 'Bearer', expires_in: 900 });
-    });
-    store.subscribe(() => snapshots.push(structuredClone(store.getSnapshot())));
-    assert.equal(await (action === 'login' ? store.login('a@demo.local', 'example') : store.demoLogin('viewer')), true);
-    const session = store.getSnapshot().session;
-    assert.deepEqual(Object.keys(session).sort(), ['expires_at', 'user']);
-    assert.deepEqual(Object.keys(session.user).sort(), ['email', 'id', 'role']);
-    await store.resume();
-    assert.equal(JSON.stringify(snapshots).includes(marker), false);
-    assert.equal(JSON.stringify(snapshots).includes('access_token'), false);
-    assert.equal(JSON.stringify(requests).includes(marker), false);
-    for (const { init } of requests) assert.equal(new Headers(init.headers).has('Authorization'), false);
-    store.dispose();
+test('login ignores JWT response fields in every published snapshot, storage and subsequent request', async () => {
+  const snapshots = [];
+  const requests = [];
+  const marker = 'test-jwt-must-not-enter-web-state';
+  const h = harness(async (url, init) => {
+    requests.push({ url, init });
+    return json({ ...safe(), access_token: marker, token_type: 'Bearer', expires_in: 900 });
   });
-}
+  const { store } = h;
+  store.subscribe(() => snapshots.push(structuredClone(store.getSnapshot())));
+  assert.equal(await store.login('a@demo.local', 'example'), true);
+  const session = store.getSnapshot().session;
+  assert.deepEqual(Object.keys(session).sort(), ['expires_at', 'user']);
+  assert.deepEqual(Object.keys(session.user).sort(), ['email', 'id', 'role']);
+  await store.restore();
+  assert.equal(JSON.stringify(snapshots).includes(marker), false);
+  assert.equal(JSON.stringify(snapshots).includes('access_token'), false);
+  assert.equal(h.memory.get(SESSION_STORAGE_KEY).includes(marker), false);
+  assert.equal(JSON.stringify(requests).includes(marker), false);
+  for (const { init } of requests) assert.equal(new Headers(init.headers).has('Authorization'), false);
+  store.dispose();
+});
