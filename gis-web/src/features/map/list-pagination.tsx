@@ -1,16 +1,12 @@
 'use client';
 
 import { useRef, type FocusEvent, type RefObject } from 'react';
+import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { number } from '../../lib/map-format';
 import { PAGE_SIZES } from '../../lib/map-state';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, SelectGroup } from '../../components/ui/select';
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationPrevious,
-  PaginationNext,
-} from '../../components/ui/pagination';
+import { Button } from '../../components/ui/button';
+import { Pagination, PaginationContent, PaginationItem } from '../../components/ui/pagination';
 
 type Props = {
   page: number;
@@ -83,25 +79,35 @@ export function ListPagination({
       <small aria-live="polite" tabIndex={-1}>
         {number.format(first)}–{number.format(last)} จาก {number.format(total)}
       </small>
-      <Pagination className="pagination-navigation" aria-label="เปลี่ยนหน้ารายการแหล่ง">
+      <Pagination className="pagination-navigation mx-0 w-auto" aria-label="เปลี่ยนหน้ารายการแหล่ง">
         <PaginationContent>
           <PaginationItem>
-            <PaginationPrevious
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="หน้าก่อนหน้า"
               disabled={disabled || page <= 1}
               aria-disabled={disabled || page <= 1}
               onClick={() => {
                 if (!disabled && page > 1) goTo(page - 1);
               }}
-            />
+            >
+              <ChevronLeftIcon aria-hidden="true" />
+            </Button>
           </PaginationItem>
           <PaginationItem>
-            <PaginationNext
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="หน้าถัดไป"
               disabled={disabled || page * pageSize >= total}
               aria-disabled={disabled || page * pageSize >= total}
               onClick={() => {
                 if (!disabled && page * pageSize < total) goTo(page + 1);
               }}
-            />
+            >
+              <ChevronRightIcon aria-hidden="true" />
+            </Button>
           </PaginationItem>
         </PaginationContent>
       </Pagination>

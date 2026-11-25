@@ -14,7 +14,8 @@ export function componentHarness(path, mocks = {}, globals = {}, { inlineFixture
     return mocks[target];
   };
   const inlineFiles = new Set(inlineFixtures.map((file) => pathModule.resolve(file)));
-  const slots = [];
+  const hookScopes = new Map();
+  let slots;
   let cursor = 0;
   let effects = [];
   const memo = (fn, deps) => {
@@ -128,8 +129,13 @@ export function componentHarness(path, mocks = {}, globals = {}, { inlineFixture
       if (name === 'react') return react;
       if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx, Fragment: 'fragment' };
       if (!name.startsWith('.') && Object.hasOwn(mocks, name)) return mock(name);
-      if (name.startsWith('.')) {
-        const base = pathModule.resolve(pathModule.dirname(filePath), name);
+      if (name.startsWith('.') || name.startsWith('@/') || name === 'cn') {
+        const base =
+          name === 'cn'
+            ? fileURLToPath(new URL('../src/components/ui/utils.ts', import.meta.url))
+            : name.startsWith('@/')
+              ? fileURLToPath(new URL('../src/' + name.slice(2), import.meta.url))
+              : pathModule.resolve(pathModule.dirname(filePath), name);
         const target = [base, base + '.ts', base + '.tsx'].find((candidate) => existsSync(candidate));
         if (!target) throw new Error(`Cannot resolve ${JSON.stringify(name)} from ${filePath}`);
         if (Object.hasOwn(mocks, target)) return mock(target);
@@ -150,7 +156,10 @@ export function componentHarness(path, mocks = {}, globals = {}, { inlineFixture
   return {
     exports,
     host: (node) => hosts.get(node),
-    render(fn) {
+    render(fn, scope = 'default') {
+      // Tests that render a wrapper and its child separately need distinct hook state.
+      if (!hookScopes.has(scope)) hookScopes.set(scope, []);
+      slots = hookScopes.get(scope);
       cursor = 0;
       effects = [];
       const tree = fn();

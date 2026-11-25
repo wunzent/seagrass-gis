@@ -8,6 +8,7 @@ import * as mapState from '../src/lib/map-state.ts';
 
 const sourceFile = (name) => fileURLToPath(new URL('../src/' + name, import.meta.url));
 const inlineFixtures = [
+  'components/ui/button.tsx',
   'components/ui/pagination.tsx',
   'components/ui/alert.tsx',
   'components/ui/select.tsx',
@@ -50,6 +51,7 @@ const componentHarness = (entry, mocks, globals) =>
     {
       '@base-ui/react/select': { Select: selectPrimitives },
       '@base-ui/react/input': { Input: 'input' },
+      '@base-ui/react/button': { Button: 'button' },
       '@base-ui/react/use-render': {
         useRender: ({ defaultTagName, props, state }) => ({
           type: defaultTagName,
@@ -386,9 +388,11 @@ test('expired session has one default status Alert button which dismisses then o
     [sourceFile('components/ui/button.tsx')]: { Button: 'button' },
     [sourceFile('stores/session-context.tsx')]: { useSession: () => state },
   });
+  const controls = nodes(h.render(() => h.exports.SessionControls()));
+  assert.ok(controls.every((node) => node.props?.['data-slot'] !== 'alert'));
   const notice = () =>
-    nodes(h.render(() => h.exports.SessionControls())).find((n) => n.props?.['data-slot'] === 'alert');
-  let box = notice();
+    nodes(h.render(() => h.exports.SessionNotices())).find((n) => n.props?.['data-slot'] === 'alert');
+  const box = notice();
   assert.equal(box.props.role, 'status');
   assert.match(textOf(box), /เซสชันหมดอายุ/);
   assert.match(textOf(box), /ข้อมูลที่ต้องเข้าสู่ระบบถูกซ่อน กรุณาเข้าสู่ระบบใหม่/);
@@ -397,17 +401,21 @@ test('expired session has one default status Alert button which dismisses then o
     false,
   );
   assert.equal(nodes(box).filter((n) => n.type === 'button').length, 1);
-  assert.equal(textOf(nodes(box).find((n) => n.type === 'button')), 'ตกลง');
+  const button = nodes(box).find((n) => n.type === 'button');
+  assert.equal(textOf(button), 'ตกลง');
+  assert.equal(button.props.size, 'sm');
+  assert.equal(button.props.variant ?? 'default', 'default');
+  assert.equal(button.props.className, undefined);
+  assert.ok(nodes(box).some((node) => node.props?.['aria-hidden'] === 'true'));
   assert.ok(!box.props.className.includes('text-destructive'));
-  nodes(box)
-    .find((n) => n.type === 'button')
-    .props.onClick();
+  button.props.onClick();
   assert.equal(dismissed, 1);
   assert.deepEqual(actions, ['dismiss', '/login']);
   state.expiryNotice = null;
   assert.equal(notice(), undefined);
 });
 test('logout retry shows the rate-limit wait and is disabled until the store retries', () => {
+  let retries = 0;
   const state = {
     phase: 'ready',
     session: null,
@@ -416,20 +424,28 @@ test('logout retry shows the rate-limit wait and is disabled until the store ret
     error: 'unconfirmed',
     errorSource: 'logout',
     rateLimitedUntil: 91000,
-    store: { logout() {} },
+    store: { logout: () => retries++ },
   };
   const h = componentHarness('../src/features/auth/session-controls.tsx', {
     'next/link': { default: 'a', __esModule: true },
     [sourceFile('components/ui/button.tsx')]: { Button: 'button' },
     [sourceFile('stores/session-context.tsx')]: { useSession: () => state },
   });
-  let button = nodes(h.render(() => h.exports.SessionControls())).find((node) => node.type === 'button');
+  const renderNotice = () => nodes(h.render(() => h.exports.SessionNotices()));
+  const tree = renderNotice();
+  const box = tree.find((node) => node.props?.['data-slot'] === 'alert');
+  assert.equal(box.props.role, 'alert');
+  assert.match(textOf(box), /unconfirmed/);
+  let button = nodes(box).find((node) => node.type === 'button');
+  assert.equal(button.props.size, 'sm');
   assert.equal(button.props.disabled, true);
   assert.equal(button.props.children, 'กรุณารอสักครู่');
   state.rateLimitedUntil = 0;
-  button = nodes(h.render(() => h.exports.SessionControls())).find((node) => node.type === 'button');
+  button = renderNotice().find((node) => node.type === 'button');
   assert.equal(button.props.disabled, false);
   assert.equal(button.props.children, 'ลองออกจากระบบอีกครั้ง');
+  button.props.onClick();
+  assert.equal(retries, 1);
 });
 test('anonymous resource 401 becomes retryable error; authenticated 401 invalidates identity', async () => {
   for (const session of [null, { user: { id: 'a' } }]) {
@@ -468,7 +484,7 @@ test('invalid filters show validation without list skeleton or map loading statu
     [sourceFile('stores/session-context.tsx')]: { useSession: () => ({ generation: 1 }) },
     [sourceFile('features/map/use-resource.ts')]: { useResource: () => ({ loading: false }) },
   });
-  const Content = h.render(() => h.exports.default({})).type;
+  const Content = h.render(() => h.exports.default({}), 'workspace-shell').type;
   const tree = h.render(() => Content({}));
   nodes(tree)
     .find((node) => node.type === 'input')
@@ -760,7 +776,7 @@ test('map stale notice starts only after a collection and stays stable through v
       useResource: (url) => (url?.startsWith('/api/sites.geojson') ? resource : { loading: false }),
     },
   });
-  const Content = h.render(() => h.exports.default({})).type;
+  const Content = h.render(() => h.exports.default({}), 'workspace-shell').type;
   const render = () => nodes(h.render(() => Content({})));
   const progress = (tree) => tree.find((node) => node.props?.className === 'map-progress').props;
   let tree = render();
@@ -808,7 +824,7 @@ function provinceWorkspace(provinces) {
       },
     },
   });
-  const Content = h.render(() => h.exports.default({})).type;
+  const Content = h.render(() => h.exports.default({}), 'workspace-shell').type;
   const render = () => nodes(h.render(() => Content({})));
   const provinceCell = () => {
     render()
@@ -915,7 +931,7 @@ function historyWorkspace() {
     },
     { document },
   );
-  const Content = h.render(() => h.exports.default({})).type;
+  const Content = h.render(() => h.exports.default({}), 'workspace-shell').type;
   const render = () => {
     calls.length = 0;
     return nodes(h.render(() => Content({})));

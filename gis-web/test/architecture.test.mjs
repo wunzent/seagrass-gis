@@ -29,7 +29,7 @@ const reactStores = new Set(['stores/map-store.ts', 'stores/session-context.tsx'
 const packages = {
   app: ['next', 'react'],
   guards: ['react'],
-  features: ['react', 'react-dom', 'next/link', 'next/navigation', 'next/dynamic', 'maplibre-gl'],
+  features: ['react', 'react-dom', 'next/link', 'next/navigation', 'next/dynamic', 'maplibre-gl', 'lucide-react'],
   services: [],
   stores: ['react'],
   components: [
@@ -38,6 +38,8 @@ const packages = {
     'clsx',
     'tailwind-merge',
     'lucide-react',
+    'cn',
+    '@base-ui/react/button',
     '@base-ui/react/select',
     '@base-ui/react/input',
     '@base-ui/react/merge-props',

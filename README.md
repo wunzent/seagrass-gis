@@ -160,12 +160,12 @@ Auth และ session:
 
 ## Web (gis-web)
 
-Next.js + React, Tailwind CSS, shadcn/ui Button, MapLibre GL ดู [ARCHITECTURE](gis-web/ARCHITECTURE.md) สำหรับ layer rules, folder map และ flow จริง; [gis-web/DESIGN.md](gis-web/DESIGN.md) เป็น UI design system ส่วน [DESIGN.md](DESIGN.md) ที่ root ตอบแนวทางระบบ
+Next.js + React, Tailwind CSS v4, shadcn/ui Base และ MapLibre GL ดู [ARCHITECTURE](gis-web/ARCHITECTURE.md) สำหรับ layer rules, folder map และ flow จริง; [gis-web/DESIGN.md](gis-web/DESIGN.md) เป็น UI design system ส่วน [DESIGN.md](DESIGN.md) ที่ root ตอบแนวทางระบบ
 
 - `app`: routes/layouts; `guards`: session visibility; `features/map` และ `features/auth`: UI, hooks, orchestration
 - `services`: REST transport; `stores`: session/shared map state ผ่าน `useSyncExternalStore`
-- `components/ui`: UI แสดงผล; `lib`: pure helpers/types และ server proxy; `scripts`: Tailwind/worker/env; `test`: unit + architecture boundaries
-- Style/font/icon อยู่ใน `src/assets/` (`styles/globals.css`, generated `styles/tailwind.css`, `styles/maplibre.css`, `fonts/fonts.ts`, `icons/login-icons.tsx`)
+- `components/ui`: UI แสดงผล; `lib`: pure helpers/types และ server proxy; `scripts`: worker/env; `test`: unit + architecture boundaries
+- Style/font/icon อยู่ใน `src/assets/` (`styles/globals.css`, `styles/maplibre.css`, `fonts/fonts.ts`, `icons/login-icons.tsx`)
 
 รันบน host จาก `gis-web/`:
 
@@ -177,24 +177,23 @@ npm run dev
 
 `.env` (ignored) ตั้ง `PORT=3003` เพื่อไม่ชน Docker web ที่ 3000 ตรวจ health ที่ `http://localhost:3003/health` `API_INTERNAL_URL` (ฝั่ง server เท่านั้น): `http://localhost:3002` สำหรับ host API (default) หรือ `http://localhost:3001` สำหรับ Docker API; Compose ตั้ง `http://api:3001` ถ้าใช้ host web กับ Docker API ต้องให้ `PUBLIC_WEB_ORIGIN` ของ API ตรง `http://localhost:3003` ไม่เช่นนั้น login จะได้ CSRF error
 
-| Script                                        | ใช้ทำอะไร                                                                  |
-| --------------------------------------------- | -------------------------------------------------------------------------- |
-| `npm run dev` / `npm run build` / `npm start` | สร้าง `src/assets/styles/tailwind.css` + copy MapLibre worker แล้วรัน Next |
-| `npm run styles`                              | compile Tailwind ใหม่หลังแก้ CSS/class ระหว่าง dev                         |
-| `npm run typecheck`                           | `tsc --noEmit`                                                             |
-| `npm run lint`                                | ESLint (`eslint-config-next` core-web-vitals + typescript)                 |
-| `npm run format` / `npm run format:check`     | Prettier                                                                   |
-| `npm run test:unit`                           | unit tests ใน `test/`                                                      |
+| Script                                        | ใช้ทำอะไร                                                                    |
+| --------------------------------------------- | ---------------------------------------------------------------------------- |
+| `npm run dev` / `npm run build` / `npm start` | dev/build copy MapLibre worker แล้วให้ Next compile Tailwind v4 ผ่าน PostCSS |
+| `npm run typecheck`                           | `tsc --noEmit`                                                               |
+| `npm run lint`                                | ESLint (`eslint-config-next` core-web-vitals + typescript)                   |
+| `npm run format` / `npm run format:check`     | Prettier                                                                     |
+| `npm run test:unit`                           | unit tests ใน `test/`                                                        |
 
 พฤติกรรมสำคัญ:
 
-- UI ใช้ shadcn Base: Pagination, Alert, Select, Input, Table, Badge และ Card บน Tailwind 3 โดยคง theme tokens และสีสถานะเดิม; loading/error/empty มี Alert และ error ที่ลองใหม่ได้มีปุ่ม ลองใหม่
+- UI ใช้ Button, Pagination, Alert, Select, Input, Table, Badge และ Card จาก shadcn CLI 4.23.0 (Base UI / Nova) บน Tailwind v4 โดยใช้ palette เดิม สถานะ loading/error/empty ใช้ Alert พร้อมปุ่มลองใหม่เมื่อทำได้
 - Geometry cache อยู่ใน memory ต่อ map mount: snap bbox ออกสู่ grid 0.25 องศา, TTL 5 นาที, รวม sites/surveys สูงสุด 200 entries แบบ LRU; key รวมชั้นข้อมูล/bbox/filters, ล้างทั้ง cache เมื่อ filters หรือ session identity เปลี่ยน มี clear() สำหรับการเขียนข้อมูลในอนาคต ไม่มี localStorage สำหรับ geometry; pan ที่อยู่นอก grid ที่เคยโหลดส่ง bbox request ใหม่หลัง debounce 600ms
 
 - Browser เรียก relative `/api/*`; proxy ตัด `/api`, ส่ง Cookie/Set-Cookie และ CSRF headers, ไม่ cache, ไม่เปิด CORS; JavaScript ไม่อ่านหรือเก็บ JWT และไม่ forward `Authorization` จาก browser
 - proxy ลบ `access_token` จาก JSON response ที่สำเร็จของ `POST /api/auth/login` แล้วเติม `expires_at` จาก claim `exp` ให้ browser โดยคง user และ Set-Cookie; ส่ง `X-Auth-Session: invalid` ต่อให้ browser
 - หน้า `/`: ตัวกรองจังหวัด/สถานะ/คำค้น, ตารางหน้าละ 20 (เลือก 10/20/50/100 ต่อหน้า พร้อมช่วงรายการและปุ่มก่อนหน้า/ถัดไป), polygons ตาม bbox, province outlines, survey points, legend 5 สถานะ, รายละเอียดและประวัติการสำรวจหน้าละ 5; mobile สลับแผนที่/รายการ
-- Session ฝั่งเว็บไม่เรียก `/api/auth/me`: login แล้วจำเฉพาะ id/email/role/expires_at (ไม่มี JWT) ใน localStorage เพื่อแสดงชื่อและ role หลัง refresh; เมื่อหมดอายุแสดง Alert แบบ status พร้อมปุ่ม ตกลง เพื่อล้างข้อความแล้วไป /login; ถ้า API ตอบ 401 หรือ `X-Auth-Session: invalid` เว็บล้าง identity ทันที; แท็บอื่น login/logout แล้วอัปเดตตามผ่าน storage event
+- Session ฝั่งเว็บไม่เรียก `/api/auth/me`: login แล้วจำเฉพาะ id/email/role/expires_at (ไม่มี JWT) ใน localStorage เพื่อแสดงชื่อและ role หลัง refresh; เมื่อหมดอายุแสดง Alert ที่มุมขวาล่างของ viewport พร้อมปุ่ม ตกลง เพื่อล้างข้อความแล้วไป /login ข้อผิดพลาดจากการออกจากระบบแสดงตรงจุดเดียวกันพร้อมปุ่มลองอีกครั้ง; ถ้า API ตอบ 401 หรือ `X-Auth-Session: invalid` เว็บล้าง identity ทันที; แท็บอื่น login/logout แล้วอัปเดตตามผ่าน storage event
 - `/login`: ฟอร์มมีบัญชีสาธิตที่หน้า server อ่านจาก `DEMO_*_PASSWORD` ตอน request ผ่าน `src/lib/demo-accounts.ts` (fallback เป็นค่าใน `.env.example`) กดเพื่อกรอกโดยไม่ส่ง; ไม่มีปุ่ม login ตาม role
 - จุดสำรวจที่อยู่ใกล้กัน (ภายใน 40 px) รวมเป็นวงกลมมีตัวเลขเฉพาะตอนซูมออกจนมาตราส่วนประมาณ 30 กม. ขึ้นไป (ซูม ≤ 9) ซูมเข้ามากกว่านั้นแสดงจุดและแหล่งตามปกติ คลิกวงกลมครั้งเดียวแผนที่ซูมให้เห็นทุกจุดในกลุ่มและแตกเป็นจุดเดี่ยวทันที (อย่างน้อยซูม 10); popup ของแหล่ง/จุดมีลูกศรชี้ไปยังตำแหน่งที่เลือก
 - แผนที่ฐานสลับได้ 2 แบบจากกล่อง "แผนที่ฐาน" มุมซ้ายล่างของแผนที่: แผนที่ถนน (OpenStreetMap) และภาพดาวเทียม (Esri World Imagery ซ้อนชั้นถนนและชื่อสถานที่จาก Esri Reference World Transportation / World Boundaries and Places) browser จำตัวเลือกไว้ใน localStorage (`gis-basemap`); ทั้งหมดเป็น raster tiles สำหรับ demo เท่านั้น ก่อนใช้งานจริงต้องเลือกผู้ให้บริการและปฏิบัติตามเงื่อนไขของแต่ละราย เช่น [OSM tile usage policy](https://operations.osmfoundation.org/policies/tiles/); ถ้าแผนที่เปิดไม่ได้ ตารางและรายละเอียดยังใช้ได้

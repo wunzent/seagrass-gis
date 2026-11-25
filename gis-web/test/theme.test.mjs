@@ -54,3 +54,13 @@ test('demo values stay unbroken and disabled notched labels match the input surf
   assert.match(css, /\.demo-accounts \.demo-value\s*\{[^}]*white-space: nowrap/);
   assert.match(css, /\.login-field:has\(input:disabled\) label\s*\{[^}]*background: var\(--surface\)/);
 });
+
+test('Next processes the Tailwind v4 entry through the PostCSS adapter', () => {
+  const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
+  const { devDependencies } = JSON.parse(read('../package.json'));
+  assert.match(devDependencies.tailwindcss, /^4\.\d+\.\d+$/);
+  assert.equal(devDependencies['@tailwindcss/postcss'], devDependencies.tailwindcss);
+  assert.match(read('../postcss.config.mjs'), /@tailwindcss\/postcss/);
+  assert.match(read('../src/app/layout.tsx'), /import ['"][^'"]*\/globals\.css['"]/);
+  assert.match(read('../src/assets/styles/globals.css'), /@import ['"]tailwindcss['"]/);
+});

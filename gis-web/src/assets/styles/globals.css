@@ -1,6 +1,53 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss' source('../../');
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+/* Shared Select variants from shadcn 4.23.0's Tailwind stylesheet. */
+@custom-variant data-open {
+  &:where([data-state='open']),
+  &:where([data-open]:not([data-open='false'])) {
+    @slot;
+  }
+}
+@custom-variant data-closed {
+  &:where([data-state='closed']),
+  &:where([data-closed]:not([data-closed='false'])) {
+    @slot;
+  }
+}
+@custom-variant data-disabled {
+  &:where([data-disabled='true']),
+  &:where([data-disabled]:not([data-disabled='false'])) {
+    @slot;
+  }
+}
+
+@theme inline {
+  --font-heading: var(--font-plex), Tahoma, sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+}
 
 /* Bright palette: gis-web/DESIGN.md. */
 :root {
@@ -14,11 +61,23 @@
   --primary-soft: #e6f3fa;
   --sea: #dce7ea;
   --danger: #8f1d1d;
+  --background: var(--bg);
+  --foreground: var(--text);
   --card: var(--bg);
   --card-foreground: var(--text);
   --popover: var(--bg);
   --popover-foreground: var(--text);
   --primary-foreground: #ffffff;
+  --secondary: var(--surface);
+  --secondary-foreground: var(--text);
+  --muted: var(--surface);
+  --muted-foreground: var(--text-muted);
+  --accent: var(--primary-soft);
+  --accent-foreground: var(--text);
+  --destructive: var(--danger);
+  --input: var(--field-border);
+  --ring: var(--primary);
+  --radius: 0.5rem;
 }
 
 @layer base {
@@ -29,9 +88,11 @@
     font-family: var(--font-plex), Tahoma, sans-serif;
     font-size: 15px;
     line-height: 1.55;
+    @apply bg-background text-foreground;
   }
   * {
     box-sizing: border-box;
+    @apply border-border outline-ring/50;
   }
   button,
   input,
@@ -164,12 +225,14 @@
     font-size: 0.75rem;
     color: var(--text-muted);
   }
-  .filters [data-slot='select-trigger'] {
-    width: 100%;
-  }
   .filters input,
   .filters [data-slot='select-trigger'] {
+    min-height: 44px;
     border: 1px solid var(--field-border);
+  }
+  [data-slot='select-trigger'],
+  [data-slot='select-item'] {
+    min-height: 44px;
   }
   .filters input::placeholder {
     color: var(--text-muted);
@@ -269,10 +332,6 @@
   .pagination > small {
     min-width: 0;
     color: var(--text-muted);
-  }
-  .pagination .pagination-navigation {
-    margin: 0;
-    width: auto;
   }
   .pagination button {
     min-height: 44px;
@@ -653,6 +712,13 @@
   .session-user span {
     color: var(--text-muted);
   }
+  .session-controls > [data-slot='button'],
+  .route-state-actions > [data-slot='button'],
+  .error-box > [data-slot='button'],
+  .login-panel form > [data-slot='button'] {
+    min-height: 44px;
+    padding-inline: 16px;
+  }
   .session-link {
     color: var(--primary);
     text-decoration: underline;
@@ -661,12 +727,14 @@
     align-items: center;
     min-height: 44px;
   }
-  .session-notice {
-    flex-basis: 100%;
-    color: var(--danger);
-  }
-  .session-notice button {
-    margin-top: 8px;
+  .session-notices {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 60;
+    display: grid;
+    gap: 8px;
+    width: min(384px, calc(100% - 32px));
   }
   .route-state {
     min-height: 100svh;
@@ -716,22 +784,6 @@
     .route-spinner {
       animation: none;
     }
-  }
-  .expiry-notice {
-    flex-basis: 100%;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--primary-soft);
-    color: var(--text);
-  }
-  .expiry-notice p {
-    flex-basis: 100%;
-    margin: 0;
   }
   .login-page {
     background: var(--surface);
@@ -924,7 +976,7 @@
   }
 }
 
-/* Outside @layer so Tailwind keeps them: the status class names are built at runtime (swatch-${status}). */
+/* Status swatches are selected at runtime (swatch-${status}). */
 .swatch-very_good {
   background: #1e5a3c;
 }
@@ -939,4 +991,38 @@
 }
 .swatch-no_data {
   background: repeating-linear-gradient(45deg, #f2eee4 0 3px, #8a8f94 3px 4.5px);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
 }

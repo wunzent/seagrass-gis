@@ -3,7 +3,16 @@
 import { Alert, AlertDescription } from '../../components/ui/alert';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/card';
 import dynamic from 'next/dynamic';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import { number, surveyRounds } from '../../lib/map-format';
 import { debounce, emptyFilters, filterState, pageSizeState, type Bbox, type Filters } from '../../lib/map-state';
 import { DEFAULT_BASEMAP, readBasemap, saveBasemap, type BasemapId } from '../../lib/basemaps';
@@ -37,14 +46,45 @@ const SiteMap = dynamic(() => import('./site-map'), {
   ),
 });
 export default function MapWorkspace({ sessionControls }: { sessionControls?: ReactNode } = {}) {
-  const { generation } = useSession();
-  return <MapContent key={generation} sessionControls={sessionControls} />;
+  const { generation, expiryNotice } = useSession();
+  const savedNavViewRef = useRef<string | null>(null);
+  return (
+    <MapContent
+      key={generation}
+      sessionControls={sessionControls}
+      savedNavViewRef={savedNavViewRef}
+      restoreNavigationFocus={Boolean(expiryNotice)}
+    />
+  );
 }
-function MapContent({ sessionControls }: { sessionControls?: ReactNode } = {}) {
+function MapContent({
+  sessionControls,
+  savedNavViewRef,
+  restoreNavigationFocus,
+}: {
+  sessionControls?: ReactNode;
+  savedNavViewRef?: RefObject<string | null>;
+  restoreNavigationFocus?: boolean;
+}) {
   const { draft, setDraft, state, setState, bbox, setBbox, popup, setPopup, view, setView, resources, layerCache } =
     useMapStore();
   // Session generation remounts MapContent; discard the old identity's cached payloads too.
   useEffect(() => () => layerCache.clear(), [layerCache]);
+  const navigationRef = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const navigation = navigationRef.current;
+    if (!savedNavViewRef || !navigation) return;
+    const buttons = Array.from(navigation.querySelectorAll<HTMLButtonElement>('button[data-view]'));
+    const previous = savedNavViewRef.current;
+    savedNavViewRef.current = null;
+    if (restoreNavigationFocus && previous && document.activeElement === document.body) {
+      buttons.find((button) => button.dataset.view === previous)?.focus();
+    }
+    return () => {
+      // The keyed reset removes the old DOM. Carry only focus on the public view controls across expiry.
+      savedNavViewRef.current = buttons.find((button) => button === document.activeElement)?.dataset.view ?? null;
+    };
+  }, [savedNavViewRef, restoreNavigationFocus]);
   const [validation, setValidation] = useState('');
   const [selectionNotice, setSelectionNotice] = useState('');
   const [mapAvailable, setMapAvailable] = useState(true);
@@ -305,7 +345,7 @@ function MapContent({ sessionControls }: { sessionControls?: ReactNode } = {}) {
 
   return (
     <div className="app">
-      <TopNav view={view} switchView={switchView} sessionControls={sessionControls} />
+      <TopNav view={view} switchView={switchView} sessionControls={sessionControls} navigationRef={navigationRef} />
       <main>
         <div className={`map-layout ${view === 'map' ? '' : 'view-hidden'}`}>
           {view === 'map' && (

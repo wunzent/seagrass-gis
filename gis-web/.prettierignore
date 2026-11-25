@@ -2,7 +2,15 @@
 node_modules
 coverage
 public/maplibre
-src/assets/styles/tailwind.css
+# Keep the shadcn CLI's generated component source verbatim.
+src/components/ui/alert.tsx
+src/components/ui/badge.tsx
+src/components/ui/button.tsx
+src/components/ui/card.tsx
+src/components/ui/input.tsx
+src/components/ui/pagination.tsx
+src/components/ui/select.tsx
+src/components/ui/table.tsx
 package-lock.json
 next-env.d.ts
 tsconfig.tsbuildinfo

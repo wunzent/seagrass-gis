@@ -26,7 +26,7 @@ export function FiltersPanel({
             if (value !== null) change({ province: value });
           }}
         >
-          <SelectTrigger aria-label="จังหวัด">
+          <SelectTrigger className="w-full" aria-label="จังหวัด">
             <SelectValue>{provinces.get(draft.province) ?? (draft.province || 'ทุกจังหวัด')}</SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -52,7 +52,7 @@ export function FiltersPanel({
             if (value !== null) change({ status: value });
           }}
         >
-          <SelectTrigger aria-label="สถานะ">
+          <SelectTrigger className="w-full" aria-label="สถานะ">
             <SelectValue>{statuses[draft.status as keyof typeof statuses]?.label ?? 'ทุกสถานะ'}</SelectValue>
           </SelectTrigger>
           <SelectContent>

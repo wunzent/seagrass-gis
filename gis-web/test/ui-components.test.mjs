@@ -4,6 +4,12 @@ import { readFileSync } from 'node:fs';
 import { componentHarness, nodes } from './component-harness.mjs';
 import { fileURLToPath } from 'node:url';
 const source = (file) => fileURLToPath(new URL('../src/components/ui/' + file, import.meta.url));
+test('shadcn uses the Base UI button and Tailwind v4 registry configuration', () => {
+  const config = JSON.parse(readFileSync(new URL('../components.json', import.meta.url), 'utf8'));
+  assert.equal(config.style, 'base-nova');
+  assert.equal(config.tailwind.config, '');
+  assert.match(readFileSync(source('button.tsx'), 'utf8'), /@base-ui\/react\/button/);
+});
 test('shadcn default Alert allows polite status while destructive Alert stays assertive', () => {
   const h = componentHarness('../src/components/ui/alert.tsx');
   const polite = h.exports.Alert({ role: 'status', children: 'ข้อความ' });
