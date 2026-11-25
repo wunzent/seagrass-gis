@@ -373,9 +373,29 @@ export default function SiteMap({
             button.setAttribute('aria-label', label.aria);
             button.addEventListener('click', (event) => {
               event.stopPropagation();
+              // One click shows the whole group: fit all its points and zoom at least past the clustering zoom.
               void (instance.getSource('surveys') as GeoJSONSource)
-                .getClusterExpansionZoom(clusterId)
-                .then((zoom) => instance.easeTo({ center: coordinates, zoom }))
+                .getClusterLeaves(clusterId, Infinity, 0)
+                .then((leaves) => {
+                  const points = leaves
+                    .map((leaf) => (leaf.geometry as { coordinates?: [number, number] }).coordinates)
+                    .filter((point): point is [number, number] => Array.isArray(point));
+                  if (!points.length) points.push(coordinates);
+                  const lons = points.map((point) => point[0]);
+                  const lats = points.map((point) => point[1]);
+                  const camera = instance.cameraForBounds(
+                    [
+                      [Math.min(...lons), Math.min(...lats)],
+                      [Math.max(...lons), Math.max(...lats)],
+                    ],
+                    { padding: 60, maxZoom: 14 },
+                  );
+                  instance.easeTo({
+                    center:
+                      (camera?.center as { toArray?: () => [number, number] } | undefined)?.toArray?.() ?? coordinates,
+                    zoom: Math.max(camera?.zoom ?? 0, SURVEY_CLUSTER.clusterMaxZoom + 1),
+                  });
+                })
                 .catch(() => undefined);
             });
             clusterMarkers.set(clusterId, new Marker({ element: button }).setLngLat(coordinates).addTo(instance));

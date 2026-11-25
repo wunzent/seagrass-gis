@@ -514,9 +514,9 @@ function mapHarness(globals = {}, onDisplayChange, onSelect = () => {}) {
         setData(data) {
           this.data = data;
         },
-        async getClusterExpansionZoom(clusterId) {
-          map.expandedClusters = [...(map.expandedClusters ?? []), clusterId];
-          return 13;
+        async getClusterLeaves(clusterId, limit) {
+          map.expandedClusters = [...(map.expandedClusters ?? []), [clusterId, limit]];
+          return map.leaves ?? [];
         },
       });
     }
@@ -524,6 +524,10 @@ function mapHarness(globals = {}, onDisplayChange, onSelect = () => {}) {
       assert.equal(source, 'surveys');
       assert.deepEqual(JSON.parse(JSON.stringify(options.filter)), ['has', 'point_count']);
       return this.clusters ?? [];
+    }
+    cameraForBounds(bounds, options) {
+      this.cameraRequests = [...(this.cameraRequests ?? []), { bounds, options }];
+      return this.camera ?? { center: { toArray: () => [98.55, 8.55] }, zoom: 7.5 };
     }
     eases = [];
     easeTo(options) {
@@ -1885,8 +1889,25 @@ test('survey points cluster; individual points exclude clusters; numbered cluste
   assert.deepEqual(JSON.parse(JSON.stringify(twelve.lngLat)), [98.5, 8.5]);
   twelve.element.dispatch('click');
   await new Promise((resolve) => setImmediate(resolve));
-  assert.deepEqual(JSON.parse(JSON.stringify(map.expandedClusters)), [7]);
-  assert.deepEqual(JSON.parse(JSON.stringify(map.eases.at(-1))), { center: [98.5, 8.5], zoom: 13 });
+  // One click: fit every point of the cluster, and zoom at least past the clustering zoom so the points show.
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(map.expandedClusters)),
+    [[7, Infinity]].map(([id]) => [id, null]),
+  );
+  assert.deepEqual(JSON.parse(JSON.stringify(map.cameraRequests.at(-1).bounds)), [
+    [98.5, 8.5],
+    [98.5, 8.5],
+  ]);
+  assert.deepEqual(JSON.parse(JSON.stringify(map.eases.at(-1))), { center: [98.55, 8.55], zoom: 10 });
+  map.camera = { center: { toArray: () => [98.6, 8.6] }, zoom: 12.4 };
+  map.leaves = [{ geometry: { coordinates: [98.6, 8.5] } }, { geometry: { coordinates: [98.62, 8.7] } }];
+  twelve.element.dispatch('click');
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(JSON.parse(JSON.stringify(map.cameraRequests.at(-1).bounds)), [
+    [98.6, 8.5],
+    [98.62, 8.7],
+  ]);
+  assert.deepEqual(JSON.parse(JSON.stringify(map.eases.at(-1))), { center: [98.6, 8.6], zoom: 12.4 });
   map.clusters = [cluster(9, 3, [98.6, 8.6])];
   map.emit('render');
   assert.equal(twelve.removed, true, 'a cluster that is gone loses its marker');
