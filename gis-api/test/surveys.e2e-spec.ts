@@ -484,6 +484,7 @@ describe('PATCH /surveys/:id (real PostGIS)', () => {
         species: ['EA'],
         note: null,
         created_by: { id: USERS.admin, email: EMAIL('admin') },
+        siteStatus: 'fair',
       },
     ]);
     const full = await send('PATCH', `/surveys/${id}`, {
@@ -501,6 +502,7 @@ describe('PATCH /surveys/:id (real PostGIS)', () => {
         species: ['CR', 'HO'],
         note: 'แก้ไข',
         created_by: { id: USERS.admin, email: EMAIL('admin') },
+        siteStatus: 'very_good',
       },
     ]);
     const [after] = (await surveyRows()).filter((r) => r.id === id);
