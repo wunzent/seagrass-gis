@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '../../components/ui/button';
+import { Label } from '../../components/ui/label';
 import { Input } from '../../components/ui/input';
 import { Alert, AlertDescription } from '../../components/ui/alert';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem } from '../../components/ui/select';
@@ -18,15 +20,15 @@ export function FiltersPanel({
 }) {
   return (
     <>
-      <label>
-        <span>จังหวัด</span>
+      <div className="filter-field">
+        <Label htmlFor="province-filter">จังหวัด</Label>
         <Select
           value={draft.province}
           onValueChange={(value) => {
             if (value !== null) change({ province: value });
           }}
         >
-          <SelectTrigger className="w-full" aria-label="จังหวัด">
+          <SelectTrigger id="province-filter" className="w-full" aria-label="จังหวัด">
             <SelectValue>{provinces.get(draft.province) ?? (draft.province || 'ทุกจังหวัด')}</SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -43,16 +45,16 @@ export function FiltersPanel({
             </SelectGroup>
           </SelectContent>
         </Select>
-      </label>
-      <label>
-        <span>สถานะ</span>
+      </div>
+      <div className="filter-field">
+        <Label htmlFor="status-filter">สถานะ</Label>
         <Select
           value={draft.status}
           onValueChange={(value) => {
             if (value !== null) change({ status: value });
           }}
         >
-          <SelectTrigger className="w-full" aria-label="สถานะ">
+          <SelectTrigger id="status-filter" className="w-full" aria-label="สถานะ">
             <SelectValue>{statuses[draft.status as keyof typeof statuses]?.label ?? 'ทุกสถานะ'}</SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -66,20 +68,21 @@ export function FiltersPanel({
             </SelectGroup>
           </SelectContent>
         </Select>
-      </label>
-      <label>
-        <span>ค้นหาแหล่ง</span>
+      </div>
+      <div className="filter-field">
+        <Label htmlFor="search-filter">ค้นหาแหล่ง</Label>
         <Input
+          id="search-filter"
           type="search"
           value={draft.q}
           maxLength={200}
           placeholder="ชื่อแหล่งหรือรหัส"
           onChange={(e) => change({ q: e.target.value })}
         />
-      </label>
-      <button type="button" className="text-button" onClick={() => change(emptyFilters)}>
+      </div>
+      <Button variant="link" size="sm" className="justify-self-start" onClick={() => change(emptyFilters)}>
         ล้างตัวกรอง
-      </button>
+      </Button>
       {validation && (
         <div className="filter-error">
           <Alert variant="destructive">

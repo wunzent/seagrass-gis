@@ -56,7 +56,6 @@
   --text: #1f2937;
   --text-muted: #57606a;
   --border: #d0d7de;
-  --field-border: #848d97;
   --primary: #0077b6;
   --primary-soft: #e6f3fa;
   --sea: #dce7ea;
@@ -75,7 +74,7 @@
   --accent: var(--primary-soft);
   --accent-foreground: var(--text);
   --destructive: var(--danger);
-  --input: var(--field-border);
+  --input: #848d97;
   --ring: var(--primary);
   --radius: 0.5rem;
 }
@@ -93,21 +92,6 @@
   * {
     box-sizing: border-box;
     @apply border-border outline-ring/50;
-  }
-  button,
-  input,
-  select {
-    font: inherit;
-    color: inherit;
-  }
-  button,
-  select,
-  summary,
-  a[href] {
-    cursor: pointer;
-  }
-  button:disabled {
-    cursor: default;
   }
   :focus-visible {
     outline: 2px solid var(--primary);
@@ -153,6 +137,7 @@
   /* Top bar: product name as text, two views, session on the right. */
   .app {
     height: 100svh;
+    gap: 0;
     display: flex;
     flex-direction: column;
   }
@@ -167,23 +152,7 @@
   }
   .topbar-nav {
     display: flex;
-    gap: 4px;
-    align-self: stretch;
-  }
-  .nav-item {
-    min-height: 44px;
-    padding: 0 10px;
-    color: var(--text-muted);
-    border-bottom: 2px solid transparent;
-    margin-bottom: -1.5px;
-  }
-  .nav-item:hover {
-    color: var(--text);
-  }
-  .nav-item[aria-current='page'] {
-    color: var(--primary);
-    font-weight: 500;
-    border-bottom-color: var(--primary);
+    align-items: center;
   }
   .topbar .session-controls {
     margin-left: auto;
@@ -206,7 +175,7 @@
     overflow: hidden;
   }
   .sidebar {
-    background: var(--surface);
+    background: var(--background);
     border-right: 1px solid var(--border);
     padding: 16px;
     display: flex;
@@ -219,43 +188,13 @@
     display: grid;
     gap: 10px;
   }
-  .filters label {
+  .filter-field {
     display: grid;
-    gap: 2px;
-    font-size: 0.75rem;
-    color: var(--text-muted);
-  }
-  .filters input,
-  .filters [data-slot='select-trigger'] {
-    min-height: 44px;
-    border: 1px solid var(--field-border);
-  }
-  [data-slot='select-trigger'],
-  [data-slot='select-item'] {
-    min-height: 44px;
-  }
-  .filters input::placeholder {
-    color: var(--text-muted);
+    gap: 6px;
   }
   .filter-error {
     color: var(--danger);
     font-size: 0.8rem;
-  }
-  .text-button {
-    color: var(--primary);
-    justify-self: start;
-    min-height: 44px;
-    text-decoration: underline;
-    text-underline-offset: 3px;
-    font-size: 0.85rem;
-  }
-  .text-button:hover:not(:disabled) {
-    text-decoration-thickness: 2px;
-  }
-  .text-button:disabled,
-  .text-button[aria-disabled='true'] {
-    color: var(--text-muted);
-    text-decoration: none;
   }
   .list-heading {
     display: flex;
@@ -277,20 +216,6 @@
   .site-rows li {
     border-bottom: 1px solid var(--border);
   }
-  .site-rows li.selected-row {
-    color: var(--text);
-    background: var(--primary-soft);
-  }
-  .site-button {
-    display: grid;
-    width: 100%;
-    min-height: 48px;
-    padding: 6px 4px;
-    text-align: left;
-  }
-  .site-button:hover .site-name > span:last-child {
-    text-decoration: underline;
-  }
   .site-code {
     font-size: 0.72rem;
     color: var(--text-muted);
@@ -302,12 +227,6 @@
     gap: 8px;
     font-size: 0.72rem;
     color: var(--text-muted);
-  }
-  .site-name {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    font-size: 0.85rem;
   }
   .status-label {
     display: inline-flex;
@@ -323,19 +242,9 @@
   }
   .pagination {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    font-size: 0.8rem;
-  }
-  .pagination > small {
-    min-width: 0;
-    color: var(--text-muted);
-  }
-  .pagination button {
-    min-height: 44px;
-    min-width: 44px;
   }
   .loading-state,
   .empty-state {
@@ -367,6 +276,7 @@
     min-width: 0;
   }
   .map-heading {
+    background: var(--background);
     display: flex;
     align-items: baseline;
     gap: 12px;
@@ -429,20 +339,6 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 6px 4px 10px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    font-size: 0.75rem;
-    color: var(--text-muted);
-  }
-  .basemap-select select {
-    min-height: 32px;
-    border: 0;
-    background: transparent;
-    color: var(--text);
-    font: inherit;
-    font-weight: 600;
   }
   .legend p {
     color: var(--text-muted);
@@ -478,11 +374,6 @@
     width: min(300px, calc(100% - 16px));
     max-height: calc(100% - 16px);
     overflow: auto;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    box-shadow: 0 6px 18px #1b2a3a2e;
-    font-size: 0.82rem;
   }
   /* Arrow from the popup to the selected point: a rotated square that covers the popup border where they meet.
      The rotation sits on ::before so it does not turn the inline translate that places the arrow. */
@@ -499,7 +390,7 @@
     content: '';
     position: absolute;
     inset: 0;
-    background: var(--bg);
+    background: var(--card);
     border: 1px solid var(--border);
     rotate: 45deg;
   }
@@ -516,72 +407,6 @@
   }
   .map-popup-arrow[hidden] {
     display: none;
-  }
-  /* Numbered survey clusters (HTML markers): white disc with the survey-point blue ring; size grows with the count. */
-  .survey-cluster {
-    display: grid;
-    place-items: center;
-    width: 32px;
-    height: 32px;
-    padding: 0;
-    border: 2px solid var(--primary);
-    border-radius: 50%;
-    background: var(--bg);
-    color: var(--primary);
-    font: inherit;
-    font-size: 0.75rem;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    box-shadow: 0 0 0 4px #0077b633;
-    cursor: pointer;
-  }
-  .survey-cluster.md {
-    width: 38px;
-    height: 38px;
-  }
-  .survey-cluster.lg {
-    width: 44px;
-    height: 44px;
-  }
-  .survey-cluster:hover {
-    background: var(--primary);
-    color: var(--bg);
-  }
-  .survey-cluster:focus-visible {
-    outline: 2px solid var(--text);
-    outline-offset: 2px;
-  }
-  .popup-heading {
-    position: sticky;
-    top: 0;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 6px;
-    padding: 2px 2px 2px 12px;
-    background: var(--bg);
-    border-bottom: 1px solid var(--border);
-  }
-  .popup-heading h2 {
-    font-size: 0.88rem;
-  }
-  .popup-close {
-    width: 44px;
-    height: 44px;
-    flex-shrink: 0;
-    font-size: 1.3rem;
-    line-height: 1;
-  }
-  .map-popup :focus-visible {
-    outline-offset: -2px;
-  }
-  .popup-close:hover {
-    background: var(--primary-soft);
-  }
-  .popup-body {
-    padding: 10px 12px 12px;
-    display: grid;
-    gap: 10px;
   }
   .facts {
     display: grid;
@@ -630,10 +455,15 @@
 
   /* Table view. */
   .table-view {
+    background: var(--background);
     padding: 16px 20px 24px;
     display: grid;
     gap: 12px;
     align-content: start;
+  }
+  .table-detail {
+    width: min(100%, 420px);
+    padding: 12px 16px 0;
   }
   .table-toolbar {
     display: flex;
@@ -649,7 +479,7 @@
     flex-wrap: wrap;
     gap: 12px;
   }
-  .filters-row label {
+  .filters-row .filter-field {
     width: 170px;
   }
   .filters-row .filter-error {
@@ -683,13 +513,6 @@
     border-bottom: 1px solid var(--border);
     white-space: nowrap;
   }
-  .table-link {
-    color: var(--primary);
-    min-height: 44px;
-    text-align: left;
-    text-decoration: underline;
-    text-underline-offset: 3px;
-  }
   .table-view .pagination {
     justify-content: center;
     gap: 8px;
@@ -711,21 +534,6 @@
   }
   .session-user span {
     color: var(--text-muted);
-  }
-  .session-controls > [data-slot='button'],
-  .route-state-actions > [data-slot='button'],
-  .error-box > [data-slot='button'],
-  .login-panel form > [data-slot='button'] {
-    min-height: 44px;
-    padding-inline: 16px;
-  }
-  .session-link {
-    color: var(--primary);
-    text-decoration: underline;
-    text-underline-offset: 3px;
-    display: inline-flex;
-    align-items: center;
-    min-height: 44px;
   }
   .session-notices {
     position: fixed;
@@ -815,9 +623,6 @@
     margin-top: 18px;
     gap: 6px;
   }
-  .login-panel label {
-    font-size: 0.85rem;
-  }
   .demo-accounts {
     list-style: none;
     margin: 0 0 10px;
@@ -827,84 +632,13 @@
     color: var(--text);
     font-size: 13px;
   }
-  .demo-accounts button {
-    display: block;
-    width: 100%;
-    padding: 6px;
-    border: 0;
-    border-radius: 6px;
-    background: transparent;
-    text-align: left;
-    overflow-wrap: anywhere;
-  }
   .demo-accounts .demo-value {
     white-space: nowrap;
   }
-  .demo-accounts button:hover:not(:disabled) {
-    text-decoration: underline;
-  }
-  .demo-accounts button:disabled {
-    opacity: 0.6;
-  }
   .login-field {
-    position: relative;
-    margin: 6px 0 8px;
-  }
-  .login-field label {
-    position: absolute;
-    top: 0;
-    left: 10px;
-    transform: translateY(-50%);
-    padding: 0 4px;
-    background: var(--bg);
-    z-index: 1;
-  }
-  .login-field:focus-within label {
-    color: var(--primary);
-  }
-  .login-field:has(input:disabled) label {
-    background: var(--surface);
-  }
-  .login-field input:focus-visible {
-    outline-color: var(--primary);
-  }
-  .login-field-icon,
-  .password-toggle {
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 44px;
-    height: 44px;
     display: grid;
-    place-items: center;
-    color: var(--text-muted);
-  }
-  .login-field-icon {
-    pointer-events: none;
-  }
-  .password-toggle {
-    border: 0;
-    border-radius: 6px;
-    background: transparent;
-  }
-  .password-toggle:hover:not(:disabled) {
-    color: var(--primary);
-    background: var(--primary-soft);
-  }
-  .login-panel input {
-    width: 100%;
-    min-width: 0;
-    min-height: 44px;
-    border: 1px solid var(--field-border);
-    border-radius: 6px;
-    background: var(--bg);
-    padding: 8px 44px 8px 10px;
-  }
-  .login-panel input:disabled {
-    background: var(--surface);
-  }
-  .login-panel form > button {
-    margin-top: 8px;
+    gap: 6px;
+    margin: 6px 0 8px;
   }
   .login-error,
   .field-error {
@@ -918,6 +652,9 @@
   }
 
   @media (max-width: 767px) {
+    .pagination {
+      flex-wrap: wrap;
+    }
     /* Narrow maps wrap the tile attribution onto two lines; keep the basemap box above it. */
     .basemap-select {
       bottom: 64px;
@@ -925,7 +662,7 @@
     .topbar {
       flex-wrap: wrap;
       gap: 0 12px;
-      padding: 8px 12px 0;
+      padding: 8px 12px;
     }
     .topbar h1 {
       flex: 1;
@@ -936,9 +673,7 @@
     .topbar-nav {
       order: 3;
       flex-basis: 100%;
-    }
-    .nav-item {
-      flex: 1;
+      margin-top: 6px;
     }
     .app {
       height: auto;
@@ -953,7 +688,6 @@
       overflow: visible;
     }
     .sidebar {
-      background: var(--surface);
       overflow: visible;
       border-right: 0;
       border-bottom: 1px solid var(--border);
@@ -966,7 +700,7 @@
     .table-view {
       padding: 12px;
     }
-    .filters-row label {
+    .filters-row .filter-field {
       width: 100%;
     }
     .table-total {

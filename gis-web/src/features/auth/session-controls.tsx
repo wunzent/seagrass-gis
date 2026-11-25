@@ -18,9 +18,9 @@ export function SessionControls({ view }: { view?: 'checking' | 'account' | 'gue
         <AccountOnly
           fallback={
             !logoutPending ? (
-              <Link className="session-link" href="/login">
+              <Button variant="link" nativeButton={false} render={<Link href="/login" />}>
                 เข้าสู่ระบบ
-              </Link>
+              </Button>
             ) : null
           }
         >
@@ -31,7 +31,7 @@ export function SessionControls({ view }: { view?: 'checking' | 'account' | 'gue
                 <br />
                 <span>สิทธิ์: {session.user.role}</span>
               </p>
-              <Button variant="outline" disabled={Boolean(busy)} onClick={() => void store.logout()}>
+              <Button variant="outline" size="sm" disabled={Boolean(busy)} onClick={() => void store.logout()}>
                 {busy === 'logout' ? 'กำลังออกจากระบบ…' : 'ออกจากระบบ'}
               </Button>
             </>

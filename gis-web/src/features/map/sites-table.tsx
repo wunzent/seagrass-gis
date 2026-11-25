@@ -1,6 +1,7 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { Button } from '../../components/ui/button';
+import type { ReactNode, RefObject } from 'react';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../components/ui/table';
 import { area } from '../../lib/map-format';
 import type { SiteList } from '../../lib/sites';
@@ -8,6 +9,7 @@ import { StatusLabel } from './map-ui';
 
 export function SitesTable({
   loadingList,
+  headingRef,
   filterFields,
   total,
   listState,
@@ -17,6 +19,7 @@ export function SitesTable({
   pagination,
 }: {
   loadingList: boolean;
+  headingRef: RefObject<HTMLHeadingElement | null>;
   filterFields: ReactNode;
   total: string;
   listState: ReactNode;
@@ -27,7 +30,7 @@ export function SitesTable({
 }) {
   return (
     <section className="table-view" aria-labelledby="table-heading" aria-busy={loadingList}>
-      <h2 id="table-heading" className="sr-only">
+      <h2 id="table-heading" className="sr-only" ref={headingRef} tabIndex={-1}>
         ตารางแหล่งหญ้าทะเล
       </h2>
       <div className="table-toolbar">
@@ -58,9 +61,9 @@ export function SitesTable({
                 <TableRow key={site.code}>
                   <TableCell className="site-code">{site.code}</TableCell>
                   <TableCell>
-                    <button type="button" className="table-link" onClick={() => chooseSite(site.code)}>
+                    <Button type="button" variant="link" size="sm" data-site-link onClick={() => chooseSite(site.code)}>
                       {site.name}
-                    </button>
+                    </Button>
                   </TableCell>
                   <TableCell>{provinceName(site.province_code)}</TableCell>
                   <TableCell className="num">{area.format(site.area_rai)}</TableCell>

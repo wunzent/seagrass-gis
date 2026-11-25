@@ -13,6 +13,8 @@ const inlineFixtures = [
   'components/ui/alert.tsx',
   'components/ui/select.tsx',
   'components/ui/input.tsx',
+  'components/ui/label.tsx',
+  'components/ui/tabs.tsx',
   'components/ui/table.tsx',
   'components/ui/badge.tsx',
   'components/ui/card.tsx',
@@ -45,20 +47,30 @@ const selectPrimitives = Object.fromEntries(
     'ScrollDownArrow',
   ].map((name) => [name, 'select-' + name.toLowerCase()]),
 );
+const defaultRouter = { push() {}, replace() {} };
 const componentHarness = (entry, mocks, globals) =>
   createComponentHarness(
     entry,
     {
       '@base-ui/react/select': { Select: selectPrimitives },
       '@base-ui/react/input': { Input: 'input' },
-      '@base-ui/react/button': { Button: 'button' },
+      '@base-ui/react/button': {
+        Button: Object.assign(
+          ({ render, ...props }) => ({ type: render?.type ?? 'button', props: { ...render?.props, ...props } }),
+          { inlineFixture: true },
+        ),
+      },
+      '@base-ui/react/tabs': { Tabs: { Root: 'tabs-root', List: 'tabs-list', Tab: 'button', Panel: 'tabs-panel' } },
       '@base-ui/react/use-render': {
         useRender: ({ defaultTagName, props, state }) => ({
           type: defaultTagName,
           props: { ...props, 'data-slot': state.slot, 'data-variant': state.variant },
         }),
       },
-      'next/navigation': { useRouter: () => ({ push() {} }) },
+      'next/navigation': {
+        useRouter: () => defaultRouter,
+        useSearchParams: () => new URLSearchParams(),
+      },
       ...mocks,
     },
     globals,
@@ -80,7 +92,6 @@ function loginHarness(roles, props) {
   const h = componentHarness('../src/features/auth/login-form.tsx', {
     'next/link': { default: 'a', __esModule: true },
     'next/navigation': { useRouter: () => ({ replace: (path) => calls.push(path) }) },
-    [sourceFile('components/ui/button.tsx')]: { Button: 'button' },
     [sourceFile('features/auth/session-controls.tsx')]: { SessionControls: 'controls' },
     [sourceFile('stores/session-context.tsx')]: { useSession: () => state },
   });
@@ -138,10 +149,11 @@ test('demo credentials list renders three constant accounts with bold values and
     assert.equal(button.props.type, 'button');
     assert.equal(button.props['aria-label'], undefined);
     assert.equal(nodes(button).find((n) => n.props.className === 'sr-only').props.children, 'ใช้บัญชีสาธิต ');
-    assert.ok(button.props.children.includes(account.label));
-    assert.equal(nodes(button).filter((n) => n.props.className === 'demo-value').length, 2);
+    assert.match(button.props.className, /h-7.*text-\[0\.8rem\]/);
+    assert.match(textOf(button), new RegExp(account.label));
+    assert.equal(nodes(items[i]).filter((n) => n.props.className === 'demo-value').length, 2);
     assert.deepEqual(
-      nodes(button)
+      nodes(items[i])
         .filter((n) => n.type === 'strong')
         .map((n) => n.props.children),
       [account.email, account.password],
@@ -239,6 +251,8 @@ test('password visibility toggles type and accessible pressed label without subm
   assert.equal(toggle().props['aria-label'], 'แสดงรหัสผ่าน');
   assert.equal(toggle().props['aria-pressed'], false);
   assert.equal(toggle().props.type, 'button');
+  assert.match(toggle().props.className, /\bsize-8\b/);
+  assert.equal(input().props['data-slot'], 'input');
   toggle().props.onClick();
   assert.equal(input().props.type, 'text');
   assert.equal(toggle().props['aria-label'], 'แสดงรหัสผ่าน');
@@ -495,7 +509,7 @@ test('invalid filters show validation without list skeleton or map loading statu
     invalid.some((node) => node.props?.className === 'loading-state'),
     false,
   );
-  assert.equal(invalid.find((node) => node.props?.className === 'map-progress').props.children, '');
+  assert.equal(invalid.find((node) => node.props?.className === 'map-progress').props.children ?? '', '');
 });
 
 function fakeElement(tag) {
@@ -532,24 +546,6 @@ function fakeDocument() {
     },
   };
 }
-const markers = [];
-class FakeMarker {
-  constructor({ element }) {
-    this.element = element;
-    markers.push(this);
-  }
-  setLngLat(lngLat) {
-    this.lngLat = lngLat;
-    return this;
-  }
-  addTo(map) {
-    this.map = map;
-    return this;
-  }
-  remove() {
-    this.removed = true;
-  }
-}
 function mapHarness(globals = {}, onDisplayChange, onSelect = () => {}) {
   let map;
   class FakeMap {
@@ -576,31 +572,12 @@ function mapHarness(globals = {}, onDisplayChange, onSelect = () => {}) {
     }
     addControl() {}
     addSource(id, source) {
-      // eslint-disable-next-line @typescript-eslint/no-this-alias -- test double: the source reports back to its map
-      const map = this;
       this.sources.set(id, {
         ...source,
         setData(data) {
           this.data = data;
         },
-        async getClusterLeaves(clusterId, limit) {
-          map.expandedClusters = [...(map.expandedClusters ?? []), [clusterId, limit]];
-          return map.leaves ?? [];
-        },
       });
-    }
-    querySourceFeatures(source, options) {
-      assert.equal(source, 'surveys');
-      assert.deepEqual(JSON.parse(JSON.stringify(options.filter)), ['has', 'point_count']);
-      return this.clusters ?? [];
-    }
-    cameraForBounds(bounds, options) {
-      this.cameraRequests = [...(this.cameraRequests ?? []), { bounds, options }];
-      return this.camera ?? { center: { toArray: () => [98.55, 8.55] }, zoom: 7.5 };
-    }
-    eases = [];
-    easeTo(options) {
-      this.eases.push(options);
     }
     addLayer(layer, before) {
       this.layers.push(before ? { ...layer, before } : layer);
@@ -630,11 +607,13 @@ function mapHarness(globals = {}, onDisplayChange, onSelect = () => {}) {
     getCenter() {
       return { toArray: () => [99.2, 8.1] };
     }
+    zoom = 6.2;
     getZoom() {
-      return 6.2;
+      return this.zoom;
     }
     remove() {}
     setFilter() {}
+    setLayoutProperty() {}
     fits = [];
     fitBounds(bounds) {
       this.fits.push(bounds);
@@ -662,7 +641,6 @@ function mapHarness(globals = {}, onDisplayChange, onSelect = () => {}) {
         Map: FakeMap,
         NavigationControl: class {},
         ScaleControl: class {},
-        Marker: FakeMarker,
         setWorkerUrl() {},
       },
       [sourceFile('lib/map-state.ts')]: { ...mapState, debounce: (fn) => ({ run: fn, cancel() {} }) },
@@ -827,9 +805,7 @@ function provinceWorkspace(provinces) {
   const Content = h.render(() => h.exports.default({}), 'workspace-shell').type;
   const render = () => nodes(h.render(() => Content({})));
   const provinceCell = () => {
-    render()
-      .find((node) => node.props?.className === 'nav-item' && node.props.children === 'ตารางแหล่งหญ้าทะเล')
-      .props.onClick();
+    switchTab(render(), 'ตารางแหล่งหญ้าทะเล');
     return render().filter((node) => node.type === 'td')[2].props.children;
   };
   return { h, render, Content, provinceCell };
@@ -892,7 +868,18 @@ test('province outlines stay below sites and points remain above sites through e
   assert.deepEqual(selected, ['S2']);
 });
 
-function historyWorkspace() {
+function historyWorkspace(search = '') {
+  const navigation = [];
+  const router = {
+    push: (href) => navigation.push(['push', href]),
+    replace: (href) => navigation.push(['replace', href]),
+  };
+  const listeners = new Map();
+  const browser = {
+    location: { search },
+    addEventListener: (event, fn) => listeners.set(event, fn),
+    removeEventListener: (event) => listeners.delete(event),
+  };
   const document = { body: {} };
   document.activeElement = document.body;
   let history = { data: { items: [], total: 0, page: 1 }, loading: false };
@@ -903,6 +890,10 @@ function historyWorkspace() {
     '../src/features/map/map-workspace.tsx',
     {
       'next/dynamic': { default: () => 'SiteMap', __esModule: true },
+      'next/navigation': {
+        useSearchParams: () => new URLSearchParams(search),
+        useRouter: () => router,
+      },
       [sourceFile('components/ui/button.tsx')]: { Button: 'button' },
       [sourceFile('features/auth/session-controls.tsx')]: { SessionControls: 'controls' },
       [sourceFile('stores/session-context.tsx')]: { useSession: () => ({ generation: 1 }) },
@@ -929,7 +920,7 @@ function historyWorkspace() {
         },
       },
     },
-    { document },
+    { document, window: browser },
   );
   const Content = h.render(() => h.exports.default({}), 'workspace-shell').type;
   const render = () => {
@@ -938,6 +929,11 @@ function historyWorkspace() {
   };
   return {
     render,
+    navigation,
+    restore(search) {
+      browser.location.search = search;
+      listeners.get('popstate')();
+    },
     document,
     host: h.host,
     calls,
@@ -962,6 +958,7 @@ test('workspace shares province resource and exact bounded filters with survey p
   const w = historyWorkspace();
   let tree = w.render();
   assert.equal(mapNode(tree).props.provinces, w.provinces);
+  mapNode(tree).props.onZoom(12);
   mapNode(tree).props.onViewport([98, 6, 101, 10]);
   tree.find((node) => node.type === 'select-root').props.onValueChange('81');
   tree = w.render();
@@ -1041,6 +1038,7 @@ test('clicking a survey point opens its own popup with its fields, creator only 
   };
   w.setResource('/api/surveys.geojson', { data: { type: 'FeatureCollection', features: [point] }, loading: false });
   let tree = w.render();
+  mapNode(tree).props.onZoom(12);
   mapNode(tree).props.onViewport([98, 7, 99, 9]);
   tree = w.render();
   mapNode(tree).props.onSelectSurvey('17');
@@ -1068,9 +1066,7 @@ test('clicking a survey point opens its own popup with its fields, creator only 
     false,
     'no extra request for a point',
   );
-  tree
-    .find((node) => node.props?.className === 'text-button' && textOf(node).includes('ดูรายละเอียดแหล่ง'))
-    .props.onClick();
+  tree.find((node) => node.type === 'button' && textOf(node).includes('ดูรายละเอียดแหล่ง')).props.onClick();
   tree = w.render();
   assert.equal(mapNode(tree).props.popup.key, 'site:S1');
   assert.equal(mapNode(tree).props.selectedSurveyId, null);
@@ -1291,6 +1287,7 @@ test('cursor stays a pointer moving from a survey point to a polygon, and clears
 
 test('layer failures share one named banner and retry only failing layers with accurate stale copy', () => {
   const w = historyWorkspace();
+  mapNode(w.render()).props.onZoom(12);
   mapNode(w.render()).props.onViewport([98, 6, 101, 10]);
   const pointsUrl = '/api/surveys.geojson?';
   const sitesUrl = '/api/sites.geojson?';
@@ -1441,7 +1438,7 @@ test('unavailable map drops the loading text and aria-busy from the map panel', 
   mapNode(w.render()).props.onAvailabilityChange?.(false);
   const tree = w.render();
   assert.equal(panel(tree).props['aria-busy'], false);
-  assert.equal(tree.find((node) => node.props?.className === 'map-progress').props.children, '');
+  assert.equal(tree.find((node) => node.props?.className === 'map-progress').props.children ?? '', '');
 });
 
 const siteRows = {
@@ -1453,8 +1450,9 @@ const siteRows = {
   loading: false,
 };
 const byClass = (tree, name) => tree.find((node) => node.props?.className?.split?.(' ').includes(name));
-const navItem = (tree, label) =>
-  tree.find((node) => node.props?.className === 'nav-item' && node.props.children === label);
+const navItem = (tree, label) => tree.find((node) => node.props?.['data-view'] && node.props.children === label);
+const switchTab = (tree, label) =>
+  tree.find((node) => node.type === 'tabs-root').props.onValueChange(navItem(tree, label).props.value);
 
 test('top menu switches between the map and the table view and marks the current one', () => {
   const w = historyWorkspace();
@@ -1464,7 +1462,7 @@ test('top menu switches between the map and the table view and marks the current
   assert.equal(navItem(tree, 'ตารางแหล่งหญ้าทะเล').props['aria-current'], undefined);
   assert.ok(byClass(tree, 'sidebar'), 'filters and list sit in the map sidebar');
   assert.equal(byClass(tree, 'table-view'), undefined);
-  navItem(tree, 'ตารางแหล่งหญ้าทะเล').props.onClick();
+  switchTab(tree, 'ตารางแหล่งหญ้าทะเล');
   tree = w.render();
   assert.equal(navItem(tree, 'ตารางแหล่งหญ้าทะเล').props['aria-current'], 'page');
   assert.ok(byClass(tree, 'table-view'));
@@ -1487,20 +1485,23 @@ test('choosing a site from the list opens the map popup with focus on its headin
   const w = historyWorkspace();
   w.setResource('/api/sites?', siteRows);
   let tree = w.render();
-  navItem(tree, 'ตารางแหล่งหญ้าทะเล').props.onClick();
+  switchTab(tree, 'ตารางแหล่งหญ้าทะเล');
   tree = w.render();
-  tree.find((node) => node.props?.className === 'table-link').props.onClick();
+  tree.find((node) => node.props?.['data-site-link']).props.onClick();
   tree = w.render();
   assert.ok(!byClass(tree, 'map-layout').props.className.includes('view-hidden'), 'switched to the map');
   const dialog = tree.find((node) => node.props?.role === 'dialog');
   assert.equal(dialog.props['aria-labelledby'], 'detail-heading');
+  const slots = nodes(dialog).map((node) => node.props?.['data-slot']);
+  for (const slot of ['card', 'card-header', 'card-title', 'card-action', 'card-content'])
+    assert.ok(slots.includes(slot), slot);
   assert.equal(mapNode(tree).props.popup.key, 'site:S1');
   assert.equal(mapNode(w.render()).props.popupElement, w.host(dialog), 'SiteMap receives the mounted popup element');
   tree = w.render();
   assert.equal(w.document.activeElement, w.host(tree.find((node) => node.props?.id === 'detail-heading')));
   assert.match(textOf(dialog), /Site/);
   const mapHeading = w.host(tree.find((node) => node.props?.id === 'map-heading'));
-  w.host(tree.find((node) => node.props?.className === 'site-button')).getClientRects = () => [];
+  w.host(tree.find((node) => node.props?.className?.split(' ').includes('site-button'))).getClientRects = () => [];
   mapHeading.getClientRects = () => [{}];
   tree.find((node) => node.props?.className === 'map-container').props.onKeyDown({ key: 'Escape' });
   tree = w.render();
@@ -1536,7 +1537,7 @@ test('closing the popup returns focus to the selected row, else the map heading,
     const w = historyWorkspace();
     w.setResource('/api/sites?', siteRows);
     let tree = w.render();
-    const row = () => tree.find((node) => node.props?.className === 'site-button');
+    const row = () => tree.find((node) => node.props?.className?.split(' ').includes('site-button'));
     row().props.onClick();
     tree = w.render();
     const rowHost = w.host(row());
@@ -1545,8 +1546,8 @@ test('closing the popup returns focus to the selected row, else the map heading,
     rowHost.getClientRects = () => (rowVisible ? [{}] : []);
     mapHeading.getClientRects = () => (mapVisible ? [{}] : []);
     sitesHeading.getClientRects = () => [{}];
-    const close = tree.find((node) => node.props?.className === 'popup-close');
-    assert.equal(close.props['aria-label'], 'ปิดรายละเอียด');
+    const close = tree.find((node) => node.props?.['aria-label'] === 'ปิด');
+    assert.equal(close.props.size, 'icon-sm');
     w.host(close).focus();
     close.props.onClick();
     tree = w.render();
@@ -1683,6 +1684,7 @@ test('a still-drawn survey point opens its popup while the points layer reloads 
     properties: { id: 17, site_code: 'S1', surveyed_on: '2025-03-28', cover_percent: 87, species: [], note: null },
   };
   w.setResource('/api/surveys.geojson', { data: { type: 'FeatureCollection', features: [point] }, loading: false });
+  mapNode(w.render()).props.onZoom(12);
   mapNode(w.render()).props.onViewport([98, 7, 99, 9]);
   w.render();
   for (const state of [{ loading: true }, { error: new Error('offline'), loading: false }]) {
@@ -1758,6 +1760,7 @@ test('Escape from the canvas closes the popup without moving focus; a point gone
     properties: { id, site_code: 'S1', surveyed_on: '2025-03-28', cover_percent: 87, species: [], note: null },
   });
   w.setResource('/api/surveys.geojson', { data: { type: 'FeatureCollection', features: [point(17)] }, loading: false });
+  mapNode(w.render()).props.onZoom(12);
   mapNode(w.render()).props.onViewport([98, 7, 99, 9]);
   w.render();
   mapNode(w.render()).props.onSelectSurvey('17');
@@ -1896,7 +1899,8 @@ test('list pagination has a shadcn size select, stable range and icon-only pagin
     [10, 20, 50, 100],
   );
   assert.equal(sizeSelect().props.value, 20);
-  assert.ok(nodes(nav()).some((node) => node.props?.['aria-label'] === 'จำนวนต่อหน้า'));
+  const sizeTrigger = nodes(nav()).find((node) => node.props?.['aria-label'] === 'จำนวนต่อหน้า');
+  assert.equal(sizeTrigger.props['data-size'], 'sm');
   assert.ok(nodes(nav()).some((node) => node.type === 'select-value' && node.props.children.join('') === '20 ต่อหน้า'));
   assert.equal(
     nodes(nav()).some((node) => node.props?.['aria-label'] === 'ไปหน้า'),
@@ -1906,6 +1910,12 @@ test('list pagination has a shadcn size select, stable range and icon-only pagin
   assert.deepEqual(
     buttons.map((node) => node.props['aria-label']),
     ['หน้าก่อนหน้า', 'หน้าถัดไป'],
+  );
+  assert.ok(
+    buttons.every(
+      (node) =>
+        (node.props.size === 'icon-sm' || node.props.className.includes('size-7')) && textOf(node).trim() === '',
+    ),
   );
   assert.equal(range(), '1–20 จาก 45');
   sizeSelect().props.onValueChange(50);
@@ -2037,55 +2047,28 @@ test('page-size focus waits for Base UI native disabled lag and cancels on outsi
   assert.equal(observers[2].disconnected, true, 'a new load cleans up its obsolete observer');
 });
 
-test('survey points cluster; individual points exclude clusters; numbered cluster buttons zoom in', async () => {
-  markers.length = 0;
-  const { map } = mapHarness();
-  const surveys = map.sources.get('surveys');
-  assert.equal(surveys.cluster, true);
-  assert.equal(surveys.clusterRadius, 40);
-  assert.equal(surveys.clusterMaxZoom, 9);
-  assert.deepEqual(JSON.parse(JSON.stringify(map.layers.find((layer) => layer.id === 'surveys-circle').filter)), [
-    '!',
-    ['has', 'point_count'],
-  ]);
-  const cluster = (id, count, coordinates) => ({
-    properties: { cluster: true, cluster_id: id, point_count: count },
-    geometry: { type: 'Point', coordinates },
-  });
-  map.clusters = [cluster(7, 12, [98.5, 8.5]), cluster(7, 12, [98.5, 8.5]), cluster(9, 3, [98.6, 8.6])];
-  map.emit('render');
-  assert.equal(markers.length, 2, 'one marker per cluster id, duplicates across tiles ignored');
-  const [twelve] = markers;
-  assert.equal(twelve.element.tagName, 'BUTTON');
-  assert.equal(twelve.element.textContent, '12');
-  assert.equal(twelve.element.attributes['aria-label'], 'กลุ่มจุดสำรวจ 12 จุด คลิกเพื่อซูมเข้า');
-  assert.match(twelve.element.className, /survey-cluster md/);
-  assert.deepEqual(JSON.parse(JSON.stringify(twelve.lngLat)), [98.5, 8.5]);
-  twelve.element.dispatch('click');
-  await new Promise((resolve) => setImmediate(resolve));
-  // One click: fit every point of the cluster, and zoom at least past the clustering zoom so the points show.
+test('survey sources draw individual points and report zoom crossings at level 12', () => {
+  const { map, render } = mapHarness();
+  const zooms = [];
+  render(undefined, { onZoom: (zoom) => zooms.push(zoom) });
+  assert.equal(map.sources.get('surveys').cluster, undefined);
+  assert.equal(map.layers.find((layer) => layer.id === 'surveys-circle').filter, undefined);
+  for (const zoom of [11.9, 12, 13, 11.9]) {
+    map.zoom = zoom;
+    map.emit('zoom');
+  }
+  assert.deepEqual(zooms, [12, 11.9]);
+  const layout = [];
+  map.setLayoutProperty = (...args) => layout.push(args);
+  render(undefined, { surveysVisible: false });
   assert.deepEqual(
-    JSON.parse(JSON.stringify(map.expandedClusters)),
-    [[7, Infinity]].map(([id]) => [id, null]),
+    layout.map(([layer, property, value]) => [layer, property, value]),
+    [
+      ['surveys-circle', 'visibility', 'none'],
+      ['surveys-hover', 'visibility', 'none'],
+      ['surveys-selected', 'visibility', 'none'],
+    ],
   );
-  assert.deepEqual(JSON.parse(JSON.stringify(map.cameraRequests.at(-1).bounds)), [
-    [98.5, 8.5],
-    [98.5, 8.5],
-  ]);
-  assert.deepEqual(JSON.parse(JSON.stringify(map.eases.at(-1))), { center: [98.55, 8.55], zoom: 10 });
-  map.camera = { center: { toArray: () => [98.6, 8.6] }, zoom: 12.4 };
-  map.leaves = [{ geometry: { coordinates: [98.6, 8.5] } }, { geometry: { coordinates: [98.62, 8.7] } }];
-  twelve.element.dispatch('click');
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.deepEqual(JSON.parse(JSON.stringify(map.cameraRequests.at(-1).bounds)), [
-    [98.6, 8.5],
-    [98.62, 8.7],
-  ]);
-  assert.deepEqual(JSON.parse(JSON.stringify(map.eases.at(-1))), { center: [98.6, 8.6], zoom: 12.4 });
-  map.clusters = [cluster(9, 3, [98.6, 8.6])];
-  map.emit('render');
-  assert.equal(twelve.removed, true, 'a cluster that is gone loses its marker');
-  assert.equal(markers.length, 2, 'the remaining cluster keeps its marker');
 });
 
 test('hovering a survey point shows no tooltip (the popup on click carries the details)', () => {
@@ -2187,7 +2170,7 @@ test('P6 Table and status Badge preserve column semantics, site selection and st
   );
   assert.ok(tree.some((n) => n.type === 'table' && n.props['data-slot'] === 'table'));
   assert.equal(tree.filter((n) => n.type === 'th' && n.props.scope === 'col').length, 5);
-  tree.find((n) => n.props?.className === 'table-link').props.onClick();
+  tree.find((n) => n.props?.['data-site-link']).props.onClick();
   assert.deepEqual(chosen, ['S1']);
   const ui = componentHarness('../src/features/map/map-ui.tsx');
   for (const status of [...Object.keys(mapState.statuses), 'unknown']) {
@@ -2196,4 +2179,71 @@ test('P6 Table and status Badge preserve column semantics, site selection and st
     const swatch = badge.find((n) => typeof n.type === 'function' && n.props?.status);
     assert.equal(swatch.props.status, status === 'unknown' ? 'no_data' : status);
   }
+});
+
+test('opening and traversing shared URLs restore the active view, selected site, filters and page', () => {
+  const w = historyWorkspace('?province=92&status=good&site=TRG-001&view=table&page=3&pageSize=10&q=reef');
+  let tree = w.render();
+  assert.ok(byClass(tree, 'table-view'));
+  assert.match(textOf(tree.find((node) => node.props?.role === 'dialog')), /TRG-001/);
+  assert.ok(w.calls.some(({ url }) => url?.includes('page=3&pageSize=10&province=92&status=good&q=reef')));
+  switchTab(tree, 'แผนที่');
+  tree = w.render();
+  assert.equal(mapNode(tree).props.popup.key, 'site:TRG-001');
+  assert.equal(w.navigation.at(-1)[0], 'push');
+  assert.ok(!w.navigation.at(-1)[1].includes('view=table'));
+  tree.find((node) => node.props?.type === 'search').props.onChange({ target: { value: 'new' } });
+  assert.equal(w.navigation.at(-1)[0], 'replace');
+  assert.ok(w.navigation.at(-1)[1].includes('q=new'));
+  assert.ok(!w.navigation.at(-1)[1].includes('site='));
+  w.restore('?view=table&site=TRG-002&page=2');
+  tree = w.render();
+  assert.match(textOf(tree.find((node) => node.props?.role === 'dialog')), /TRG-002/);
+  assert.equal(tree.find((node) => node.props?.type === 'search').props.value, '');
+  assert.ok(w.calls.some(({ url }) => url?.startsWith('/api/sites?page=2')));
+  assert.equal(w.navigation.length, 2, 'history restoration must not write a new entry');
+});
+
+test('survey requests and visible features follow the zoom and layer toggle', () => {
+  const w = historyWorkspace();
+  const points = {
+    type: 'FeatureCollection',
+    features: [{ properties: { id: '1', site_code: 'S1' } }, { properties: { id: '2', site_code: 'S2' } }],
+  };
+  w.setResource('/api/surveys.geojson', { data: points, loading: false });
+  const surveyRequests = () => w.calls.filter(({ url }) => url?.startsWith('/api/surveys.geojson'));
+  mapNode(w.render()).props.onViewport([98, 7, 99, 9]);
+  let tree = w.render();
+  assert.equal(surveyRequests().length, 0);
+  assert.equal(mapNode(tree).props.surveysVisible, false);
+
+  mapNode(tree).props.onSelect('S1');
+  tree = w.render();
+  assert.equal(surveyRequests().length, 1);
+  assert.deepEqual(
+    Array.from(mapNode(tree).props.surveys.features, (feature) => feature.properties.id),
+    ['1'],
+  );
+  mapNode(tree).props.onZoom(12);
+  tree = w.render();
+  assert.equal(mapNode(tree).props.surveys, points);
+  const toggle = tree.find((node) => node.type === 'button' && node.props['aria-label'] === 'จุดสำรวจ');
+  assert.equal(toggle.props['aria-pressed'], true);
+  toggle.props.onClick();
+  tree = w.render();
+  assert.equal(surveyRequests().length, 0);
+  assert.equal(mapNode(tree).props.surveysVisible, false);
+});
+
+test('a shared page past the last result is replaced by the last available page', () => {
+  const w = historyWorkspace('?page=99&pageSize=10');
+  w.setResource('/api/sites?', { data: { items: [], total: 17, page: 99 }, loading: false });
+  w.render();
+  assert.deepEqual(w.navigation.at(-1), ['replace', '/?page=2&pageSize=10']);
+  w.setResource('/api/sites?', { data: { items: [], total: 17, page: 2 }, loading: false });
+  const tree = w.render();
+  const range = nodes(tree.find((node) => node.props?.['aria-label'] === 'หน้ารายการแหล่ง')).find(
+    (node) => node.type === 'small',
+  );
+  assert.equal(range.props.children.join(''), '11–17 จาก 17');
 });

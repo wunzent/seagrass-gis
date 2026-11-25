@@ -14,7 +14,12 @@ const textOf = (tree) =>
 const harness = () =>
   componentHarness('../src/features/shell/route-states.tsx', {
     'next/link': { default: 'a', __esModule: true },
-    [sourceFile('components/ui/button.tsx')]: { Button: 'button' },
+    [sourceFile('components/ui/button.tsx')]: {
+      Button: Object.assign(
+        ({ render, ...props }) => ({ type: render?.type ?? 'button', props: { ...render?.props, ...props } }),
+        { inlineFixture: true },
+      ),
+    },
   });
 
 test('route loading page announces loading as a status', () => {

@@ -6,50 +6,43 @@ import type { Survey } from '../../lib/sites';
 export function SurveyPopup({
   survey,
   siteName,
-  openSite,
 }: {
   survey: Survey & { site_code: string };
   siteName: (code: string) => string | undefined;
-  openSite: (code: string) => void;
 }) {
   return (
-    <div className="popup-body">
-      <dl className="facts">
-        <div>
-          <dt>แหล่ง</dt>
-          <dd>
-            {survey.site_code}
-            {siteName(survey.site_code) ? ` ${siteName(survey.site_code)}` : ''}
-          </dd>
-        </div>
-        <div>
-          <dt>การปกคลุม</dt>
-          <dd className="num">{number.format(survey.cover_percent)}%</dd>
-        </div>
-        <div>
-          <dt>ชนิดหญ้าทะเล</dt>
-          <dd>{survey.species.join(', ') || 'ไม่มี'}</dd>
-        </div>
-        <div>
-          <dt>หมายเหตุ</dt>
-          <dd>{survey.note || 'ไม่มี'}</dd>
-        </div>
-        {survey.created_by && (
-          <div className="wide">
-            <dt>ผู้บันทึก</dt>
-            <dd>{survey.created_by.email}</dd>
-          </div>
-        )}
+    <dl className="facts">
+      <div>
+        <dt>แหล่ง</dt>
+        <dd>
+          {survey.site_code}
+          {siteName(survey.site_code) ? ` ${siteName(survey.site_code)}` : ''}
+        </dd>
+      </div>
+      <div>
+        <dt>การปกคลุม</dt>
+        <dd className="num">{number.format(survey.cover_percent)}%</dd>
+      </div>
+      <div>
+        <dt>ชนิดหญ้าทะเล</dt>
+        <dd>{survey.species.join(', ') || 'ไม่มี'}</dd>
+      </div>
+      <div>
+        <dt>หมายเหตุ</dt>
+        <dd>{survey.note || 'ไม่มี'}</dd>
+      </div>
+      {survey.created_by && (
         <div className="wide">
-          <dt>พิกัด</dt>
-          <dd className="num">
-            {coordinate.format(survey.lon)}, {coordinate.format(survey.lat)}
-          </dd>
+          <dt>ผู้บันทึก</dt>
+          <dd>{survey.created_by.email}</dd>
         </div>
-      </dl>
-      <button type="button" className="text-button" onClick={() => openSite(survey.site_code)}>
-        ดูรายละเอียดแหล่ง {survey.site_code}
-      </button>
-    </div>
+      )}
+      <div className="wide">
+        <dt>พิกัด</dt>
+        <dd className="num">
+          {coordinate.format(survey.lon)}, {coordinate.format(survey.lat)}
+        </dd>
+      </div>
+    </dl>
   );
 }

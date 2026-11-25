@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useRef, useState, type FormEvent } from 'react';
 import { Button } from '../../components/ui/button';
+import { Label } from '../../components/ui/label';
+import { Input } from '../../components/ui/input';
 import { useSession } from '../../stores/session-context';
 import { SessionControls } from './session-controls';
 import { validateLogin } from '../../lib/session';
@@ -50,7 +52,9 @@ export function LoginForm({
               <ul className="demo-accounts" aria-label="บัญชีสาธิตสำหรับกรอกฟอร์ม">
                 {accounts.map((account) => (
                   <li key={account.role}>
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       type="button"
                       disabled={Boolean(busy) || logoutPending || phase === 'checking'}
                       onClick={() => {
@@ -60,7 +64,11 @@ export function LoginForm({
                       }}
                     >
                       <span className="sr-only">ใช้บัญชีสาธิต </span>
-                      {account.label} Email:{' '}
+                      {account.label}
+                    </Button>
+                    <span>
+                      {' '}
+                      Email:{' '}
                       <span className="demo-value">
                         <strong>{account.email}</strong>
                       </span>{' '}
@@ -68,7 +76,7 @@ export function LoginForm({
                       <span className="demo-value">
                         <strong>{account.password}</strong>
                       </span>
-                    </button>
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -81,8 +89,10 @@ export function LoginForm({
                 {!logoutPending && error}
               </div>
               <div className="login-field">
-                <label htmlFor="email">Email</label>
-                <input
+                <Label htmlFor="email">
+                  <MailIcon /> Email
+                </Label>
+                <Input
                   ref={emailInput}
                   id="email"
                   name="email"
@@ -96,9 +106,6 @@ export function LoginForm({
                   aria-describedby={fields.email ? 'email-error' : undefined}
                   disabled={Boolean(busy)}
                 />
-                <span className="login-field-icon">
-                  <MailIcon />
-                </span>
               </div>
               {fields.email && (
                 <p className="field-error" id="email-error">
@@ -106,31 +113,34 @@ export function LoginForm({
                 </p>
               )}
               <div className="login-field">
-                <label htmlFor="password">Password</label>
-                <input
-                  ref={passwordInput}
-                  id="password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  aria-invalid={Boolean(fields.password)}
-                  aria-describedby={fields.password ? 'password-error' : undefined}
-                  disabled={Boolean(busy)}
-                />
-                <button
-                  className="password-toggle"
-                  type="button"
-                  aria-label="แสดงรหัสผ่าน"
-                  aria-pressed={showPassword}
-                  aria-controls="password"
-                  disabled={Boolean(busy)}
-                  onClick={() => setShowPassword((visible) => !visible)}
-                >
-                  <EyeIcon visible={showPassword} />
-                </button>
+                <Label htmlFor="password">Password</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    ref={passwordInput}
+                    id="password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    required
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    aria-invalid={Boolean(fields.password)}
+                    aria-describedby={fields.password ? 'password-error' : undefined}
+                    disabled={Boolean(busy)}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    type="button"
+                    aria-label="แสดงรหัสผ่าน"
+                    aria-pressed={showPassword}
+                    aria-controls="password"
+                    disabled={Boolean(busy)}
+                    onClick={() => setShowPassword((visible) => !visible)}
+                  >
+                    <EyeIcon visible={showPassword} />
+                  </Button>
+                </div>
               </div>
               {fields.password && (
                 <p className="field-error" id="password-error">
@@ -140,15 +150,15 @@ export function LoginForm({
               <Button type="submit" disabled={Boolean(busy) || logoutPending || phase === 'checking'}>
                 {busy === 'login' ? 'กำลังเข้าสู่ระบบ…' : 'เข้าสู่ระบบ'}
               </Button>
-              <Link className="session-link" href="/">
+              <Button className="self-start" variant="link" nativeButton={false} render={<Link href="/" />}>
                 กลับไปแผนที่โดยไม่เข้าสู่ระบบ
-              </Link>
+              </Button>
             </form>
           </>
         ) : (
-          <Link className="session-link" href="/">
+          <Button className="self-start" variant="link" nativeButton={false} render={<Link href="/" />}>
             กลับไปแผนที่
-          </Link>
+          </Button>
         )}
       </section>
     </main>

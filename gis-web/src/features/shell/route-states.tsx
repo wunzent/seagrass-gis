@@ -24,9 +24,9 @@ export function RouteError({ reset }: { error: Error & { digest?: string }; rese
         <p>ลองใหม่อีกครั้ง ถ้ายังไม่ได้ให้กลับไปหน้าแผนที่</p>
         <div className="route-state-actions">
           <Button onClick={() => reset()}>ลองใหม่</Button>
-          <Link className="session-link" href="/">
+          <Button variant="link" nativeButton={false} render={<Link href="/" />}>
             กลับหน้าแผนที่
-          </Link>
+          </Button>
         </div>
       </div>
     </main>
@@ -39,9 +39,9 @@ export function RouteNotFound() {
       <div className="route-state-box">
         <h1>ไม่พบหน้าที่ต้องการ</h1>
         <p>ลิงก์อาจผิดหรือหน้านี้ไม่มีอยู่แล้ว</p>
-        <Link className="session-link" href="/">
+        <Button variant="link" nativeButton={false} render={<Link href="/" />}>
           กลับหน้าแผนที่
-        </Link>
+        </Button>
       </div>
     </main>
   );

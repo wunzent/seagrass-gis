@@ -1,10 +1,10 @@
 'use client';
 
+import { Button } from '../../components/ui/button';
 import { Alert, AlertDescription } from '../../components/ui/alert';
 
 import {
   Map as MapLibreMap,
-  Marker,
   NavigationControl,
   ScaleControl,
   setWorkerUrl,
@@ -31,7 +31,8 @@ import {
   type SitesGeoJSON,
   type SurveysGeoJSON,
 } from '../../lib/sites';
-import { clusterLabel, popupArrow, SURVEY_CLUSTER } from '../../lib/map-overlay';
+import { popupArrow } from '../../lib/map-overlay';
+import { SURVEY_MIN_ZOOM } from '../../lib/survey-visibility';
 import { BASEMAPS, DEFAULT_BASEMAP, basemapOverlaySources, basemapSource, type BasemapId } from '../../lib/basemaps';
 
 // Served from public/ by scripts/copy-maplibre-worker.mjs; the default URL is relative to the bundled chunk and 404s.
@@ -42,6 +43,8 @@ type Props = {
   data?: SitesGeoJSON;
   provinces?: ProvinceCollection;
   surveys?: SurveysGeoJSON;
+  surveysVisible?: boolean;
+  onZoom?: (zoom: number) => void;
   selection?: SiteFeature;
   onSelect: (code: string) => void;
   onViewport: (box: Bbox | null) => void;
@@ -110,6 +113,8 @@ export default function SiteMap({
   data,
   provinces,
   surveys,
+  surveysVisible = true,
+  onZoom,
   selection,
   onSelect,
   onViewport,
@@ -131,9 +136,25 @@ export default function SiteMap({
   const lastClick = useRef<{ key: string; lngLat: [number, number] } | null>(null);
   const anchor = useRef<[number, number] | null>(null);
   const selectedSurvey = useRef(selectedSurveyId);
-  const callbacks = useRef({ onSelect, onViewport, onDisplayChange, onAvailabilityChange, onDeselect, onSelectSurvey });
+  const callbacks = useRef({
+    onSelect,
+    onViewport,
+    onZoom,
+    onDisplayChange,
+    onAvailabilityChange,
+    onDeselect,
+    onSelectSurvey,
+  });
   // eslint-disable-next-line react-hooks/refs -- intentional: latest-callback ref pattern keeps map listeners stable
-  callbacks.current = { onSelect, onViewport, onDisplayChange, onAvailabilityChange, onDeselect, onSelectSurvey };
+  callbacks.current = {
+    onSelect,
+    onViewport,
+    onZoom,
+    onDisplayChange,
+    onAvailabilityChange,
+    onDeselect,
+    onSelectSurvey,
+  };
   const popupTarget = useRef(popupElement);
   // eslint-disable-next-line react-hooks/refs -- intentional: map move listeners read the latest popup element
   popupTarget.current = popupElement;
@@ -187,6 +208,7 @@ export default function SiteMap({
     callbacks.current.onDisplayChange?.(false);
     callbacks.current.onAvailabilityChange?.(true);
     callbacks.current.onViewport(null);
+    callbacks.current.onZoom?.(camera.current.zoom);
     const updateViewport = debounce(() => {
       const bounds = map.current?.getBounds();
       if (!bounds) return;
@@ -283,12 +305,11 @@ export default function SiteMap({
           filter: ['==', ['get', 'code'], ''],
           paint: { 'line-color': POINT_STROKE, 'line-width': 3.5 },
         });
-        instance.addSource('surveys', { type: 'geojson', data: empty, ...SURVEY_CLUSTER });
+        instance.addSource('surveys', { type: 'geojson', data: empty });
         instance.addLayer({
           id: 'surveys-circle',
           type: 'circle',
           source: 'surveys',
-          filter: ['!', ['has', 'point_count']],
           paint: {
             'circle-color': POINT_FILL,
             'circle-radius': 4.5,
@@ -357,56 +378,15 @@ export default function SiteMap({
           instance.getCanvas().style.cursor = survey || siteAt(event.point) ? 'pointer' : '';
         });
         instance.on('mouseout', () => instance.setFilter('surveys-hover', idFilter('')));
-        // Clusters are numbered buttons (HTML markers: the style has no glyphs for map text); a click zooms in.
-        const clusterMarkers = new Map<number, Marker>();
-        instance.on('render', () => {
-          const seen = new Set<number>();
-          for (const feature of instance.querySourceFeatures('surveys', { filter: ['has', 'point_count'] })) {
-            const clusterId = feature.properties?.cluster_id;
-            const coordinates = (feature.geometry as { coordinates?: [number, number] }).coordinates;
-            if (typeof clusterId !== 'number' || seen.has(clusterId) || !coordinates) continue;
-            seen.add(clusterId);
-            if (clusterMarkers.has(clusterId)) continue;
-            const label = clusterLabel(Number(feature.properties?.point_count));
-            const button = documentOf.createElement('button');
-            button.setAttribute('type', 'button');
-            button.className = `survey-cluster ${label.size}`;
-            button.textContent = label.text;
-            button.setAttribute('aria-label', label.aria);
-            button.addEventListener('click', (event) => {
-              event.stopPropagation();
-              // One click shows the whole group: fit all its points and zoom at least past the clustering zoom.
-              void (instance.getSource('surveys') as GeoJSONSource)
-                .getClusterLeaves(clusterId, Infinity, 0)
-                .then((leaves) => {
-                  const points = leaves
-                    .map((leaf) => (leaf.geometry as { coordinates?: [number, number] }).coordinates)
-                    .filter((point): point is [number, number] => Array.isArray(point));
-                  if (!points.length) points.push(coordinates);
-                  const lons = points.map((point) => point[0]);
-                  const lats = points.map((point) => point[1]);
-                  const camera = instance.cameraForBounds(
-                    [
-                      [Math.min(...lons), Math.min(...lats)],
-                      [Math.max(...lons), Math.max(...lats)],
-                    ],
-                    { padding: 60, maxZoom: 14 },
-                  );
-                  instance.easeTo({
-                    center:
-                      (camera?.center as { toArray?: () => [number, number] } | undefined)?.toArray?.() ?? coordinates,
-                    zoom: Math.max(camera?.zoom ?? 0, SURVEY_CLUSTER.clusterMaxZoom + 1),
-                  });
-                })
-                .catch(() => undefined);
-            });
-            clusterMarkers.set(clusterId, new Marker({ element: button }).setLngLat(coordinates).addTo(instance));
+        let surveyZoom = instance.getZoom() >= SURVEY_MIN_ZOOM;
+        callbacks.current.onZoom?.(instance.getZoom());
+        instance.on('zoom', () => {
+          const zoom = instance.getZoom();
+          const next = zoom >= SURVEY_MIN_ZOOM;
+          if (next !== surveyZoom) {
+            surveyZoom = next;
+            callbacks.current.onZoom?.(zoom);
           }
-          for (const [clusterId, marker] of clusterMarkers)
-            if (!seen.has(clusterId)) {
-              marker.remove();
-              clusterMarkers.delete(clusterId);
-            }
         });
         setReady(true);
         updateViewport.run(undefined);
@@ -487,11 +467,23 @@ export default function SiteMap({
     if (!ready || !provinces) return;
     (map.current?.getSource('provinces') as GeoJSONSource | undefined)?.setData(provinces);
   }, [provinces, ready]);
+  useLayoutEffect(() => {
+    const instance = map.current;
+    if (!ready || !instance) return;
+    for (const layer of ['surveys-circle', 'surveys-hover', 'surveys-selected']) {
+      instance.setLayoutProperty(layer, 'visibility', surveysVisible ? 'visible' : 'none');
+    }
+    if (!surveysVisible) {
+      instance.setFilter('surveys-hover', idFilter(''));
+      (instance.getSource('surveys') as GeoJSONSource | undefined)?.setData(empty);
+      callbacks.current.onDisplayChange?.(false, 'surveys');
+    }
+  }, [ready, surveysVisible]);
   useEffect(() => {
-    if (!ready || !surveys) return;
+    if (!ready || !surveysVisible || !surveys) return;
     (map.current?.getSource('surveys') as GeoJSONSource | undefined)?.setData(surveys);
     callbacks.current.onDisplayChange?.(true, 'surveys');
-  }, [surveys, ready]);
+  }, [surveys, ready, surveysVisible]);
   useEffect(() => {
     const instance = map.current;
     if (!instance || !ready) return;
@@ -550,9 +542,14 @@ export default function SiteMap({
       {failure && (
         <Alert className="map-warning" role="alert" variant="destructive">
           <AlertDescription>{failure}</AlertDescription>
-          <button type="button" className="text-button" onClick={() => setGeneration((value) => value + 1)}>
+          <Button
+            variant="link"
+            size="sm"
+            className="justify-self-start"
+            onClick={() => setGeneration((value) => value + 1)}
+          >
             ลองใหม่
-          </button>
+          </Button>
         </Alert>
       )}
       {!ready && !failure && (

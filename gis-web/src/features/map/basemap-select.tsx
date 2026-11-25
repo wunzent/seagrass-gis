@@ -1,19 +1,20 @@
 'use client';
 
+import { Label } from '../../components/ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem } from '../../components/ui/select';
 import { BASEMAPS, isBasemap, type BasemapId } from '../../lib/basemaps';
 
 export function BasemapSelect({ value, onChange }: { value: BasemapId; onChange: (value: BasemapId) => void }) {
   return (
-    <label className="basemap-select">
-      <span>แผนที่ฐาน</span>
+    <div className="basemap-select">
+      <Label htmlFor="basemap">แผนที่ฐาน</Label>
       <Select
         value={value}
         onValueChange={(next) => {
           if (isBasemap(next)) onChange(next);
         }}
       >
-        <SelectTrigger aria-label="แผนที่ฐาน">
+        <SelectTrigger id="basemap" className="bg-background" aria-label="แผนที่ฐาน">
           <SelectValue>{BASEMAPS[value].label}</SelectValue>
         </SelectTrigger>
         <SelectContent>
@@ -26,6 +27,6 @@ export function BasemapSelect({ value, onChange }: { value: BasemapId; onChange:
           </SelectGroup>
         </SelectContent>
       </Select>
-    </label>
+    </div>
   );
 }

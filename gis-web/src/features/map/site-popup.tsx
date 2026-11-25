@@ -27,7 +27,7 @@ export function SitePopup({
   rounds: ReturnType<typeof surveyRounds>;
 }) {
   return (
-    <div className="popup-body">
+    <div className="grid gap-3">
       {detail.loading && (
         <Alert role="status">
           <AlertDescription>กำลังโหลดรายละเอียด…</AlertDescription>

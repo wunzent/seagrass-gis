@@ -49,6 +49,7 @@ export function componentHarness(path, mocks = {}, globals = {}, { inlineFixture
       }
     },
   };
+  react.Suspense = 'suspense';
   react.useLayoutEffect = react.useEffect;
   react.useSyncExternalStore = (_subscribe, getSnapshot) => getSnapshot();
   const file = new URL(path, import.meta.url);
@@ -147,7 +148,7 @@ export function componentHarness(path, mocks = {}, globals = {}, { inlineFixture
       }
       return require(name);
     };
-    runInNewContext(code, { exports: result, require: load, console, Error, ...globals });
+    runInNewContext(code, { exports: result, require: load, console, Error, URLSearchParams, ...globals });
     return result;
   };
   evaluate(fileURLToPath(file), true);

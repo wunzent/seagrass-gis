@@ -24,9 +24,10 @@ test('shadcn Table keeps table semantics inside its local scroll container', () 
   assert.equal(tree.find((n) => n.type === 'table').props['aria-label'], 'แหล่ง');
   assert.equal(tree[0].props['data-slot'], 'table-container');
 });
-test('Base UI Select uses accessible primitives and all seven components are present', () => {
+test('shadcn Select and Tabs use Base UI primitives and all registry components are present', () => {
   const select = readFileSync(source('select.tsx'), 'utf8');
   assert.match(select, /@base-ui\/react\/select/);
-  for (const name of ['pagination', 'alert', 'select', 'input', 'table', 'badge', 'card'])
+  assert.match(readFileSync(source('tabs.tsx'), 'utf8'), /@base-ui\/react\/tabs/);
+  for (const name of ['button', 'pagination', 'alert', 'select', 'input', 'label', 'tabs', 'table', 'badge', 'card'])
     assert.match(readFileSync(source(name + '.tsx'), 'utf8'), /data-slot|slot:/);
 });

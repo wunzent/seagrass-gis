@@ -41,6 +41,7 @@ const packages = {
     'cn',
     '@base-ui/react/button',
     '@base-ui/react/select',
+    '@base-ui/react/tabs',
     '@base-ui/react/input',
     '@base-ui/react/merge-props',
     '@base-ui/react/use-render',

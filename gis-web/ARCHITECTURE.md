@@ -54,15 +54,20 @@ src/services/              http-client, auth-service, session-service
                            sites-service, surveys-service, lookups-service, map-cache-service
 src/stores/                external-store, session-store, session-context
                            map-store, resource-store
-src/components/ui/         button, pagination, alert, select, input, table, badge, card, utils
+src/components/ui/         button, pagination, alert, select, input, label, tabs, table, badge, card, utils
 src/lib/                   map-state, map-format, sites, session, proxy, demo-accounts, basemaps, map-overlay, map-cache
+                           map-url, survey-visibility
 ```
 
 SessionProvider สร้าง session-store + createSessionService(sink, options) ต่อ mount แล้ว expose facade เฉพาะ getSnapshot/getServerSnapshot/subscribe/isCurrent และ service actions โดยไม่เปิด setState ให้ features ที่คง identity ผ่าน useSession. ไม่เรียก /auth/me: ตอน mount อ่าน identity ที่จำไว้ตอน login (localStorage key gis-session เก็บเฉพาะ id/email/role/expires_at ไม่มี JWT) แล้วตั้ง timer เฉพาะเวลาหมดอายุ; API ตรวจ session ทุกคำขอ ถ้า 401 หรือ response มี X-Auth-Session: invalid (http-client onSessionInvalid) จะล้าง identity และแจ้งหมดอายุ; storage event จากแท็บอื่นสั่ง restore ใหม่. ไม่มี focus/visibility listener; dispose ยกเลิก timers และ listener. session-context เก็บแค่ context/subscription ไม่มี service wiring; ตอน hydrate useSession อ่าน getServerSnapshot (สถานะ checking คงที่) เพราะ identity จาก storage อาจถูกอ่านก่อน subtree ที่ hydrate ทีหลัง (แผนที่เป็น dynamic import) แล้ว HTML ไม่ตรงกับ server
 
-MapContent สร้าง map-store ต่อ mount มี filters/page/pageSize (10/20/50/100, เปลี่ยนแล้วกลับหน้า 1)/view/bbox/popup และ resource slices provinces/list/sites/surveys/detail/history. useResource(key, load, retry, resource) subscribe slice ผ่าน useSyncExternalStore; slice ถือ identity key/retry/generation, latestRequest/AbortController และ response/error. Loader ref เปลี่ยนได้โดยไม่ fetch ซ้ำหาก key/retry/generation/session เดิม. MapWorkspace key ตาม session generation จึงทิ้ง selection/private payload เมื่อ identity เปลี่ยน
+MapContent สร้าง map-store ต่อ mount มี filters/page/pageSize (10/20/50/100, เปลี่ยนแล้วกลับหน้า 1)/view/bbox/selectedSite/popup และ resource slices provinces/list/sites/surveys/detail/history. useResource(key, load, retry, resource) subscribe slice ผ่าน useSyncExternalStore; slice ถือ identity key/retry/generation, latestRequest/AbortController และ response/error. Loader ref เปลี่ยนได้โดยไม่ fetch ซ้ำหาก key/retry/generation/session เดิม. MapWorkspace key ตาม session generation จึงโหลดข้อมูลแหล่งจาก URL อีกครั้งด้วย identity ใหม่และทิ้ง payload ของ session เดิม
 
-State ที่ยัง local มี basemap ที่เลือก (อ่าน/เขียน localStorage gis-basemap หลัง mount; SiteMap สลับเฉพาะ raster source ใต้ชั้นข้อมูล (ภาพดาวเทียมมี overlay ถนน/ชื่อสถานที่ basemap-overlay-N; tile overlay ที่โหลดไม่ได้ไม่ขึ้นคำเตือน) ไม่สร้างแผนที่ใหม่; จุดสำรวจใช้ GeoJSON cluster (SURVEY_CLUSTER) ตัวเลขกลุ่มเป็น HTML Marker ปุ่ม เพราะ style ไม่มี glyphs; ลูกศร popup เป็น element ใน map container ที่ SiteMap จัดตำแหน่งเอง ไม่ผ่าน React state), validation/selection notice, retry counters, pagination metadata เดิม, ข้อมูลที่แผนที่ยังวาดระหว่างโหลด, MapLibre availability/display flags และ DOM/focus refs. เป็นสถานะการแสดงผลของ mount; response/error ของแต่ละคำขออยู่ใน resource slice. geometry cache เป็นของ map-store ต่อ mount ไม่ใช้ singleton หรือ localStorage และไม่เพิ่ม preload
+State ที่ยัง local มี basemap ที่เลือก (อ่าน/เขียน localStorage gis-basemap หลัง mount; SiteMap สลับเฉพาะ raster source ใต้ชั้นข้อมูล (ภาพดาวเทียมมี overlay ถนน/ชื่อสถานที่ basemap-overlay-N; tile overlay ที่โหลดไม่ได้ไม่ขึ้นคำเตือน) ไม่สร้างแผนที่ใหม่; ลูกศร popup เป็น element ใน map container ที่ SiteMap จัดตำแหน่งเอง ไม่ผ่าน React state), validation/selection notice, retry counters, pagination metadata, ซูมและสถานะปุ่มเปิด/ปิดชั้นจุดสำรวจ, ข้อมูลที่แผนที่ยังวาดระหว่างโหลด, MapLibre availability/display flags และ DOM/focus refs. เป็นสถานะการแสดงผลของ mount; response/error ของแต่ละคำขออยู่ใน resource slice. geometry cache เป็นของ map-store ต่อ mount ไม่ใช้ singleton หรือ localStorage และไม่เพิ่ม preload
+
+## Page URL
+
+`map-url.ts` parse/serialize ตัวกรอง แหล่งที่เลือก view page และ pageSize ใช้ `filterState` และ `pageSizeState` ตรวจค่าแต่ละตัวแยกกัน MapWorkspace อ่าน query ตอนเริ่มและ restore map-store เมื่อเกิด popstate พร้อมยกเลิก debounce เดิม ตัวกรองใช้ router.replace หลัง 300ms ส่วนเลือกแหล่ง เปลี่ยนแท็บ หรือเปลี่ยน pagination ใช้ router.push แท็บใช้ shadcn Tabs และคง MapLibre instance ไว้เมื่อเปิดตาราง
 
 ## Route guards
 
@@ -78,11 +83,12 @@ Page / ประกอบ SessionRoute ใน sessionControls slot ของ Map
 2. Feature ใช้ sitesService.listKey(state)/geojsonKey(filters,bbox) และ surveysService.geojsonKey ซึ่ง snap bbox ออกสู่ grid 0.25 องศา เป็น resource identity; loader เรียก list/geojson ด้วย domain arguments ไม่สร้าง URL เอง
 3. Geometry loaders อ่าน cache ของ map-store ตาม URL key (layer + snapped bbox + filters); cache miss จึงสร้าง relative /api URL ผ่าน mapQuery ส่วน list ใช้ listQuery → http-client → Next proxy → REST API โดยคง query order, credentials same-origin, cache no-store และ signal เดิม
 4. useResource ส่ง callback loader ให้ resource.load; resource-store เรียก loader(signal) ซึ่งเรียก service แล้วรับ promise; resource slice ตรวจ latest request + session isCurrent(generation), strip created_by เมื่อ anonymous แล้ว publish; authenticated401 เรียก unauthorized, anonymous401 เป็น retryable error
-5. Feature subscribe snapshot แล้วส่ง collection ให้ SiteMap; loading/error ไม่แสดงผลเก่าเป็นผลใหม่ แต่ MapLibre ยังวาด collection เดิมพร้อม stale notice แยก sites/surveys
+5. Feature ส่ง collection ให้ SiteMap ขณะโหลด/ล้มเหลวคงข้อมูลเดิมพร้อม stale notice แยก sites/surveys
+6. ชั้นจุดสำรวจเปิดเมื่อซูม ≥12 หรือมีแหล่งที่เลือกและผู้ใช้เปิดชั้นนั้น เมื่อซูมต่ำกว่า 12 ใช้เฉพาะ feature ที่ site_code ตรงแหล่งที่เลือก เมื่อซ่อนชั้นจะยกเลิก request และซ่อนทั้งสามชั้นย่อย โดยยังใช้ bbox, debounce และ cache เดิมเมื่อชั้นทำงาน
 
 ### Open site popup with round summary
 
-เลือก sidebar/table → map-store popup site/view map → sitesService.get(code) และ surveysService.history(code). Services สร้าง encoded code URL และ history page1/pageSize100 เดิม. Resource detail/history เก็บ response/error; surveyRounds จัดกลุ่มวันที่ใหม่ไปเก่าและตัดรอบเก่าสุดหากอาจไม่ครบและมีหลายรอบ. SitePopup แสดง facts/summary; heading focus เฉพาะ list/table selection. คลิก survey ใช้ feature ที่วาดอยู่ ไม่ request เพิ่ม
+เลือก sidebar/table → map-store popup site/view map → sitesService.get(code) และ surveysService.history(code). Services สร้าง encoded code URL และ history page1/pageSize100 เดิม. Resource detail/history เก็บ response/error; surveyRounds จัดกลุ่มวันที่ใหม่ไปเก่าและตัดรอบเก่าสุดหากอาจไม่ครบและมีหลายรอบ. Card แสดง facts/summary และปุ่มปิด ลิงก์ที่เปิด view=table พร้อม site จะแสดง Card ในแท็บตาราง ส่วน view=map จะซูมไปยังแหล่งแล้วแสดง popup ที่มีลูกศร heading focus เฉพาะ list/table selection. คลิก survey ใช้ feature ที่วาดอยู่ ไม่ request เพิ่ม
 
 ### Role login
 

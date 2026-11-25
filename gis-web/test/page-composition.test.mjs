@@ -8,7 +8,9 @@ const source = (name) => fileURLToPath(new URL('../src/' + name, import.meta.url
 
 test('filter reset uses the canonical emptyFilters object', () => {
   let changed;
-  const h = componentHarness('../src/features/map/filters-panel.tsx');
+  const h = componentHarness('../src/features/map/filters-panel.tsx', {
+    [source('components/ui/button.tsx')]: { Button: 'button' },
+  });
   const tree = h.render(() =>
     h.exports.FiltersPanel({
       draft: { province: '81', status: 'good', q: 'x' },
@@ -34,7 +36,7 @@ test('survey history uses exported ROUNDS_PAGE_SIZE instead of a duplicated lite
 
 test('home wires every session slot to its matching view inside MapWorkspace', () => {
   const h = componentHarness('../src/app/page.tsx', {
-    [source('features/map/map-workspace.tsx')]: { default: 'workspace', __esModule: true },
+    [source('features/map/map-workspace.tsx')]: { MapWorkspaceBoundary: 'workspace' },
     [source('features/auth/session-controls.tsx')]: { SessionControls: 'controls' },
     [source('guards/session-guard.tsx')]: { SessionRoute: 'route' },
   });

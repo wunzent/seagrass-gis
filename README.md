@@ -187,15 +187,16 @@ npm run dev
 
 พฤติกรรมสำคัญ:
 
-- UI ใช้ Button, Pagination, Alert, Select, Input, Table, Badge และ Card จาก shadcn CLI 4.23.0 (Base UI / Nova) บน Tailwind v4 โดยใช้ palette เดิม สถานะ loading/error/empty ใช้ Alert พร้อมปุ่มลองใหม่เมื่อทำได้
+- UI ใช้ Button, Pagination, Alert, Select, Input, Label, Tabs, Table, Badge และ Card จาก shadcn CLI 4.23.0 (Base UI / Nova) บน Tailwind v4 โดยใช้ palette เดิม สถานะ loading/error/empty ใช้ Alert พร้อมปุ่มลองใหม่เมื่อทำได้
 - Geometry cache อยู่ใน memory ต่อ map mount: snap bbox ออกสู่ grid 0.25 องศา, TTL 5 นาที, รวม sites/surveys สูงสุด 200 entries แบบ LRU; key รวมชั้นข้อมูล/bbox/filters, ล้างทั้ง cache เมื่อ filters หรือ session identity เปลี่ยน มี clear() สำหรับการเขียนข้อมูลในอนาคต ไม่มี localStorage สำหรับ geometry; pan ที่อยู่นอก grid ที่เคยโหลดส่ง bbox request ใหม่หลัง debounce 600ms
 
 - Browser เรียก relative `/api/*`; proxy ตัด `/api`, ส่ง Cookie/Set-Cookie และ CSRF headers, ไม่ cache, ไม่เปิด CORS; JavaScript ไม่อ่านหรือเก็บ JWT และไม่ forward `Authorization` จาก browser
 - proxy ลบ `access_token` จาก JSON response ที่สำเร็จของ `POST /api/auth/login` แล้วเติม `expires_at` จาก claim `exp` ให้ browser โดยคง user และ Set-Cookie; ส่ง `X-Auth-Session: invalid` ต่อให้ browser
-- หน้า `/`: ตัวกรองจังหวัด/สถานะ/คำค้น, ตารางหน้าละ 20 (เลือก 10/20/50/100 ต่อหน้า พร้อมช่วงรายการและปุ่มก่อนหน้า/ถัดไป), polygons ตาม bbox, province outlines, survey points, legend 5 สถานะ, รายละเอียดและประวัติการสำรวจหน้าละ 5; mobile สลับแผนที่/รายการ
+- หน้า `/`: ตัวกรองจังหวัด/สถานะ/คำค้น, ตารางหน้าละ 20 (เลือก 10/20/50/100 ต่อหน้า พร้อมช่วงรายการและปุ่มก่อนหน้า/ถัดไป), polygons ตาม bbox, province outlines, survey points, legend 5 สถานะ, รายละเอียดและประวัติแยกตามรอบสำรวจ; สลับแท็บแผนที่/ตารางได้ที่ desktop และ mobile
 - Session ฝั่งเว็บไม่เรียก `/api/auth/me`: login แล้วจำเฉพาะ id/email/role/expires_at (ไม่มี JWT) ใน localStorage เพื่อแสดงชื่อและ role หลัง refresh; เมื่อหมดอายุแสดง Alert ที่มุมขวาล่างของ viewport พร้อมปุ่ม ตกลง เพื่อล้างข้อความแล้วไป /login ข้อผิดพลาดจากการออกจากระบบแสดงตรงจุดเดียวกันพร้อมปุ่มลองอีกครั้ง; ถ้า API ตอบ 401 หรือ `X-Auth-Session: invalid` เว็บล้าง identity ทันที; แท็บอื่น login/logout แล้วอัปเดตตามผ่าน storage event
 - `/login`: ฟอร์มมีบัญชีสาธิตที่หน้า server อ่านจาก `DEMO_*_PASSWORD` ตอน request ผ่าน `src/lib/demo-accounts.ts` (fallback เป็นค่าใน `.env.example`) กดเพื่อกรอกโดยไม่ส่ง; ไม่มีปุ่ม login ตาม role
-- จุดสำรวจที่อยู่ใกล้กัน (ภายใน 40 px) รวมเป็นวงกลมมีตัวเลขเฉพาะตอนซูมออกจนมาตราส่วนประมาณ 30 กม. ขึ้นไป (ซูม ≤ 9) ซูมเข้ามากกว่านั้นแสดงจุดและแหล่งตามปกติ คลิกวงกลมครั้งเดียวแผนที่ซูมให้เห็นทุกจุดในกลุ่มและแตกเป็นจุดเดี่ยวทันที (อย่างน้อยซูม 10); popup ของแหล่ง/จุดมีลูกศรชี้ไปยังตำแหน่งที่เลือก
+- แชร์สถานะหน้าได้ด้วย URL เช่น `/?site=TRG-001&province=92` ตัวกรอง แหล่งที่เลือก แท็บ และเลข/ขนาดหน้าอ่านจาก query เมื่อเปิดลิงก์หรือใช้ Back/Forward
+- ชั้นจุดสำรวจแสดงเมื่อซูมระดับ 12 ขึ้นไป หรือแสดงเฉพาะจุดของแหล่งที่เลือกเมื่อซูมต่ำกว่า 12 ผู้ใช้เปิด/ปิดชั้นนี้จากคำอธิบายแผนที่ Popup ของแหล่ง/จุดมีลูกศรชี้ตำแหน่งที่เลือก
 - แผนที่ฐานสลับได้ 2 แบบจากกล่อง "แผนที่ฐาน" มุมซ้ายล่างของแผนที่: แผนที่ถนน (OpenStreetMap) และภาพดาวเทียม (Esri World Imagery ซ้อนชั้นถนนและชื่อสถานที่จาก Esri Reference World Transportation / World Boundaries and Places) browser จำตัวเลือกไว้ใน localStorage (`gis-basemap`); ทั้งหมดเป็น raster tiles สำหรับ demo เท่านั้น ก่อนใช้งานจริงต้องเลือกผู้ให้บริการและปฏิบัติตามเงื่อนไขของแต่ละราย เช่น [OSM tile usage policy](https://operations.osmfoundation.org/policies/tiles/); ถ้าแผนที่เปิดไม่ได้ ตารางและรายละเอียดยังใช้ได้
 
 ## CI

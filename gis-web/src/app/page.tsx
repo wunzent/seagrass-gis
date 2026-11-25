@@ -1,4 +1,4 @@
-import MapWorkspace from '../features/map/map-workspace';
+import { MapWorkspaceBoundary as MapWorkspace } from '../features/map/map-workspace';
 import { SessionControls } from '../features/auth/session-controls';
 import { SessionRoute } from '../guards/session-guard';
 

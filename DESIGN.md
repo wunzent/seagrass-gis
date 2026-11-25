@@ -1,6 +1,6 @@
 # DESIGN — Seagrass GIS
 
-**Date**: 2026-11-23 · **Scope**: assessment steps 1–6 + 9.5 CI
+**Date**: 2026-11-25 · **Scope**: assessment steps 1–6 + 9.5 CI
 
 ## Architecture
 
@@ -39,16 +39,18 @@
 
 ## (d) Strategy for 500k Polygons within 2 Seconds (Proposal)
 
-ข้อเสนอ ยังไม่ได้ทำหรือวัดผล (ปัจจุบันมี 27 sites):
+ปัจจุบัน API กรอง GeoJSON ด้วย bbox + GiST เว็บ cache แต่ละ layer ตาม bbox ที่ขยายออกเป็นกริด 0.25 องศาและตัวกรอง เก็บใน memory 5 นาที สูงสุด 200 รายการรวมทุก layer แบบ LRU เมื่อเปลี่ยนตัวกรองหรือ session จะล้าง cache ตารางแบ่งหน้าสูงสุด 100 รายการ
 
-1. คง bbox query + GiST และบังคับ bbox ทุกคำขอแผนที่ (ทำแล้วใน `/sites.geojson`, `/surveys.geojson`) เพิ่มเพดานจำนวน feature ต่อคำขอ
+แนวทางสำหรับ 500k polygons (ยังไม่ได้วัดผล):
+
+1. กำหนดเพดานจำนวน polygon ต่อ bbox request
 2. Vector tiles (`ST_AsMVT` หรือ tile server) ตาม zoom แทน GeoJSON ก้อนใหญ่; ใช้ geometry ที่ simplify ล่วงหน้าต่อระดับ zoom (`ST_SimplifyPreserveTopology` เก็บเป็นคอลัมน์/ตารางแยก) และ full geometry เฉพาะ zoom สูงหรือ detail
-3. ตารางและการค้นหาใช้ pagination (มีแล้ว สูงสุด 100/หน้า) และพิจารณา keyset pagination เมื่อข้อมูลโต; status ล่าสุดอาจเก็บเป็น materialized/summary table ที่อัปเดตตอนเขียน survey
+3. ใช้ keyset pagination สำหรับตารางและการค้นหาเมื่อข้อมูลโต; status ล่าสุดอาจเก็บเป็น materialized/summary table ที่อัปเดตตอนเขียน survey
 4. Cache tiles/lookup ด้วย HTTP cache หรือ CDN โดยล้างตาม version ของข้อมูล; import ขนาดใหญ่ใช้ `COPY` + background job
 5. วัดผลด้วย `EXPLAIN ANALYZE` และ load test ก่อนอ้างตัวเลข
 
 ## (e) Remaining Work and Next-Day Plan
 
-- ขอบเขต: ขั้นที่ 1–6 และขั้นที่ 9 ข้อ CI (GitHub Actions); งานระดับ Senior (ขั้นที่ 7–8 และงานเพิ่มท้ายขั้นที่ 3 กับ 6) ไม่อยู่ในขอบเขต
+- ขอบเขต: ขั้นที่ 1–6 และขั้นที่ 9 ข้อ CI (GitHub Actions); ขั้นที่ 6 รองรับลิงก์แชร์สถานะหน้าและกฎแสดงจุดสำรวจที่ซูม 12 ขึ้นไปหรือเมื่อเลือกแหล่ง
 - ยังไม่ทำ: แนบรูปผลสำรวจ (ข้อเสริมขั้นที่ 4) และขั้นที่ 9 ข้ออื่นนอกจาก CI
 - ถ้ามีเวลาอีก 1 วัน: (1) แนบรูปผลสำรวจ jpg/png ไม่เกิน 5 MB เก็บใน volume (2) E2E test ของหน้าแผนที่ ตาราง และ login (3) vector tiles ตามข้อเสนอด้านบนพร้อมวัดผล (ขั้นที่ 9 ข้อ 1)

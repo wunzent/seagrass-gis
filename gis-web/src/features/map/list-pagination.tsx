@@ -1,12 +1,16 @@
 'use client';
 
 import { useRef, type FocusEvent, type RefObject } from 'react';
-import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { number } from '../../lib/map-format';
 import { PAGE_SIZES } from '../../lib/map-state';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, SelectGroup } from '../../components/ui/select';
-import { Button } from '../../components/ui/button';
-import { Pagination, PaginationContent, PaginationItem } from '../../components/ui/pagination';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationPrevious,
+  PaginationNext,
+} from '../../components/ui/pagination';
 
 type Props = {
   page: number;
@@ -63,7 +67,7 @@ export function ListPagination({
           }
         }}
       >
-        <SelectTrigger ref={sizeTrigger} disabled={disabled} aria-label="จำนวนต่อหน้า">
+        <SelectTrigger size="sm" ref={sizeTrigger} disabled={disabled} aria-label="จำนวนต่อหน้า">
           <SelectValue>{pageSize} ต่อหน้า</SelectValue>
         </SelectTrigger>
         <SelectContent>
@@ -76,38 +80,38 @@ export function ListPagination({
           </SelectGroup>
         </SelectContent>
       </Select>
-      <small aria-live="polite" tabIndex={-1}>
+      <small className="whitespace-nowrap text-sm text-muted-foreground" aria-live="polite" tabIndex={-1}>
         {number.format(first)}–{number.format(last)} จาก {number.format(total)}
       </small>
       <Pagination className="pagination-navigation mx-0 w-auto" aria-label="เปลี่ยนหน้ารายการแหล่ง">
         <PaginationContent>
           <PaginationItem>
-            <Button
-              variant="outline"
-              size="icon"
+            <PaginationPrevious
+              asButton
+              type="button"
+              text=""
+              size="icon-sm"
               aria-label="หน้าก่อนหน้า"
               disabled={disabled || page <= 1}
               aria-disabled={disabled || page <= 1}
               onClick={() => {
                 if (!disabled && page > 1) goTo(page - 1);
               }}
-            >
-              <ChevronLeftIcon aria-hidden="true" />
-            </Button>
+            />
           </PaginationItem>
           <PaginationItem>
-            <Button
-              variant="outline"
-              size="icon"
+            <PaginationNext
+              asButton
+              type="button"
+              text=""
+              size="icon-sm"
               aria-label="หน้าถัดไป"
               disabled={disabled || page * pageSize >= total}
               aria-disabled={disabled || page * pageSize >= total}
               onClick={() => {
                 if (!disabled && page * pageSize < total) goTo(page + 1);
               }}
-            >
-              <ChevronRightIcon aria-hidden="true" />
-            </Button>
+            />
           </PaginationItem>
         </PaginationContent>
       </Pagination>
