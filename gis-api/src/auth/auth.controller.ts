@@ -67,10 +67,7 @@ export class AuthController {
     response.setHeader('Set-Cookie', accessCookie(result.token, ACCESS_TTL_SECONDS, this.auth.config.cookieSecure));
     return {
       access_token: result.token,
-      token_type: 'Bearer',
       user: result.user,
-      expires_in: ACCESS_TTL_SECONDS,
-      expires_at: result.expiresAt.toISOString(),
     };
   }
 

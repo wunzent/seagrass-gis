@@ -447,7 +447,7 @@ test('login ignores JWT response fields in every published snapshot, storage and
   const marker = 'test-jwt-must-not-enter-web-state';
   const h = harness(async (url, init) => {
     requests.push({ url, init });
-    return json({ ...safe(), access_token: marker, token_type: 'Bearer', expires_in: 900 });
+    return json({ ...safe(), access_token: marker });
   });
   const { store } = h;
   store.subscribe(() => snapshots.push(structuredClone(store.getSnapshot())));
@@ -462,4 +462,27 @@ test('login ignores JWT response fields in every published snapshot, storage and
   assert.equal(JSON.stringify(requests).includes(marker), false);
   for (const { init } of requests) assert.equal(new Headers(init.headers).has('Authorization'), false);
   store.dispose();
+});
+
+test('hydration reads a fixed checking snapshot, never the identity restored from storage before the tree hydrates', () => {
+  const store = createSessionStore();
+  const server = store.getServerSnapshot();
+  assert.equal(server.phase, 'checking');
+  assert.equal(server.session, null);
+  store.setState((state) => ({
+    ...state,
+    phase: 'ready',
+    session: { user: { id: 'u', email: 'a@demo.local', role: 'admin' }, expires_at: '2999-01-01T00:00:00Z' },
+  }));
+  assert.equal(store.getSnapshot().phase, 'ready');
+  assert.equal(store.getServerSnapshot(), server, 'same object every call');
+  assert.equal(store.getServerSnapshot().phase, 'checking');
+});
+
+test('useSession hydrates from the server snapshot', async () => {
+  const { readFileSync } = await import('node:fs');
+  const source = readFileSync(new URL('../src/stores/session-context.tsx', import.meta.url), 'utf8');
+  assert.match(source, /useSyncExternalStore\(store\.subscribe, store\.getSnapshot, store\.getServerSnapshot\)/);
+  const provider = readFileSync(new URL('../src/features/auth/session-provider.tsx', import.meta.url), 'utf8');
+  assert.match(provider, /getServerSnapshot: sink\.getServerSnapshot/);
 });

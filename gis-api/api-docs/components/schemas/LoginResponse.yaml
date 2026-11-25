@@ -2,23 +2,9 @@ type: object
 properties:
   access_token:
     type: string
-    description: JWT เดียวกับ HttpOnly cookie gis_access; อายุ 900 วินาที
-  token_type:
-    type: string
-    enum:
-      - Bearer
+    description: JWT เดียวกับ HttpOnly cookie gis_access; อายุ 900 วินาที (ดูเวลาหมดอายุจาก claim exp)
   user:
     $ref: ./User.yaml
-  expires_in:
-    type: integer
-    enum:
-      - 900
-  expires_at:
-    type: string
-    format: date-time
 required:
   - access_token
-  - token_type
   - user
-  - expires_in
-  - expires_at

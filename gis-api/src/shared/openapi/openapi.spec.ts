@@ -103,9 +103,8 @@ describe('api docs', () => {
       ]) {
         expect(spec.paths[path][method].security).toEqual(expect.arrayContaining([{ gis_access: [] }, { bearer: [] }]));
       }
-      expect(spec.components.schemas.LoginResponse.required).toEqual(
-        expect.arrayContaining(['access_token', 'token_type']),
-      );
+      expect([...spec.components.schemas.LoginResponse.required].sort()).toEqual(['access_token', 'user']);
+      expect(Object.keys(spec.components.schemas.LoginResponse.properties).sort()).toEqual(['access_token', 'user']);
     } finally {
       await app.close();
     }

@@ -10,6 +10,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const sink = createSessionStore();
     return {
       getSnapshot: sink.getSnapshot,
+      getServerSnapshot: sink.getServerSnapshot,
       subscribe: sink.subscribe,
       isCurrent: sink.isCurrent,
       ...createSessionService(sink),

@@ -56,12 +56,12 @@ test('proxy forwards cookie/CSRF and body, preserves separate cookies and never 
     });
     headers.append('set-cookie', 'a=one; HttpOnly; Path=/');
     headers.append('set-cookie', 'b=two; HttpOnly; Path=/');
-    return new Response('{"ok":true}', { headers });
+    return new Response(JSON.stringify({ access_token: jwt({ exp: 1795000900 }), user: { id: 'u' } }), { headers });
   });
   assert.equal(response.headers.get('cache-control'), 'no-store');
   assert.equal(response.headers.has('access-control-allow-origin'), false);
   assert.equal(response.headers.getSetCookie().length, 2);
-  assert.deepEqual(await response.json(), { ok: true });
+  assert.deepEqual(await response.json(), { user: { id: 'u' }, expires_at: new Date(1795000900 * 1000).toISOString() });
 });
 
 test('upstream failure is sanitized and redirects are not followed', async () => {
@@ -118,28 +118,58 @@ test('proxy marks requests that arrive without the session cookie (cleared elsew
   assert.equal(login.headers.get('x-auth-session'), null);
 });
 
-for (const path of ['login']) {
-  test(`successful POST ${path} hides JWT fields while preserving session data and cookies`, async () => {
-    const safe = { user: { id: 'user-id', role: 'viewer' }, expires_in: 900, expires_at: '2026-11-23T00:15:00Z' };
-    const body = JSON.stringify({ ...safe, access_token: 'private-jwt', token_type: 'Bearer' });
+const jwt = (claims) =>
+  ['{"alg":"HS256","typ":"JWT"}', JSON.stringify(claims), 'signature']
+    .map((part, i) => (i < 2 ? Buffer.from(part).toString('base64url') : part))
+    .join('.');
+const loginReply = (payload) => {
+  const body = JSON.stringify(payload);
+  return async () =>
+    new Response(body, {
+      headers: {
+        'content-type': 'application/json; charset=utf-8',
+        'content-length': String(Buffer.byteLength(body)),
+        'set-cookie': 'gis_access=private-jwt; HttpOnly; Path=/',
+      },
+    });
+};
+
+test('successful POST login hides the JWT and gives the browser only the user and expires_at from the exp claim', async () => {
+  const user = { id: 'user-id', email: 'a@demo.local', role: 'viewer' };
+  const token = jwt({ sub: 'user-id', sid: 's', iat: 1795000000, exp: 1795000900 });
+  const response = await proxyRequest(
+    new Request('http://web/api/auth/login', { method: 'POST' }),
+    'http://api:3001',
+    loginReply({ access_token: token, user }),
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { user, expires_at: new Date(1795000900 * 1000).toISOString() });
+  assert.equal(response.headers.get('content-length'), null);
+  assert.deepEqual(response.headers.getSetCookie(), ['gis_access=private-jwt; HttpOnly; Path=/']);
+});
+
+test('a login reply whose token has no readable exp is a 502 and sets no cookie', async () => {
+  for (const token of ['not-a-jwt', jwt({ sub: 'x' }), jwt({ exp: 'soon' }), undefined]) {
     const response = await proxyRequest(
-      new Request(`http://web/api/auth/${path}`, { method: 'POST' }),
+      new Request('http://web/api/auth/login', { method: 'POST' }),
       'http://api:3001',
-      async () =>
-        new Response(body, {
-          headers: {
-            'content-type': 'application/json; charset=utf-8',
-            'content-length': String(Buffer.byteLength(body)),
-            'set-cookie': 'gis_access=private-jwt; HttpOnly; Path=/',
-          },
-        }),
+      loginReply({ access_token: token, user: { id: 'u' } }),
     );
-    assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), safe);
-    assert.equal(response.headers.get('content-length'), null);
-    assert.deepEqual(response.headers.getSetCookie(), ['gis_access=private-jwt; HttpOnly; Path=/']);
-  });
-}
+    assert.equal(response.status, 502);
+    assert.equal((await response.json()).error.code, 'BAD_GATEWAY');
+    assert.deepEqual(response.headers.getSetCookie(), []);
+  }
+});
+
+test('the browser login payload is an allowlist: unknown token fields never pass through', async () => {
+  const user = { id: 'u', email: 'a@demo.local', role: 'admin' };
+  const response = await proxyRequest(
+    new Request('http://web/api/auth/login', { method: 'POST' }),
+    'http://api:3001',
+    loginReply({ access_token: jwt({ exp: 1795000900 }), refresh_token: 'secret', user }),
+  );
+  assert.deepEqual(Object.keys(await response.json()).sort(), ['expires_at', 'user']);
+});
 
 test('proxy streams errors, other routes, GET auth and non-JSON login unchanged', async () => {
   for (const [path, method, status, type] of [
@@ -148,7 +178,7 @@ test('proxy streams errors, other routes, GET auth and non-JSON login unchanged'
     ['auth/me', 'GET', 200, 'application/json'],
     ['auth/login', 'POST', 200, 'text/plain'],
   ]) {
-    const body = '{ "access_token": "unchanged", "token_type": "Bearer" }';
+    const body = '{ "access_token": "unchanged" }';
     const upstream = new Response(body, { status, headers: { 'content-type': type } });
     const stream = upstream.body;
     const response = await proxyRequest(

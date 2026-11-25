@@ -212,7 +212,7 @@ describe('auth (real PostGIS)', () => {
     }
   });
 
-  it('login returns the cookie JWT and Bearer token type while preserving cookie attributes', async () => {
+  it('login returns only the cookie JWT and the user while preserving cookie attributes', async () => {
     const response = await login('Viewer@Demo.Local', 'viewer-pass');
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('no-store');
@@ -221,16 +221,15 @@ describe('auth (real PostGIS)', () => {
     expect(setCookie).not.toMatch(/Domain=|Secure/);
     const text = await response.text();
     const body = JSON.parse(text);
-    expect(Object.keys(body).sort()).toEqual(['access_token', 'expires_at', 'expires_in', 'token_type', 'user']);
+    expect(Object.keys(body).sort()).toEqual(['access_token', 'user']);
     expect(body.user).toEqual({ id: USERS.viewer, email: 'viewer@demo.local', role: 'viewer' });
-    expect(body.expires_in).toBe(900);
-    expect(body.token_type).toBe('Bearer');
     expect(typeof body.access_token).toBe('string');
     expect(body.access_token === cookieOf(response).split('=')[1]).toBe(true);
     const restored = await me(cookieOf(response));
     expect(restored.status).toBe(200);
     expect(restored.headers.get('cache-control')).toBe('no-store');
-    expect(await restored.json()).toEqual({ user: body.user, expires_at: body.expires_at });
+    const exp = JSON.parse(Buffer.from(body.access_token.split('.')[1], 'base64url').toString()).exp;
+    expect(await restored.json()).toEqual({ user: body.user, expires_at: new Date(exp * 1000).toISOString() });
   });
 
   it('wrong credentials give one generic 401 and create no session', async () => {

@@ -2,7 +2,7 @@ import { createExternalStore } from './external-store.ts';
 import type { SessionState } from '../lib/session.ts';
 
 export function createSessionStore(now: () => number = Date.now) {
-  const sink = createExternalStore<SessionState>({
+  const initial: SessionState = {
     session: null,
     phase: 'checking',
     busy: null,
@@ -12,9 +12,13 @@ export function createSessionStore(now: () => number = Date.now) {
     errorSource: null,
     rateLimitedUntil: 0,
     expiryNotice: null,
-  });
+  };
+  const sink = createExternalStore<SessionState>(initial);
   return {
     ...sink,
+    /** What the server rendered. Hydration must use it: the identity restored from storage can land before a
+     * lazily hydrated subtree (the map is a dynamic import), and rendering it there mismatches the server HTML. */
+    getServerSnapshot: () => initial,
     isCurrent(generation: number) {
       const state = sink.getSnapshot();
       return (

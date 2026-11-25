@@ -36,6 +36,18 @@ const errorResponse = (status: number, code: string) =>
 
 class PayloadTooLarge extends Error {}
 
+/** ISO time from the JWT `exp` claim (seconds). Not a verification: the token came straight from the API. */
+function tokenExpiry(token: unknown): string | undefined {
+  if (typeof token !== 'string') return undefined;
+  try {
+    const claims: unknown = JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8'));
+    const exp = (claims as { exp?: unknown } | null)?.exp;
+    return typeof exp === 'number' && Number.isFinite(exp) ? new Date(exp * 1000).toISOString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function readLimitedBody(request: Request, signal: AbortSignal): Promise<Uint8Array<ArrayBuffer> | undefined> {
   if (['GET', 'HEAD'].includes(request.method)) return undefined;
   const declared = request.headers.get('content-length');
@@ -121,9 +133,14 @@ export async function proxyRequest(request: Request, internalUrl: string, fetche
       /^application\/(?:[\w.-]+\+)?json(?:\s*;|$)/i.test(contentType ?? '')
     ) {
       const payload = await upstream.json();
-      delete payload.access_token;
-      delete payload.token_type;
-      return new Response(JSON.stringify(payload), { status: upstream.status, headers: responseHeaders });
+      // The API returns { access_token, user }. The browser never sees the JWT; it gets only the user and the expiry
+      // from the token's claim. A token without a readable exp is an API fault: answer 502 and drop its cookie.
+      const expiresAt = tokenExpiry(payload.access_token);
+      if (!expiresAt) return errorResponse(502, 'BAD_GATEWAY');
+      return new Response(JSON.stringify({ user: payload.user, expires_at: expiresAt }), {
+        status: upstream.status,
+        headers: responseHeaders,
+      });
     }
     return new Response(upstream.body, { status: upstream.status, headers: responseHeaders });
   } catch {
