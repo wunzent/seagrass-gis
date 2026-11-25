@@ -1,6 +1,5 @@
 import type { NextConfig } from 'next';
-
-const TILE_HOSTS = ['https://tile.openstreetmap.org'];
+import { TILE_HOSTS } from './src/lib/basemaps.ts';
 
 export function contentSecurityPolicy(development: boolean): string {
   return [

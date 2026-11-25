@@ -9,7 +9,9 @@ import * as mapState from '../src/lib/map-state.ts';
 const sourceFile = (name) => fileURLToPath(new URL('../src/' + name, import.meta.url));
 const inlineFixtures = [
   'guards/session-guard.tsx',
+  'features/map/basemap-select.tsx',
   'features/map/filters-panel.tsx',
+  'features/map/list-pagination.tsx',
   'features/map/legend.tsx',
   'features/map/site-list.tsx',
   'features/map/site-popup.tsx',
@@ -427,6 +429,58 @@ test('invalid filters show validation without list skeleton or map loading statu
   assert.equal(invalid.find((node) => node.props?.className === 'map-progress').props.children, '');
 });
 
+function fakeElement(tag) {
+  const listeners = {};
+  return {
+    tagName: tag.toUpperCase(),
+    style: {},
+    attributes: {},
+    className: '',
+    textContent: '',
+    hidden: false,
+    removed: false,
+    setAttribute(name, value) {
+      this.attributes[name] = String(value);
+    },
+    addEventListener(name, listener) {
+      listeners[name] = listener;
+    },
+    dispatch(name, event = {}) {
+      listeners[name]?.({ stopPropagation() {}, ...event });
+    },
+    remove() {
+      this.removed = true;
+    },
+  };
+}
+function fakeDocument() {
+  return {
+    created: [],
+    createElement(tag) {
+      const element = fakeElement(tag);
+      this.created.push(element);
+      return element;
+    },
+  };
+}
+const markers = [];
+class FakeMarker {
+  constructor({ element }) {
+    this.element = element;
+    markers.push(this);
+  }
+  setLngLat(lngLat) {
+    this.lngLat = lngLat;
+    return this;
+  }
+  addTo(map) {
+    this.map = map;
+    return this;
+  }
+  remove() {
+    this.removed = true;
+  }
+}
 function mapHarness(globals = {}, onDisplayChange, onSelect = () => {}) {
   let map;
   class FakeMap {
@@ -437,7 +491,7 @@ function mapHarness(globals = {}, onDisplayChange, onSelect = () => {}) {
     coveringKeys = ['a', 'b'];
     coveringTiles(options) {
       assert.equal(options.tileSize, 256);
-      assert.equal(options.maxzoom, 19);
+      assert.equal(options.maxzoom, this.expectedMaxzoom ?? 19);
       assert.equal(options.roundZoom, true);
       return this.coveringKeys.map((key) => ({ key }));
     }
@@ -453,15 +507,36 @@ function mapHarness(globals = {}, onDisplayChange, onSelect = () => {}) {
     }
     addControl() {}
     addSource(id, source) {
+      // eslint-disable-next-line @typescript-eslint/no-this-alias -- test double: the source reports back to its map
+      const map = this;
       this.sources.set(id, {
         ...source,
         setData(data) {
           this.data = data;
         },
+        async getClusterExpansionZoom(clusterId) {
+          map.expandedClusters = [...(map.expandedClusters ?? []), clusterId];
+          return 13;
+        },
       });
     }
-    addLayer(layer) {
-      this.layers.push(layer);
+    querySourceFeatures(source, options) {
+      assert.equal(source, 'surveys');
+      assert.deepEqual(JSON.parse(JSON.stringify(options.filter)), ['has', 'point_count']);
+      return this.clusters ?? [];
+    }
+    eases = [];
+    easeTo(options) {
+      this.eases.push(options);
+    }
+    addLayer(layer, before) {
+      this.layers.push(before ? { ...layer, before } : layer);
+    }
+    removeLayer(id) {
+      this.layers = this.layers.filter((layer) => layer.id !== id);
+    }
+    removeSource(id) {
+      this.sources.delete(id);
     }
     getCanvas() {
       return (this.canvas ??= { style: {} });
@@ -491,7 +566,7 @@ function mapHarness(globals = {}, onDisplayChange, onSelect = () => {}) {
     fitBounds(bounds) {
       this.fits.push(bounds);
     }
-    container = { clientWidth: 800, clientHeight: 600 };
+    container = { clientWidth: 800, clientHeight: 600, ownerDocument: fakeDocument(), appendChild() {} };
     getContainer() {
       return this.container;
     }
@@ -510,7 +585,13 @@ function mapHarness(globals = {}, onDisplayChange, onSelect = () => {}) {
   const h = componentHarness(
     '../src/features/map/site-map.tsx',
     {
-      'maplibre-gl': { Map: FakeMap, NavigationControl: class {}, ScaleControl: class {}, setWorkerUrl() {} },
+      'maplibre-gl': {
+        Map: FakeMap,
+        NavigationControl: class {},
+        ScaleControl: class {},
+        Marker: FakeMarker,
+        setWorkerUrl() {},
+      },
       [sourceFile('lib/map-state.ts')]: { ...mapState, debounce: (fn) => ({ run: fn, cancel() {} }) },
     },
     {
@@ -1231,6 +1312,9 @@ test('map reports unavailable when MapLibre cannot start and available again on 
           constructor() {
             if (fail) throw new Error('no WebGL');
           }
+          getContainer() {
+            return { ownerDocument: fakeDocument(), appendChild() {} };
+          }
           addControl() {}
           on() {}
           remove() {}
@@ -1304,7 +1388,12 @@ test('top menu switches between the map and the table view and marks the current
   assert.ok(byClass(tree, 'table-view'));
   assert.ok(byClass(tree, 'map-layout').props.className.includes('view-hidden'), 'map stays mounted, hidden');
   assert.equal(byClass(tree, 'sidebar'), undefined, 'one set of filter controls at a time');
-  assert.equal(tree.filter((node) => node.type === 'select').length, 2);
+  const paging = ['ไปหน้า', 'จำนวนต่อหน้า'];
+  assert.equal(
+    tree.filter((node) => node.type === 'select' && !paging.includes(node.props['aria-label'])).length,
+    2,
+    'only the two filter selects (pagination options aside), no basemap select while the map is hidden',
+  );
   assert.equal(
     tree.some((node) => node.props?.role === 'dialog'),
     false,
@@ -1597,4 +1686,233 @@ test('Escape from the canvas closes the popup without moving focus; a point gone
     w.render().some((node) => node.props?.role === 'dialog'),
     false,
   );
+});
+
+test('basemap prop picks the first basemap and swaps tiles under the data layers without recreating the map', () => {
+  const h = mapHarness();
+  const first = h.map;
+  assert.deepEqual(first.sources.get('basemap').tiles, ['https://tile.openstreetmap.org/{z}/{x}/{y}.png']);
+  assert.equal(
+    first.layers.findIndex((layer) => layer.id === 'basemap'),
+    0,
+    'basemap is drawn first',
+  );
+  first.emit('error', { sourceId: 'basemap', tile: { tileID: { key: 'a' } } });
+  assert.ok(nodes(h.render()).some((node) => node.props?.className === 'map-warning'));
+  h.render(undefined, { basemap: 'satellite' });
+  assert.equal(h.map, first, 'switching keeps the same map');
+  assert.match(first.sources.get('basemap').tiles[0], /^https:\/\/server\.arcgisonline\.com\//);
+  const layer = first.layers.find((item) => item.id === 'basemap');
+  assert.equal(layer.before, 'provinces-line', 'new basemap goes below provinces, sites and surveys');
+  assert.equal(first.layers.filter((item) => item.id === 'basemap').length, 1);
+  assert.equal(
+    nodes(h.render(undefined, { basemap: 'satellite' })).some((node) => node.props?.className === 'map-warning'),
+    false,
+    'tile errors of the old basemap are forgotten',
+  );
+  const ids = () => first.layers.map((item) => item.id);
+  assert.deepEqual(
+    ids().filter((id) => id.startsWith('basemap')),
+    ['basemap', 'basemap-overlay-0', 'basemap-overlay-1'],
+    'satellite carries road and place-name overlays',
+  );
+  for (const id of ['basemap-overlay-0', 'basemap-overlay-1'])
+    assert.equal(first.layers.find((item) => item.id === id).before, 'provinces-line');
+  assert.match(first.sources.get('basemap-overlay-0').tiles[0], /World_Transportation/);
+  assert.match(first.sources.get('basemap-overlay-1').tiles[0], /World_Boundaries_and_Places/);
+  first.emit('error', { sourceId: 'basemap-overlay-0', tile: { tileID: { key: 'o' } } });
+  assert.equal(
+    nodes(h.render(undefined, { basemap: 'satellite' })).some((node) => node.props?.className === 'map-warning'),
+    false,
+    'a missing label tile does not raise the basemap warning',
+  );
+  h.render(undefined, { basemap: 'streets' });
+  assert.deepEqual(
+    ids().filter((id) => id.startsWith('basemap')),
+    ['basemap'],
+    'overlays leave with the satellite basemap',
+  );
+  assert.equal(first.sources.has('basemap-overlay-0'), false);
+  first.emit('idle');
+});
+
+test('a map that loads on satellite draws its overlays above the imagery and below the data', () => {
+  const h = mapHarness();
+  h.render(undefined, { basemap: 'satellite' });
+  const old = h.map;
+  old.emit('error', { sourceId: 'basemap', tile: { tileID: { key: 'z' } } });
+  nodes(h.render(undefined, { basemap: 'satellite' }))
+    .find((node) => node.type === 'button')
+    .props.onClick();
+  h.render(undefined, { basemap: 'satellite' });
+  h.map.emit('load');
+  const ids = h.map.layers.map((item) => item.id);
+  assert.deepEqual(ids.slice(0, 3), ['basemap', 'basemap-overlay-0', 'basemap-overlay-1']);
+  assert.ok(ids.indexOf('provinces-line') > 2);
+});
+
+test('a basemap chosen before the map loads is used when it loads', () => {
+  const h = mapHarness();
+  h.render(undefined, { basemap: 'satellite' });
+  const old = h.map;
+  nodes(h.render(undefined, { basemap: 'satellite' })); // no-op
+  old.emit('error', { sourceId: 'basemap', tile: { tileID: { key: 'z' } } });
+  nodes(h.render(undefined, { basemap: 'satellite' }))
+    .find((node) => node.type === 'button')
+    .props.onClick();
+  h.render(undefined, { basemap: 'satellite' });
+  assert.notEqual(h.map, old);
+  h.map.emit('load');
+  assert.match(h.map.sources.get('basemap').tiles[0], /arcgisonline/);
+});
+
+test('workspace offers a basemap select that drives the map and remembers the choice', () => {
+  const w = historyWorkspace();
+  let tree = w.render();
+  const select = () => tree.find((node) => node.type === 'select' && node.props['aria-label'] === 'แผนที่ฐาน');
+  assert.ok(select(), 'basemap select exists');
+  const options = nodes(select()).filter((node) => node.type === 'option');
+  assert.deepEqual(
+    options.map((option) => option.props.value),
+    ['streets', 'satellite'],
+  );
+  assert.equal(select().props.value, 'streets');
+  assert.equal(mapNode(tree).props.basemap, 'streets');
+  select().props.onChange({ target: { value: 'satellite' } });
+  tree = w.render();
+  assert.equal(select().props.value, 'satellite');
+  assert.equal(mapNode(tree).props.basemap, 'satellite');
+  select().props.onChange({ target: { value: 'not-a-basemap' } });
+  tree = w.render();
+  assert.equal(mapNode(tree).props.basemap, 'satellite', 'unknown values are ignored');
+});
+
+test('list pagination offers page size and page jump; both ask the API and return focus-safe controls', () => {
+  const w = historyWorkspace();
+  w.setResource('/api/sites?', { data: { items: [], total: 45, page: 1 }, loading: false });
+  w.render();
+  let tree = w.render();
+  const nav = () => tree.find((node) => node.props?.['aria-label'] === 'หน้ารายการแหล่ง');
+  const sizeSelect = () =>
+    nodes(nav()).find((node) => node.type === 'select' && node.props['aria-label'] === 'จำนวนต่อหน้า');
+  const pageSelect = () => nodes(nav()).find((node) => node.type === 'select' && node.props['aria-label'] === 'ไปหน้า');
+  assert.deepEqual(
+    nodes(sizeSelect())
+      .filter((node) => node.type === 'option')
+      .map((option) => option.props.value),
+    [10, 20, 50, 100],
+  );
+  assert.equal(sizeSelect().props.value, 20);
+  assert.deepEqual(
+    nodes(pageSelect())
+      .filter((node) => node.type === 'option')
+      .map((option) => option.props.value),
+    [1, 2, 3],
+  );
+  const range = () =>
+    nodes(nav())
+      .find((node) => node.type === 'small')
+      .props.children.join('');
+  assert.equal(range(), '1–20 จาก 45');
+  pageSelect().props.onChange({ target: { value: '3' } });
+  tree = w.render();
+  assert.ok(w.calls.some(({ url }) => url?.startsWith('/api/sites?page=3&pageSize=20')));
+  sizeSelect().props.onChange({ target: { value: '50' } });
+  tree = w.render();
+  assert.ok(
+    w.calls.some(({ url }) => url?.startsWith('/api/sites?page=1&pageSize=50')),
+    'new size starts at page 1',
+  );
+  w.setResource('/api/sites?', { loading: true });
+  tree = w.render();
+  assert.equal(range(), '1–20 จาก 45', 'while the new size loads, the range still describes the rows on screen');
+  assert.equal(
+    nodes(nav())
+      .find((node) => node.type === 'span')
+      .props.children.join(''),
+    'หน้า 1 / 3',
+  );
+  assert.equal(sizeSelect().props.value, 50, 'the size select shows the requested size');
+  w.setResource('/api/sites?', { data: { items: [], total: 45, page: 1 }, loading: false });
+  tree = w.render();
+  assert.deepEqual(
+    nodes(pageSelect())
+      .filter((node) => node.type === 'option')
+      .map((option) => option.props.value),
+    [1],
+  );
+  assert.equal(range(), '1–45 จาก 45');
+  sizeSelect().props.onChange({ target: { value: '7' } });
+  tree = w.render();
+  assert.equal(sizeSelect().props.value, 50, 'sizes outside the list are ignored');
+  w.setResource('/api/sites?', { loading: true });
+  tree = w.render();
+  assert.equal(sizeSelect().props['aria-disabled'], true);
+  w.calls.length = 0;
+  pageSelect().props.onChange({ target: { value: '1' } });
+  sizeSelect().props.onChange({ target: { value: '10' } });
+  w.render();
+  assert.equal(
+    w.calls.some(({ url }) => /pageSize=10/.test(url ?? '')),
+    false,
+    'loading blocks changes',
+  );
+});
+
+test('survey points cluster; individual points exclude clusters; numbered cluster buttons zoom in', async () => {
+  markers.length = 0;
+  const { map } = mapHarness();
+  const surveys = map.sources.get('surveys');
+  assert.equal(surveys.cluster, true);
+  assert.equal(surveys.clusterRadius, 40);
+  assert.equal(surveys.clusterMaxZoom, 9);
+  assert.deepEqual(JSON.parse(JSON.stringify(map.layers.find((layer) => layer.id === 'surveys-circle').filter)), [
+    '!',
+    ['has', 'point_count'],
+  ]);
+  const cluster = (id, count, coordinates) => ({
+    properties: { cluster: true, cluster_id: id, point_count: count },
+    geometry: { type: 'Point', coordinates },
+  });
+  map.clusters = [cluster(7, 12, [98.5, 8.5]), cluster(7, 12, [98.5, 8.5]), cluster(9, 3, [98.6, 8.6])];
+  map.emit('render');
+  assert.equal(markers.length, 2, 'one marker per cluster id, duplicates across tiles ignored');
+  const [twelve] = markers;
+  assert.equal(twelve.element.tagName, 'BUTTON');
+  assert.equal(twelve.element.textContent, '12');
+  assert.equal(twelve.element.attributes['aria-label'], 'กลุ่มจุดสำรวจ 12 จุด คลิกเพื่อซูมเข้า');
+  assert.match(twelve.element.className, /survey-cluster md/);
+  assert.deepEqual(JSON.parse(JSON.stringify(twelve.lngLat)), [98.5, 8.5]);
+  twelve.element.dispatch('click');
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(JSON.parse(JSON.stringify(map.expandedClusters)), [7]);
+  assert.deepEqual(JSON.parse(JSON.stringify(map.eases.at(-1))), { center: [98.5, 8.5], zoom: 13 });
+  map.clusters = [cluster(9, 3, [98.6, 8.6])];
+  map.emit('render');
+  assert.equal(twelve.removed, true, 'a cluster that is gone loses its marker');
+  assert.equal(markers.length, 2, 'the remaining cluster keeps its marker');
+});
+
+test('hovering a survey point shows no tooltip (the popup on click carries the details)', () => {
+  const { map } = mapHarness();
+  assert.equal(
+    map.container.ownerDocument.created.some((element) => element.className === 'map-tooltip'),
+    false,
+  );
+});
+
+test('the popup gets an arrow pointing at its anchor, and none without an anchor', () => {
+  const { render, map } = mapHarness();
+  const arrow = map.container.ownerDocument.created.find((element) => element.className.startsWith('map-popup-arrow'));
+  assert.ok(arrow);
+  assert.equal(arrow.hidden, true);
+  const popupElement = { style: {}, offsetWidth: 200, offsetHeight: 100 };
+  map.point = { x: 400, y: 400 };
+  render(undefined, { popupElement, popup: { key: 'survey:7', point: [98, 7] } });
+  assert.equal(arrow.hidden, false);
+  assert.equal(arrow.className, 'map-popup-arrow above');
+  // The popup sits above the point: its bottom edge is 14 px over the point, the arrow centred on the point.
+  assert.equal(arrow.style.transform, 'translate(392px, 386px)');
+  render(undefined, { popupElement, popup: null });
+  assert.equal(arrow.hidden, true);
 });

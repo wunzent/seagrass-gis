@@ -3,10 +3,13 @@
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { number, surveyRounds } from '../../lib/map-format';
-import { debounce, emptyFilters, filterState, PAGE_SIZE, type Bbox, type Filters } from '../../lib/map-state';
+import { debounce, emptyFilters, filterState, pageSizeState, type Bbox, type Filters } from '../../lib/map-state';
+import { DEFAULT_BASEMAP, readBasemap, saveBasemap, type BasemapId } from '../../lib/basemaps';
 import { type SitesGeoJSON, type SurveysGeoJSON } from '../../lib/sites';
 import { useSession } from '../../stores/session-context';
+import { BasemapSelect } from './basemap-select';
 import { FiltersPanel } from './filters-panel';
+import { ListPagination } from './list-pagination';
 import { Legend } from './legend';
 import { Failure } from './map-ui';
 import { SiteListPanel } from './site-list';
@@ -51,7 +54,20 @@ function MapContent({ sessionControls }: { sessionControls?: ReactNode } = {}) {
   const [surveysRetry, setSurveysRetry] = useState(0);
   const [detailRetry, setDetailRetry] = useState(0);
   const [historyRetry, setHistoryRetry] = useState(0);
-  const [listPagination, setListPagination] = useState<{ total: number; page: number }>();
+  // The size asked for when the shown list arrived (the API answers {items, total, page} without pageSize).
+  const requestedPageSize = useRef(state.pageSize);
+  // eslint-disable-next-line react-hooks/refs -- intentional: read by the list effect when new data lands
+  requestedPageSize.current = state.pageSize;
+  const [listPagination, setListPagination] = useState<{ total: number; page: number; pageSize: number }>();
+  const [basemap, setBasemap] = useState<BasemapId>(DEFAULT_BASEMAP);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: read the browser's choice after hydration
+    setBasemap(readBasemap(() => globalThis.localStorage));
+  }, []);
+  const chooseBasemap = useCallback((value: BasemapId) => {
+    setBasemap(value);
+    saveBasemap(() => globalThis.localStorage, value);
+  }, []);
   const commitFilters = useMemo(
     () => debounce<Filters>((filters) => setState((previous) => filterState(previous, filters))),
     [setState],
@@ -111,8 +127,10 @@ function MapContent({ sessionControls }: { sessionControls?: ReactNode } = {}) {
     return history.data.total > history.data.items.length && all.length > 1 ? all.slice(0, -1) : all;
   }, [history.data]);
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: keep last page totals while a new page loads
-    if (list.data) setListPagination({ total: list.data.total, page: list.data.page });
+    if (!list.data) return;
+    const shown = { total: list.data.total, page: list.data.page, pageSize: requestedPageSize.current };
+    // Keep the last page totals while a new page loads.
+    setListPagination(shown);
   }, [list.data]);
   // SiteMap keeps drawing the last collections while a layer reloads or fails; lookups use the same data.
   const [shownSurveys, setShownSurveys] = useState<SurveysGeoJSON>();
@@ -133,7 +151,15 @@ function MapContent({ sessionControls }: { sessionControls?: ReactNode } = {}) {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: mirror what the map still draws
     if (geojson.data) setShownSites(geojson.data);
   }, [geojson.data]);
-  const listPages = list.data ?? listPagination;
+  // Range and page count describe the rows on screen: data for the current key was asked with state.pageSize; while
+  // another size loads they keep the size of the last response.
+  const listPages = list.data
+    ? {
+        total: list.data.total,
+        page: list.data.page,
+        pageSize: state.pageSize,
+      }
+    : listPagination;
   const historyMissing = history.error instanceof ApiError && history.error.status === 404;
   const missing = detail.error instanceof ApiError && detail.error.status === 404;
   useEffect(() => {
@@ -256,35 +282,19 @@ function MapContent({ sessionControls }: { sessionControls?: ReactNode } = {}) {
     </>
   );
   const pagination = listPages && (
-    <nav key="list-pagination" className="pagination" aria-label="หน้ารายการแหล่ง" {...listFocus}>
-      <button
-        type="button"
-        className="text-button"
-        disabled={!loadingList && state.page <= 1}
-        aria-disabled={listInert || state.page <= 1}
-        onClick={() => {
-          if (listInert || state.page <= 1) return;
-          setState((previous) => ({ ...previous, page: previous.page - 1 }));
-        }}
-      >
-        ก่อนหน้า
-      </button>
-      <span tabIndex={-1}>
-        หน้า {listPages.page} / {Math.max(1, Math.ceil(listPages.total / PAGE_SIZE))}
-      </span>
-      <button
-        type="button"
-        className="text-button"
-        disabled={!loadingList && state.page * PAGE_SIZE >= listPages.total}
-        aria-disabled={listInert || state.page * PAGE_SIZE >= listPages.total}
-        onClick={() => {
-          if (listInert || state.page * PAGE_SIZE >= listPages.total) return;
-          setState((previous) => ({ ...previous, page: previous.page + 1 }));
-        }}
-      >
-        ถัดไป
-      </button>
-    </nav>
+    <ListPagination
+      key="list-pagination"
+      page={state.page}
+      pageSize={state.pageSize}
+      total={listPages.total}
+      shownPage={listPages.page}
+      shownPageSize={listPages.pageSize}
+      inert={listInert}
+      loading={loadingList}
+      goTo={(page) => setState((previous) => ({ ...previous, page }))}
+      setPageSize={(pageSize) => setState((previous) => pageSizeState(previous, pageSize))}
+      focus={listFocus}
+    />
   );
   const total = list.data ? `${number.format(list.data.total)} แหล่ง` : '';
 
@@ -368,7 +378,9 @@ function MapContent({ sessionControls }: { sessionControls?: ReactNode } = {}) {
                 onDeselect={deselect}
                 popupElement={popupElement}
                 popup={mapPopup}
+                basemap={basemap}
               />
+              {mapAvailable && view === 'map' && <BasemapSelect value={basemap} onChange={chooseBasemap} />}
               {popup && (
                 <section
                   ref={setPopupElement}

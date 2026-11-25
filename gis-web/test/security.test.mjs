@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { proxyRequest, MAX_BODY_BYTES } from '../src/lib/proxy.ts';
 import config, { securityHeaders } from '../next.config.ts';
+import { TILE_HOSTS } from '../src/lib/basemaps.ts';
 
 const asMap = (list) => new Map(list.map((h) => [h.key, h.value]));
 
@@ -15,14 +16,15 @@ test('security headers apply to all routes with the required static headers', as
   assert.equal(headers.get('Referrer-Policy'), 'strict-origin-when-cross-origin');
 });
 
-test('CSP is restrictive, allows only the OSM tile host, and no unsafe-eval in production', () => {
+test('CSP is restrictive, allows only the basemap tile hosts, and no unsafe-eval in production', () => {
   const csp = asMap(securityHeaders(false)).get('Content-Security-Policy');
   const directives = new Map(csp.split('; ').map((d) => [d.split(' ')[0], d]));
   assert.equal(directives.get('default-src'), "default-src 'self'");
   assert.equal(directives.get('script-src'), "script-src 'self' 'unsafe-inline'");
   assert.equal(directives.get('style-src'), "style-src 'self' 'unsafe-inline'");
-  assert.equal(directives.get('img-src'), "img-src 'self' data: blob: https://tile.openstreetmap.org");
-  assert.equal(directives.get('connect-src'), "connect-src 'self' https://tile.openstreetmap.org");
+  assert.deepEqual(TILE_HOSTS, ['https://tile.openstreetmap.org', 'https://server.arcgisonline.com']);
+  assert.equal(directives.get('img-src'), `img-src 'self' data: blob: ${TILE_HOSTS.join(' ')}`);
+  assert.equal(directives.get('connect-src'), `connect-src 'self' ${TILE_HOSTS.join(' ')}`);
   assert.equal(directives.get('worker-src'), "worker-src 'self' blob:");
   assert.equal(directives.get('frame-ancestors'), "frame-ancestors 'none'");
   assert.equal(directives.get('base-uri'), "base-uri 'self'");

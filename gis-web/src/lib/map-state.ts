@@ -14,10 +14,12 @@ export const statuses = {
 
 export type Status = keyof typeof statuses;
 export type Filters = { province: string; status: string; q: string };
-export type ListState = { filters: Filters; page: number };
+export type ListState = { filters: Filters; page: number; pageSize: number };
 export type Bbox = [number, number, number, number];
 export const emptyFilters: Filters = { province: '', status: '', q: '' };
 export const PAGE_SIZE = 20;
+/** Page sizes the list offers; the API caps pageSize at 100. */
+export const PAGE_SIZES = [10, 20, 50, 100] as const;
 export const ROUNDS_PAGE_SIZE = 100;
 
 export function filterState(state: ListState, change: Partial<Filters>): ListState {
@@ -30,7 +32,16 @@ export function filterState(state: ListState, change: Partial<Filters>): ListSta
   ) {
     throw new Error('กรุณาตรวจสอบตัวกรอง (คำค้นไม่เกิน 200 ตัวอักษร)');
   }
-  return { filters, page: 1 };
+  return { filters, page: 1, pageSize: state.pageSize ?? PAGE_SIZE };
+}
+
+export function pageSizeState(state: ListState, pageSize: number): ListState {
+  if (!(PAGE_SIZES as readonly number[]).includes(pageSize)) throw new Error('จำนวนต่อหน้าไม่ถูกต้อง');
+  return { ...state, page: 1, pageSize };
+}
+
+export function pageCount(total: number, pageSize: number) {
+  return Math.max(1, Math.ceil(total / pageSize));
 }
 
 function filterQuery(filters: Filters) {
@@ -39,7 +50,7 @@ function filterQuery(filters: Filters) {
   return query;
 }
 export function listQuery(state: ListState) {
-  const query = new URLSearchParams({ page: String(state.page), pageSize: String(PAGE_SIZE) });
+  const query = new URLSearchParams({ page: String(state.page), pageSize: String(state.pageSize ?? PAGE_SIZE) });
   filterQuery(state.filters).forEach((value, key) => query.set(key, value));
   return query.toString();
 }

@@ -2,6 +2,7 @@
 
 import {
   Map as MapLibreMap,
+  Marker,
   NavigationControl,
   ScaleControl,
   setWorkerUrl,
@@ -28,6 +29,8 @@ import {
   type SitesGeoJSON,
   type SurveysGeoJSON,
 } from '../../lib/sites';
+import { clusterLabel, popupArrow, SURVEY_CLUSTER } from '../../lib/map-overlay';
+import { BASEMAPS, DEFAULT_BASEMAP, basemapOverlaySources, basemapSource, type BasemapId } from '../../lib/basemaps';
 
 // Served from public/ by scripts/copy-maplibre-worker.mjs; the default URL is relative to the bundled chunk and 404s.
 setWorkerUrl('/maplibre/maplibre-gl-worker.mjs');
@@ -49,6 +52,8 @@ type Props = {
   popupElement?: HTMLElement | null;
   /** `site:<code>` or `survey:<id>`; a survey popup carries its own point. */
   popup?: { key: string; point?: [number, number] } | null;
+  /** Raster basemap under the data layers; switching keeps the map, its camera and its data. */
+  basemap?: BasemapId;
 };
 
 /** A survey point within this many pixels of a click wins over the polygon under it. */
@@ -67,6 +72,30 @@ function hatchImage() {
     }
   return { width: size, height: size, data };
 }
+
+const OVERLAY_PREFIX = 'basemap-overlay-';
+
+/** Adds the basemap and its overlays (same id for source and layer), below `before` when given. */
+function addBasemap(instance: MapLibreMap, id: BasemapId, before?: string) {
+  instance.addSource('basemap', basemapSource(id));
+  instance.addLayer({ id: 'basemap', type: 'raster', source: 'basemap' }, before);
+  basemapOverlaySources(id).forEach((source, index) => {
+    const layer = OVERLAY_PREFIX + index;
+    instance.addSource(layer, source);
+    instance.addLayer({ id: layer, type: 'raster', source: layer }, before);
+  });
+}
+
+function removeBasemap(instance: MapLibreMap, id: BasemapId) {
+  for (let index = basemapOverlaySources(id).length - 1; index >= 0; index--) {
+    instance.removeLayer(OVERLAY_PREFIX + index);
+    instance.removeSource(OVERLAY_PREFIX + index);
+  }
+  instance.removeLayer('basemap');
+  instance.removeSource('basemap');
+}
+
+const BASEMAP_FAILURE = 'โหลดแผนที่พื้นหลังไม่สำเร็จ ยังเลือกแหล่งจากตารางและอ่านรายละเอียดได้';
 
 const POPUP_GAP = 14;
 const POPUP_MARGIN = 8;
@@ -89,6 +118,7 @@ export default function SiteMap({
   selectedSurveyId = null,
   popupElement = null,
   popup = null,
+  basemap = DEFAULT_BASEMAP,
 }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | null>(null);
@@ -107,8 +137,12 @@ export default function SiteMap({
   popupTarget.current = popupElement;
   // The popup is never hidden: without a usable map or anchor (map failed, details still loading or failed)
   // it sits at the canvas's top-left so details, loading text and retry stay reachable.
+  // Arrow from the popup to its anchor; an element inside the map container, created with the map.
+  const arrowElement = useRef<HTMLElement | null>(null);
   const placePopup = useRef(() => {
     const element = popupTarget.current;
+    const arrow = arrowElement.current;
+    if (arrow) arrow.hidden = true;
     if (!element) return;
     const instance = map.current;
     const box = instance?.getContainer() ?? container.current;
@@ -125,12 +159,24 @@ export default function SiteMap({
       x = clamp(point.x - width / 2, POPUP_MARGIN, box.clientWidth - width - POPUP_MARGIN);
       const above = point.y - height - POPUP_GAP;
       y = above >= POPUP_MARGIN ? clamp(above, POPUP_MARGIN, maxY) : clamp(point.y + POPUP_GAP, POPUP_MARGIN, maxY);
+      const place = arrow && popupArrow(point, { x, y, width, height });
+      if (arrow && place) {
+        arrow.className = `map-popup-arrow ${place.side}`;
+        arrow.style.transform = `translate(${Math.round(place.left)}px, ${Math.round(place.top)}px)`;
+        arrow.hidden = false;
+      }
     }
     element.style.transform = `translate(${Math.round(x)}px, ${Math.round(y + top)}px)`;
   });
   const [ready, setReady] = useState(false);
   const [failure, setFailure] = useState('');
   const [generation, setGeneration] = useState(0);
+  // The basemap wanted now and the one the current map draws; a new map (retry) loads the wanted one.
+  const wantedBasemap = useRef(basemap);
+  // eslint-disable-next-line react-hooks/refs -- intentional: the load listener reads the latest choice
+  wantedBasemap.current = basemap;
+  const drawnBasemap = useRef<BasemapId | null>(null);
+  const erroredTiles = useRef(new Set<string>());
 
   useEffect(() => {
     if (!container.current) return;
@@ -151,7 +197,9 @@ export default function SiteMap({
       if (validBbox(bbox)) callbacks.current.onViewport(bbox);
     }, VIEWPORT_DEBOUNCE_MS);
     let instance: MapLibreMap;
-    const erroredTiles = new Set<string>();
+    const errored = new Set<string>();
+    erroredTiles.current = errored;
+    drawnBasemap.current = null;
     try {
       instance = new MapLibreMap({
         container: container.current,
@@ -164,21 +212,19 @@ export default function SiteMap({
         },
       });
       map.current = instance;
+      const mapBox = instance.getContainer();
+      const documentOf = mapBox.ownerDocument;
+      const arrow = documentOf.createElement('div');
+      arrow.className = 'map-popup-arrow';
+      arrow.setAttribute('aria-hidden', 'true');
+      arrow.hidden = true;
+      mapBox.appendChild(arrow);
+      arrowElement.current = arrow;
       instance.addControl(new NavigationControl({ showCompass: false }), 'top-right');
       instance.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-left');
       instance.on('load', () => {
-        instance.addSource('basemap', {
-          type: 'raster',
-          tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-          tileSize: 256,
-          maxzoom: 19,
-          attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        });
-        instance.addLayer({
-          id: 'basemap',
-          type: 'raster',
-          source: 'basemap',
-        });
+        drawnBasemap.current = wantedBasemap.current;
+        addBasemap(instance, drawnBasemap.current);
         instance.addSource('provinces', { type: 'geojson', data: empty });
         instance.addLayer({
           id: 'provinces-line',
@@ -235,11 +281,12 @@ export default function SiteMap({
           filter: ['==', ['get', 'code'], ''],
           paint: { 'line-color': POINT_STROKE, 'line-width': 3.5 },
         });
-        instance.addSource('surveys', { type: 'geojson', data: empty });
+        instance.addSource('surveys', { type: 'geojson', data: empty, ...SURVEY_CLUSTER });
         instance.addLayer({
           id: 'surveys-circle',
           type: 'circle',
           source: 'surveys',
+          filter: ['!', ['has', 'point_count']],
           paint: {
             'circle-color': POINT_FILL,
             'circle-radius': 4.5,
@@ -308,6 +355,37 @@ export default function SiteMap({
           instance.getCanvas().style.cursor = survey || siteAt(event.point) ? 'pointer' : '';
         });
         instance.on('mouseout', () => instance.setFilter('surveys-hover', idFilter('')));
+        // Clusters are numbered buttons (HTML markers: the style has no glyphs for map text); a click zooms in.
+        const clusterMarkers = new Map<number, Marker>();
+        instance.on('render', () => {
+          const seen = new Set<number>();
+          for (const feature of instance.querySourceFeatures('surveys', { filter: ['has', 'point_count'] })) {
+            const clusterId = feature.properties?.cluster_id;
+            const coordinates = (feature.geometry as { coordinates?: [number, number] }).coordinates;
+            if (typeof clusterId !== 'number' || seen.has(clusterId) || !coordinates) continue;
+            seen.add(clusterId);
+            if (clusterMarkers.has(clusterId)) continue;
+            const label = clusterLabel(Number(feature.properties?.point_count));
+            const button = documentOf.createElement('button');
+            button.setAttribute('type', 'button');
+            button.className = `survey-cluster ${label.size}`;
+            button.textContent = label.text;
+            button.setAttribute('aria-label', label.aria);
+            button.addEventListener('click', (event) => {
+              event.stopPropagation();
+              void (instance.getSource('surveys') as GeoJSONSource)
+                .getClusterExpansionZoom(clusterId)
+                .then((zoom) => instance.easeTo({ center: coordinates, zoom }))
+                .catch(() => undefined);
+            });
+            clusterMarkers.set(clusterId, new Marker({ element: button }).setLngLat(coordinates).addTo(instance));
+          }
+          for (const [clusterId, marker] of clusterMarkers)
+            if (!seen.has(clusterId)) {
+              marker.remove();
+              clusterMarkers.delete(clusterId);
+            }
+        });
         setReady(true);
         updateViewport.run(undefined);
       });
@@ -323,19 +401,27 @@ export default function SiteMap({
       instance.on('error', (event) => {
         if ('sourceId' in event && event.sourceId === 'basemap') {
           const tile = (event as { tile?: { tileID: { key: string } } }).tile;
-          erroredTiles.add(tile?.tileID.key ?? 'unknown');
-          setFailure('โหลดแผนที่พื้นหลังไม่สำเร็จ ยังเลือกแหล่งจากตารางและอ่านรายละเอียดได้');
-        } else console.error(event.error);
+          errored.add(tile?.tileID.key ?? 'unknown');
+          setFailure(BASEMAP_FAILURE);
+          // A missing road/label overlay tile leaves the imagery usable, so it raises no warning.
+        } else if (!('sourceId' in event && String(event.sourceId).startsWith(OVERLAY_PREFIX)))
+          console.error(event.error);
       });
       instance.on('sourcedata', (event) => {
-        if (event.sourceId === 'basemap' && event.tile?.state === 'loaded') erroredTiles.delete(event.tile.tileID.key);
+        if (event.sourceId === 'basemap' && event.tile?.state === 'loaded') errored.delete(event.tile.tileID.key);
       });
       instance.on('idle', () => {
         const covering = new Set(
-          instance.coveringTiles({ tileSize: 256, maxzoom: 19, roundZoom: true }).map((tile) => tile.key),
+          instance
+            .coveringTiles({
+              tileSize: 256,
+              maxzoom: BASEMAPS[drawnBasemap.current ?? DEFAULT_BASEMAP].maxzoom,
+              roundZoom: true,
+            })
+            .map((tile) => tile.key),
         );
-        for (const key of erroredTiles) if (key !== 'unknown' && !covering.has(key)) erroredTiles.delete(key);
-        if (!erroredTiles.size && instance.isSourceLoaded('basemap')) setFailure('');
+        for (const key of errored) if (key !== 'unknown' && !covering.has(key)) errored.delete(key);
+        if (!errored.size && instance.isSourceLoaded('basemap')) setFailure('');
       });
     } catch {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: map init failure is reported once from the mount effect
@@ -357,6 +443,18 @@ export default function SiteMap({
       map.current = null;
     };
   }, [generation]);
+
+  useEffect(() => {
+    const instance = map.current;
+    const drawn = drawnBasemap.current;
+    if (!ready || !instance || drawn === basemap || drawn === null) return;
+    // Swap only the raster source; the data layers, camera and popup stay as they are.
+    removeBasemap(instance, drawn);
+    addBasemap(instance, basemap, 'provinces-line');
+    drawnBasemap.current = basemap;
+    erroredTiles.current.clear();
+    setFailure((current) => (current === BASEMAP_FAILURE ? '' : current));
+  }, [basemap, ready]);
 
   useEffect(() => {
     if (!ready || !data) return;

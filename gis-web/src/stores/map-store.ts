@@ -1,7 +1,7 @@
 'use client';
 import { useState, useSyncExternalStore } from 'react';
 import { createExternalStore } from './external-store.ts';
-import { emptyFilters, type Filters, type ListState, type Bbox } from '../lib/map-state.ts';
+import { emptyFilters, PAGE_SIZE, type Filters, type ListState, type Bbox } from '../lib/map-state.ts';
 import type {
   Survey,
   ProvinceCollection,
@@ -18,7 +18,7 @@ type Update<T> = T | ((previous: T) => T);
 export function createMapStore() {
   const store = createExternalStore<MapState>({
     draft: emptyFilters,
-    state: { filters: emptyFilters, page: 1 },
+    state: { filters: emptyFilters, page: 1, pageSize: PAGE_SIZE },
     bbox: null,
     popup: null,
     view: 'map',

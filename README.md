@@ -149,7 +149,7 @@ Jest รันโหมด ESM (`node --experimental-vm-modules`) ต้อง�
 
 Auth และ session:
 
-- `POST /auth/login` คืน `{access_token, token_type:"Bearer", user, expires_in:900, expires_at}` พร้อม HttpOnly cookie `gis_access`; session ฝั่ง server ไม่ต่ออายุเมื่ออ่านข้อมูล และห้าม log token
+- `POST /auth/login` คืน `{access_token, user}` พร้อม HttpOnly cookie `gis_access` (เวลาหมดอายุอยู่ใน claim `exp` ของ JWT, 15 นาที); session ฝั่ง server ไม่ต่ออายุเมื่ออ่านข้อมูล และห้าม log token
 - เมื่อมี `Authorization: Bearer` จะใช้ header ก่อน cookie แม้ header ผิดรูป (ไม่ fallback ไป cookie); public reads ตอบข้อมูล anonymous ส่วน protected endpoints ตอบ 401
 - Write ที่ใช้ Bearer ไม่ต้องส่ง Origin/`X-CSRF-Protection` แต่ยังตรวจ role และสิทธิ์ราย field; ถ้าใช้ cookie ต้องส่งทั้งสองเสมอ และ `login`/`logout` ตรวจ CSRF ทุกกรณี
 - login ทั้งสองแบบเพิกถอน session เดิมจาก cookie และ Bearer พร้อมสร้าง session ใหม่ใน transaction เดียวกัน; logout เลือก session จาก header ก่อน ถ้า Bearer ใช้ไม่ได้จะตอบ 204 โดยไม่ล้าง cookie
@@ -189,11 +189,12 @@ npm run dev
 พฤติกรรมสำคัญ:
 
 - Browser เรียก relative `/api/*`; proxy ตัด `/api`, ส่ง Cookie/Set-Cookie และ CSRF headers, ไม่ cache, ไม่เปิด CORS; JavaScript ไม่อ่านหรือเก็บ JWT และไม่ forward `Authorization` จาก browser
-- proxy ลบ `access_token` และ `token_type` จาก JSON response ที่สำเร็จของ `POST /api/auth/login` โดยคง user/expiry และ Set-Cookie; ส่ง `X-Auth-Session: invalid` ต่อให้ browser
-- หน้า `/`: ตัวกรองจังหวัด/สถานะ/คำค้น, ตารางหน้าละ 20, polygons ตาม bbox, province outlines, survey points, legend 5 สถานะ, รายละเอียดและประวัติการสำรวจหน้าละ 5; mobile สลับแผนที่/รายการ
+- proxy ลบ `access_token` จาก JSON response ที่สำเร็จของ `POST /api/auth/login` แล้วเติม `expires_at` จาก claim `exp` ให้ browser โดยคง user และ Set-Cookie; ส่ง `X-Auth-Session: invalid` ต่อให้ browser
+- หน้า `/`: ตัวกรองจังหวัด/สถานะ/คำค้น, ตารางหน้าละ 20 (เลือก 10/20/50/100 ต่อหน้า และเลือกเลขหน้าได้), polygons ตาม bbox, province outlines, survey points, legend 5 สถานะ, รายละเอียดและประวัติการสำรวจหน้าละ 5; mobile สลับแผนที่/รายการ
 - Session ฝั่งเว็บไม่เรียก `/api/auth/me`: login แล้วจำเฉพาะ id/email/role/expires_at (ไม่มี JWT) ใน localStorage เพื่อแสดงชื่อและ role หลัง refresh; เตือน 1 นาทีก่อนหมดอายุและแจ้งเมื่อหมด; ถ้า API ตอบ 401 หรือ `X-Auth-Session: invalid` เว็บล้าง identity ทันที; แท็บอื่น login/logout แล้วอัปเดตตามผ่าน storage event
 - `/login`: ฟอร์มมีบัญชีสาธิตที่หน้า server อ่านจาก `DEMO_*_PASSWORD` ตอน request ผ่าน `src/lib/demo-accounts.ts` (fallback เป็นค่าใน `.env.example`) กดเพื่อกรอกโดยไม่ส่ง; ไม่มีปุ่ม login ตาม role
-- พื้นหลังใช้ OpenStreetMap raster tiles สำหรับ demo เท่านั้น ก่อนใช้งานจริงต้องเลือกผู้ให้บริการและปฏิบัติตาม [OSM tile usage policy](https://operations.osmfoundation.org/policies/tiles/); ถ้าแผนที่เปิดไม่ได้ ตารางและรายละเอียดยังใช้ได้
+- จุดสำรวจที่อยู่ใกล้กัน (ภายใน 40 px) รวมเป็นวงกลมมีตัวเลขเฉพาะตอนซูมออกจนมาตราส่วนประมาณ 30 กม. ขึ้นไป (ซูม ≤ 9) ซูมเข้ามากกว่านั้นแสดงจุดและแหล่งตามปกติ คลิกวงกลมเพื่อซูมเข้า; popup ของแหล่ง/จุดมีลูกศรชี้ไปยังตำแหน่งที่เลือก
+- แผนที่ฐานสลับได้ 2 แบบจากกล่อง "แผนที่ฐาน" มุมซ้ายล่างของแผนที่: แผนที่ถนน (OpenStreetMap) และภาพดาวเทียม (Esri World Imagery ซ้อนชั้นถนนและชื่อสถานที่จาก Esri Reference World Transportation / World Boundaries and Places) browser จำตัวเลือกไว้ใน localStorage (`gis-basemap`); ทั้งหมดเป็น raster tiles สำหรับ demo เท่านั้น ก่อนใช้งานจริงต้องเลือกผู้ให้บริการและปฏิบัติตามเงื่อนไขของแต่ละราย เช่น [OSM tile usage policy](https://operations.osmfoundation.org/policies/tiles/); ถ้าแผนที่เปิดไม่ได้ ตารางและรายละเอียดยังใช้ได้
 
 ## CI
 
@@ -209,7 +210,7 @@ workflow ใช้ `contents: read`, `actions/checkout@v4`, `actions/setup-node@
 
 - ยังไม่มี UI สำหรับเขียนข้อมูล (วาด polygon, เพิ่ม survey บนแผนที่ เป็นงานระดับ Senior ซึ่งไม่อยู่ในขอบเขต) การเขียนทำผ่าน API/Swagger/`.http`
 - `seed-data/seagrass_large_utm.zip` (UTM) ยังไม่ import; ไม่มีการแปลง CRS; งานระดับ Senior ไม่อยู่ในขอบเขต; ขั้นที่ 9 ทำข้อ CI
-- แผนที่พื้นหลังใช้ OpenStreetMap tiles (ต้องมีอินเทอร์เน็ตและ WebGL) สำหรับ demo เท่านั้น
+- แผนที่พื้นหลังใช้ tiles จาก OpenStreetMap และ Esri (ต้องมีอินเทอร์เน็ตและ WebGL) สำหรับ demo เท่านั้น
 - Survey ไม่มี version: แก้พร้อมกันเป็น last-write-wins; หลัง admin ย้าย site อาจมี survey เดิมที่ห่างเกิน 50 m ค้างอยู่
 - `/surveys.geojson` คืนสูงสุด 5000 จุดใหม่สุด; rate limit login คิดตาม client+email เพราะ API เห็น IP เดียวของ web proxy
 - HTTP loopback เท่านั้น ไม่ใช่ production HTTPS

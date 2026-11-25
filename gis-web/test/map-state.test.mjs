@@ -80,3 +80,18 @@ test('map viewport requests wait 600ms after the map stops moving', () => {
   assert.match(source, /const updateViewport = debounce\([\s\S]*?\}, VIEWPORT_DEBOUNCE_MS\);/);
   assert.match(source, /instance\.on\('moveend'/);
 });
+
+test('page size options: list asks for the chosen size, a new size or filter returns to page 1 and keeps the size', async () => {
+  const { PAGE_SIZES, pageSizeState, pageCount } = await import('../src/lib/map-state.ts');
+  assert.deepEqual([...PAGE_SIZES], [10, 20, 50, 100]);
+  const base = { filters: { province: '', status: '', q: '' }, page: 3, pageSize: 20 };
+  const bigger = pageSizeState(base, 50);
+  assert.deepEqual(bigger, { ...base, page: 1, pageSize: 50 });
+  assert.equal(new URLSearchParams(listQuery(bigger)).get('pageSize'), '50');
+  assert.equal(filterState(bigger, { q: 'x' }).pageSize, 50, 'a filter change keeps the chosen size');
+  for (const bad of [0, 7, 101, 1000, Number.NaN]) assert.throws(() => pageSizeState(base, bad));
+  assert.equal(pageCount(0, 20), 1);
+  assert.equal(pageCount(30, 20), 2);
+  assert.equal(pageCount(100, 50), 2);
+  assert.equal(pageCount(101, 100), 2);
+});
