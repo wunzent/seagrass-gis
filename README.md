@@ -28,12 +28,13 @@ seagrass-gis/
 
 | Step          | สิ่งที่ทำงานได้                                                                                                                                                                                                                                                                                                            | หลักฐาน                                      |
 | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| 1 Runtime     | Compose 3 services, versioned migrations, `/health` ตรวจ PostGIS, ข้อมูลคงอยู่หลัง restart                                                                                                                                                                                                                                 | fresh DB/restart proof                       |
+| 1 Runtime     | Compose, versioned migrations, `/health` ตรวจ PostGIS, ข้อมูลคงอยู่หลัง restart                                                                                                                                                                                                                                             | fresh DB/restart proof                       |
 | 2 Import      | importer อัตโนมัติตอน start + รันซ้ำได้, `reports/import_report.csv`                                                                                                                                                                                                                                                       | unit + real PostGIS integration              |
 | 3 Site writes | POST/PATCH/DELETE `/sites` พร้อม optimistic locking (`version`) และ soft delete                                                                                                                                                                                                                                            | real PostGIS e2e                             |
 | 4 Surveys     | CRUD survey, history, `/surveys.geojson`, `/provinces.geojson`, `/species`                                                                                                                                                                                                                                                 | real PostGIS e2e                             |
 | 5 Auth        | `POST /auth/login` คืน JWT (`access_token`, 15 นาที) + HttpOnly cookie; ใช้ `Authorization: Bearer` หรือ cookie; API ตรวจ token + session ทุกคำขอ; me/logout, session revocation, CSRF สำหรับ cookie, roles viewer/editor/admin                                                                                            | e2e (real PostGIS) + Docker smoke            |
 | 6 Web         | เมนู แผนที่ / ตารางแหล่งหญ้าทะเล; sidebar ตัวกรอง + รายการ; MapLibre polygons ตาม bbox (debounce), เส้นจังหวัด, จุดสำรวจ, legend; popup แหล่ง (รายละเอียด + ประวัติสรุปรอบ) และ popup จุดสำรวจ; login (ฟอร์ม + กล่องบัญชีสาธิต), แจ้งเตือนเมื่อ session หมดอายุ; loading/error/empty + หน้า loading/error/not-found; 375px | unit + browser บน Docker (desktop และ 375px) |
+| 9.1 Tiles     | นำเข้าแปลงอ้างอิง EPSG:32647 → EPSG:4326 อัตโนมัติ และเปิดชั้น MVT ผ่าน Martin กับ MapLibre                                                                                                                                                                                                                                | import e2e และ web unit                     |
 | 9.5 CI        | `.github/workflows/ci.yml`: `api-test` → `api-image`, `web-test` → `web-image`                                                                                                                                                                                                                                             | GitHub Actions ผ่านบน `main`                 |
 
 ## Run
@@ -55,8 +56,9 @@ docker compose up --build -d --wait
 | API readiness / PostGIS | http://localhost:3001/health                                                  |
 | Swagger UI              | http://localhost:3001/docs (spec: `/docs/openapi.json`, `/docs/openapi.yaml`) |
 | Database                | `127.0.0.1:54329`, database/user `gis`                                        |
+| Martin / tile catalog   | http://localhost:3002/health · http://localhost:3002/catalog                  |
 
-ทุก port ผูกกับ loopback เท่านั้น ห้ามเปิดบริการนี้ออกอินเทอร์เน็ตด้วยค่า demo การรัน API/Web บน host (port 3002/3003)
+ทุก port ผูกกับ loopback เท่านั้น ใช้ค่า demo บนเครื่อง local หากรัน host API ที่ port 3002 พร้อม Compose ให้ตั้ง `TILES_PORT` เป็น port ว่างอื่น
 
 ## Demo Accounts (local-only)
 
@@ -92,6 +94,37 @@ docker compose exec api npm run import
 ```
 
 รันซ้ำข้าม key เดิม ไม่ overwrite การแก้ไขผ่าน API และไม่ฟื้น site ที่ลบ ผลรอบแรก: 339 records รับ 310 / ปฏิเสธ 29; เก็บ provinces 3, species 6, sites 27, surveys 274 (สำเนา [import_report.initial.csv](reports/import_report.initial.csv)) รายงานปัจจุบันถูกแทนทุกครั้งที่รัน; ใช้ row index เริ่ม 1 สำหรับ feature/array และ physical line เริ่ม 2 สำหรับ CSV
+
+## Step 9.1 · Vector Tiles
+
+`docker compose up --build -d --wait` รัน job `import-tiles` หลัง PostGIS พร้อม Job ใช้ migration เดียวกับ API จากนั้นอ่าน `seed-data/seagrass_large_utm.zip` แบบ read-only กำหนด EPSG:32647 เพราะชุดไฟล์ไม่มี `.prj` และแปลงเป็น EPSG:4326 ด้วย PostGIS แถวที่ผิดมีเหตุผลกับลำดับแถวใน `reports/reference_import_report.csv` การรันซ้ำข้าม `REF_ID` เดิม
+
+API health เป็นอิสระจาก job นี้ ส่วน Martin 1.14.0 เริ่มหลัง job สำเร็จและเปิดเฉพาะ `reference_parcels` โดยใช้ geometry EPSG:3857 ที่คำนวณไว้และมี GiST ดูเวลา import ใน log และรันซ้ำได้ด้วยคำสั่งต่อไปนี้
+
+```powershell
+docker compose logs import-tiles
+docker compose run --rm import-tiles
+```
+
+เปิด **แปลงอ้างอิง (ขั้น 9)** ใน legend ที่ zoom 7 ขึ้นไป ค่าเริ่มต้นปิดเพื่อให้เห็นสีสถานะของแหล่งชัดเจน เว็บใช้ `/tiles/reference_parcels/{z}/{x}/{y}` บน origin เดียวกัน หากรัน Next บน host ให้ตั้ง `TILES_INTERNAL_URL` เป็น origin ของ Martin เช่น `http://127.0.0.1:3002` โดยใช้ port ที่ตั้งใน `TILES_PORT`
+
+### Localhost timing
+
+วัด tile แรกก่อนเปิดชั้นแผนที่หลังเริ่ม Martin ใหม่ แล้ววัด viewport ของกระบี่ที่ zoom 10 เปลี่ยน web port เป็น 3200 เมื่อใช้ Compose smoke test แยก
+
+```powershell
+$tile = 'http://127.0.0.1:3000/tiles/reference_parcels/10'
+curl.exe -fsS -o NUL -w "%{http_code} %{size_download} %{time_total}s`n" "$tile/792/489"
+foreach ($x in 791..794) {
+  foreach ($y in 487..490) {
+    curl.exe -fsS -o NUL -w "$x/$y %{http_code} %{size_download} %{time_total}s`n" "$tile/$x/$y"
+  }
+}
+```
+
+เป้าหมายคือเห็นชั้นแปลงบน localhost ภายใน 2 วินาทีหลังเปิดชั้น เวลา HTTP ใช้ตรวจเส้นทาง tile ส่วนเวลาแสดงผลให้จับจากการเปิดชั้นจนเห็นเส้นครั้งแรก
+
+ผลวัดด้วยคำสั่ง curl ด้านบนที่ web port 3210 บน PostgreSQL 16.15/PostGIS 3.5.2 และ Next proxy โดยใช้ HTTP bridge ที่รัน SQL แบบเดียวกับ Martin: tile แรก `10/792/489` **0.154 s** (63,870 bytes), tile กระบี่ 16 ใบที่ z10 **0.086–0.203 s/ใบ** และ tile ระดับเริ่มต้น `7/99/61` **0.278 s** นำเข้า 20,000 แถวใน **6.923 s** และ API health พร้อมใน **5.510 s** เครื่องทดสอบถูกปฏิเสธสิทธิ์เข้าถึง Docker engine จึงยังต้องจับเวลา Martin ใน Compose และเวลาแสดงผลบน browser
 
 ## Test
 
@@ -212,7 +245,7 @@ workflow ใช้ `contents: read`, `actions/checkout@v5`, `actions/setup-node@
 ## Known Limitations
 
 - ยังไม่มี UI สำหรับเขียนข้อมูล (วาด polygon, เพิ่ม survey บนแผนที่ เป็นงานระดับ Senior ซึ่งไม่อยู่ในขอบเขต) การเขียนทำผ่าน API/Swagger/`.http`
-- `seed-data/seagrass_large_utm.zip` (UTM) ยังไม่ import; ไม่มีการแปลง CRS; งานระดับ Senior ไม่อยู่ในขอบเขต; ขั้นที่ 9 ทำข้อ CI
+- ขั้นที่ 9 ทำข้อ vector tiles และ CI ส่วนข้อ 2–4 ยังไม่อยู่ในขอบเขต
 - แผนที่พื้นหลังใช้ tiles จาก OpenStreetMap และ Esri (ต้องมีอินเทอร์เน็ตและ WebGL) สำหรับ demo เท่านั้น
 - Survey ไม่มี version: แก้พร้อมกันเป็น last-write-wins; หลัง admin ย้าย site อาจมี survey เดิมที่ห่างเกิน 50 m ค้างอยู่
 - `/surveys.geojson` คืนสูงสุด 5000 จุดใหม่สุด; rate limit login คิดตาม client+email เพราะ API เห็น IP เดียวของ web proxy
@@ -225,10 +258,10 @@ workflow ใช้ `contents: read`, `actions/checkout@v5`, `actions/setup-node@
 | Item                      | ที่ส่งมอบ / วิธีตรวจ                                                                                                                                                                                                                                                                                                                                    |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 4.1 Source + commits      | repository นี้มี [gis-api/](gis-api/) และ [gis-web/](gis-web/); ประวัติรวมเป็น timeline เดียวของ commits `step-N:` ตรวจจาก root ด้วย `git log --oneline`                                                                                                                                                                                                |
-| 4.2 Compose + environment | [docker-compose.yml](docker-compose.yml) เปิด db/api/web และ import อัตโนมัติด้วยคำสั่งเดียวใน Run; [.env.example](.env.example) เป็นค่า demo-only                                                                                                                                                                                                      |
+| 4.2 Compose + environment | [docker-compose.yml](docker-compose.yml) เปิด db/api/web/Martin และ import อัตโนมัติด้วยคำสั่งเดียวใน Run; [.env.example](.env.example) เป็นค่า demo-only                                                                                                                                                                                               |
 | 4.3 README                | README นี้ (Run, Test, API (gis-api), Web (gis-web), Current Status และ Demo Accounts) ระบุวิธีเปิด/ทดสอบ ขั้นที่ทำเสร็จ และบัญชี viewer/editor/admin                                                                                                                                                                                                   |
 | 4.4 API docs + examples   | `/docs` ตาม API Usage และ [api-examples.http](api-examples.http)                                                                                                                                                                                                                                                                                        |
 | 4.5 Tests                 | [status unit](gis-api/src/sites/site-status.spec.ts), [validation unit](gis-api/src/sites/dto/create-site.dto.spec.ts), [OUTSIDE_SITE integration](gis-api/test/surveys.e2e-spec.ts), [VERSION_CONFLICT integration](gis-api/test/sites-write.e2e-spec.ts); คำสั่งอยู่ใน Test                                                                           |
 | 4.6 Import report         | [import_report.csv](reports/import_report.csv) จากขั้น 2; จำนวนและวิธีรันซ้ำอยู่ใน Seed Import                                                                                                                                                                                                                                                          |
-| 4.7 Design                | [UI design system ของเว็บ](gis-web/DESIGN.md); [DESIGN.md](DESIGN.md) ตอบ a geometry/SRID/index, b invalid/missing CRS, c concurrent edits, d วิธีส่ง 500,000 polygons ไปหน้าเว็บให้แสดงภายใน 2 วินาที (โจทย์ถามแนวทาง; vector tiles จริงเป็นขั้นที่ 9 ข้อเลือกทำ), e งานที่ยังไม่ทำและแผนอีก 1 วัน; ตรวจแล้ว 2 หน้า A4 (Chrome print, 11pt, ขอบ 20 mm) |
+| 4.7 Design                | [UI design system ของเว็บ](gis-web/DESIGN.md); [DESIGN.md](DESIGN.md) ตอบ a geometry/SRID/index, b invalid/missing CRS, c concurrent edits, d vector tiles ขั้น 9.1 และแนวทางสำหรับ 500,000 polygons, e งานที่ยังไม่ทำและแผนอีก 1 วัน                                                                                                                      |
 | 9.5 CI                    | [GitHub Actions](.github/workflows/ci.yml) รัน test และ build image เมื่อ push/PR ตาม CI; run บน `main` ผ่าน                                                                                                                                                                                                                                            |

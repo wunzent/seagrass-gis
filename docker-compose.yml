@@ -13,7 +13,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -60,11 +60,57 @@ services:
       start_period: 180s
     restart: unless-stopped
 
+  import-tiles:
+    build:
+      context: ./gis-api
+    command: ["node", "dist/import-tiles.js"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-gis}:${POSTGRES_PASSWORD:-gis-local-demo-only}@db:5432/${POSTGRES_DB:-gis}
+      SEED_DATA_DIR: /seed-data
+      IMPORT_REPORT_DIR: /reports
+    volumes:
+      - type: bind
+        source: ./seed-data
+        target: /seed-data
+        read_only: true
+        bind:
+          create_host_path: false
+      - ./reports:/reports
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  tiles:
+    image: ghcr.io/maplibre/martin:1.14.0
+    command: ["--config", "/config/martin.yml"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-gis}:${POSTGRES_PASSWORD:-gis-local-demo-only}@db:5432/${POSTGRES_DB:-gis}
+    volumes:
+      - type: bind
+        source: ./martin.yml
+        target: /config/martin.yml
+        read_only: true
+        bind:
+          create_host_path: false
+    ports:
+      - "127.0.0.1:${TILES_PORT:-3002}:3000"
+    depends_on:
+      import-tiles:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://127.0.0.1:3000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
   web:
     build:
       context: ./gis-web
     environment:
       API_INTERNAL_URL: http://api:3001
+      TILES_INTERNAL_URL: http://tiles:3000
       PORT: 3000
       HOSTNAME: 0.0.0.0
       NEXT_TELEMETRY_DISABLED: 1

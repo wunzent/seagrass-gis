@@ -1,6 +1,51 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { upstreamUrl, proxyRequest } from '../src/lib/proxy.ts';
+import { upstreamUrl, proxyRequest, proxyTile } from '../src/lib/proxy.ts';
+
+test('tile proxy forwards only fixed-source coordinates and streams binary without session headers', async () => {
+  const request = new Request('http://web/tiles/reference_parcels/10/792/489', {
+    headers: { cookie: 'gis_access=secret', authorization: 'Bearer secret' },
+  });
+  const response = await proxyTile(request, 'http://tiles:3000', async (url, init) => {
+    assert.equal(url.href, 'http://tiles:3000/reference_parcels/10/792/489');
+    assert.equal(init.redirect, 'manual');
+    assert.equal(init.headers, undefined);
+    return new Response(new Uint8Array([1, 2, 3]), {
+      headers: { 'set-cookie': 'private=value', 'content-encoding': 'gzip', 'content-length': '42' },
+    });
+  });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('content-type'), 'application/vnd.mapbox-vector-tile');
+  assert.equal(response.headers.has('set-cookie'), false);
+  assert.equal(response.headers.has('content-encoding'), false);
+  assert.equal(response.headers.has('content-length'), false);
+  assert.deepEqual(new Uint8Array(await response.arrayBuffer()), new Uint8Array([1, 2, 3]));
+  const empty = await proxyTile(request, 'http://tiles:3000', async () => new Response(null, { status: 204 }));
+  assert.equal(empty.status, 204);
+  assert.equal(empty.body, null);
+});
+
+test('tile proxy denies arbitrary sources, paths, parameters and out-of-range coordinates', async () => {
+  const never = async () => assert.fail('unexpected upstream request');
+  for (const path of [
+    'catalog',
+    'sites/10/792/489',
+    'reference_parcels/10/1024/489',
+    'reference_parcels/10/792/489?limit=1',
+    'reference_parcels/10/%2F/489',
+    'reference_parcels/10/792/489/extra',
+  ]) {
+    const result = await proxyTile(new Request('http://web/tiles/' + path), 'http://tiles:3000', never);
+    assert.equal(result.status, 404);
+  }
+  const request = new Request('http://web/tiles/reference_parcels/10/792/489');
+  assert.equal((await proxyTile(request, '', never)).status, 503);
+  assert.equal((await proxyTile(request, 'http://user:secret@tiles:3000', never)).status, 503);
+  assert.equal(
+    (await proxyTile(request, 'http://tiles:3000', async () => Response.redirect('http://elsewhere'))).status,
+    502,
+  );
+});
 
 test('proxy forwards Retry-After for both delay seconds and HTTP-date without other upstream headers', async () => {
   for (const after of ['90', 'Sat, 21 Nov 2026 12:00:00 GMT']) {

@@ -69,6 +69,8 @@ State ที่ยัง local มี basemap ที่เลือก (อ่�
 
 `map-url.ts` parse/serialize ตัวกรอง แหล่งที่เลือก view page และ pageSize ใช้ `filterState` และ `pageSizeState` ตรวจค่าแต่ละตัวแยกกัน MapWorkspace อ่าน query ตอนเริ่มและ restore map-store เมื่อเกิด popstate พร้อมยกเลิก debounce เดิม ตัวกรองใช้ router.replace หลัง 300ms ส่วนเลือกแหล่ง เปลี่ยนแท็บ หรือเปลี่ยน pagination ใช้ router.push แท็บใช้ shadcn Tabs และคง MapLibre instance ไว้เมื่อเปิดตาราง
 
+ชั้นแปลงอ้างอิงมี toggle local ใน MapWorkspace เริ่มปิด SiteMap ลงทะเบียน vector source และเส้นใต้ polygon ของแหล่งที่ zoom 7–16 แผนที่ซูมสูงกว่านั้นใช้ tile จาก zoom 16 คำขอ `GET /tiles/reference_parcels/{z}/{x}/{y}` ผ่าน Next route ไปยัง Martin ที่ `TILES_INTERNAL_URL` เป็น same-origin จึงใช้ CSP เดิม Route จำกัดพิกัด XYZ และชื่อแหล่งที่อนุญาต เก็บ tile สำเร็จใน HTTP cache 5 นาที และส่งไปยัง Martin โดยไม่ส่ง session cookie
+
 ## Route guards
 
 Page / ประกอบ SessionRoute ใน sessionControls slot ของ MapWorkspace → TopNav เลือก SessionControls view checking/account/guest; public map เปิดได้ทุกสถานะ. Page /login ประกอบ SessionRoute เลือก LoginForm ไม่ส่ง guest ใน checking (ให้ form อิง session ปัจจุบัน), guest=true เมื่อ anonymous และ guest=false เมื่อ signed-in. ใช้ component ชนิดเดิมที่ตำแหน่งเดิม จึงรักษา form state และ discovery lifecycle. Page (server, `dynamic = 'force-dynamic'`) อ่าน DEMO_VIEWER_PASSWORD/DEMO_EDITOR_PASSWORD/DEMO_ADMIN_PASSWORD ตอน request ผ่าน pure demoAccounts(env) ใน lib (ว่างหรือไม่ตั้งใช้ค่า .env.example) แล้วส่ง prop accounts ให้ LoginForm ทั้งสาม slot; LoginForm ใช้ accounts สำหรับกล่องบัญชีสาธิตและค่า Admin เริ่มต้น (ไม่ส่ง prop ใช้ DEMO_ACCOUNTS) และ features ไม่อ่าน env เอง. LoginForm ยังคง checking/logoutPending controls และ disabled rules เดิม

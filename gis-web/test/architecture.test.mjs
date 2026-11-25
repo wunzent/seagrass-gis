@@ -65,7 +65,10 @@ export function checkArchitectureSource(relative, text) {
         : path.resolve(path.dirname(file), name);
       const resolved = path.relative(root, targetPath).replaceAll('\\', '/').replace(sourceExtension, '');
       if (resolved === 'lib/proxy')
-        assert.ok(relative.startsWith('app/api/'), relative + ': proxy belongs to app/api only');
+        assert.ok(
+          relative.startsWith('app/api/') || relative === 'app/tiles/[...path]/route.ts',
+          relative + ': proxy belongs to the API and tile route handlers only',
+        );
       const target = path.relative(root, targetPath).replaceAll('\\', '/').split('/')[0];
       // Services may use store contracts as erased types, never runtime values.
       if (!(layer === 'services' && target === 'stores' && typeOnly))

@@ -145,6 +145,7 @@ function MapContent({
   const [mapAvailable, setMapAvailable] = useState(true);
   const [zoom, setZoom] = useState(0);
   const [surveysEnabled, setSurveysEnabled] = useState(true);
+  const [referenceParcelsEnabled, setReferenceParcelsEnabled] = useState(false);
   const scope = surveyScope(zoom, selectedSite, surveysEnabled && view === 'map');
   const surveysVisible = scope !== false;
   const selectedRow = useRef<HTMLButtonElement>(null);
@@ -593,6 +594,7 @@ function MapContent({
                 provinces={provinceResource.data}
                 surveys={visiblePoints}
                 surveysVisible={surveysVisible}
+                referenceParcelsVisible={referenceParcelsEnabled && view === 'map'}
                 onZoom={setZoom}
                 selection={view === 'map' ? selected : undefined}
                 onSelect={select}
@@ -608,7 +610,12 @@ function MapContent({
               />
               {mapAvailable && view === 'map' && <BasemapSelect value={basemap} onChange={chooseBasemap} />}
               {view === 'map' && detailPopup}
-              <Legend surveysEnabled={surveysEnabled} toggleSurveys={() => setSurveysEnabled((enabled) => !enabled)} />
+              <Legend
+                surveysEnabled={surveysEnabled}
+                toggleSurveys={() => setSurveysEnabled((enabled) => !enabled)}
+                referenceParcelsEnabled={referenceParcelsEnabled}
+                toggleReferenceParcels={() => setReferenceParcelsEnabled((enabled) => !enabled)}
+              />
             </div>
           </section>
         </TabsContent>

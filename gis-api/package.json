@@ -28,10 +28,12 @@
     "@nestjs/swagger": "12.1.2",
     "class-transformer": "0.5.1",
     "class-validator": "0.15.1",
+    "fflate": "0.8.3",
     "js-yaml": "5.5.0",
     "pg": "8.23.1",
     "reflect-metadata": "0.2.2",
-    "rxjs": "7.8.2"
+    "rxjs": "7.8.2",
+    "shapefile": "0.6.6"
   },
   "devDependencies": {
     "@nestjs/cli": "12.0.15",
@@ -39,6 +41,7 @@
     "@types/jest": "30.0.0",
     "@types/node": "22.18.0",
     "@types/pg": "8.15.5",
+    "@types/shapefile": "0.6.4",
     "jest": "30.5.2",
     "prettier": "3.9.10",
     "ts-jest": "29.4.15",

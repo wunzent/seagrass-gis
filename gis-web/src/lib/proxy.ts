@@ -1,7 +1,6 @@
 export const MAX_BODY_BYTES = 128 * 1024;
 
-export function upstreamUrl(requestUrl: string, internalUrl: string): URL {
-  const incoming = new URL(requestUrl);
+function upstreamOrigin(internalUrl: string) {
   const base = new URL(internalUrl);
   if (
     !['http:', 'https:'].includes(base.protocol) ||
@@ -11,7 +10,13 @@ export function upstreamUrl(requestUrl: string, internalUrl: string): URL {
     base.search ||
     base.hash
   )
-    throw new Error('Invalid API origin');
+    throw new Error('Invalid upstream origin');
+  return base;
+}
+
+export function upstreamUrl(requestUrl: string, internalUrl: string): URL {
+  const incoming = new URL(requestUrl);
+  const base = upstreamOrigin(internalUrl);
   if (!incoming.pathname.startsWith('/api/')) throw new Error('Invalid proxy path');
   const path = incoming.pathname.slice(4);
   if (path.startsWith('//') || /%2f|%5c|%2e|\\/i.test(path) || path.includes('..'))
@@ -33,6 +38,39 @@ const errorResponse = (status: number, code: string) =>
     { error: { code, message: 'ไม่สามารถโหลดข้อมูลได้', details: {} } },
     { status, headers: { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } },
   );
+
+export async function proxyTile(request: Request, internalUrl: string, fetcher: typeof fetch = fetch) {
+  const incoming = new URL(request.url);
+  const tile = /^\/tiles\/reference_parcels\/(\d{1,2})\/(\d{1,7})\/(\d{1,7})$/.exec(incoming.pathname);
+  if (!tile || incoming.search) return new Response(null, { status: 404 });
+  const [z, x, y] = tile.slice(1).map(Number);
+  if (z > 22 || x >= 2 ** z || y >= 2 ** z) return new Response(null, { status: 404 });
+  if (request.method !== 'GET') return new Response(null, { status: 405, headers: { allow: 'GET' } });
+
+  try {
+    const target = new URL(`/reference_parcels/${z}/${x}/${y}`, upstreamOrigin(internalUrl));
+    const upstream = await fetcher(target, {
+      cache: 'no-store',
+      redirect: 'manual',
+      signal: AbortSignal.any([request.signal, AbortSignal.timeout(5000)]),
+    });
+    if (upstream.status === 200 || upstream.status === 204) {
+      return new Response(upstream.status === 200 ? upstream.body : null, {
+        status: upstream.status,
+        headers: {
+          'content-type': 'application/vnd.mapbox-vector-tile',
+          'cache-control': 'public, max-age=300',
+          'x-content-type-options': 'nosniff',
+        },
+      });
+    }
+    await upstream.body?.cancel();
+    if (upstream.status === 404) return new Response(null, { status: 404, headers: { 'cache-control': 'no-store' } });
+    return errorResponse(502, 'BAD_GATEWAY');
+  } catch {
+    return errorResponse(503, 'SERVICE_UNAVAILABLE');
+  }
+}
 
 class PayloadTooLarge extends Error {}
 

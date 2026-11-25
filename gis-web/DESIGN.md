@@ -91,6 +91,8 @@ Mobile ≤767px รวม375px: topbar wrap ชื่อและ session ก่
 
 Map overlays: warning/status relative z2; legend absolute right10 bottom28 z3; popup absolute z5 กว้าง min(300px,100%−16px) scroll ภายใน เริ่ม translate8px/8px แล้ว SiteMap จัดตำแหน่งตาม anchor/ขอบ8px โดยนับพื้นที่ใต้ warning และ gap14pxด้วย MapLibre controls อยู่ใน control containers ของ library ไม่มี app z-index override
 
+แปลงอ้างอิง (ขั้น 9) ใช้เส้นสี muted `#57606A` กว้าง 1.15 px ที่ opacity 0.65 ใต้ polygon ของแหล่งเพื่อให้สีสถานะอ่านง่าย ปุ่มใน legend ใช้ outline ขนาด sm มีสัญลักษณ์เส้นและ `aria-pressed` เริ่มปิดและแสดงได้ตั้งแต่ zoom 7
+
 ## Components
 
 Controls ใช้ focus-visible ring ของ shadcn และ heading ที่รับ focus ใช้ outline

@@ -1322,7 +1322,7 @@ test('layer failures share one named banner and retry only failing layers with a
   const legend = tree.find((node) => node.props?.['aria-label'] === 'คำอธิบายแผนที่');
   assert.ok(legend);
   const entries = nodes(legend).filter((node) => node.type === 'li');
-  assert.equal(entries.length, 6, 'five statuses plus the survey mark');
+  assert.equal(entries.length, 7, 'five statuses plus the survey and reference parcel controls');
   assert.match(textOf(legend), /ดีมาก/);
 });
 
@@ -2233,6 +2233,20 @@ test('survey requests and visible features follow the zoom and layer toggle', ()
   tree = w.render();
   assert.equal(surveyRequests().length, 0);
   assert.equal(mapNode(tree).props.surveysVisible, false);
+});
+
+test('the reference parcel legend button controls map visibility', () => {
+  const w = historyWorkspace();
+  const button = (tree) => tree.find((node) => node.type === 'button' && textOf(node) === 'แปลงอ้างอิง (ขั้น 9)');
+  let tree = w.render();
+  assert.equal(button(tree).props['aria-pressed'], false);
+  assert.equal(mapNode(tree).props.referenceParcelsVisible, false);
+  button(tree).props.onClick();
+  tree = w.render();
+  assert.equal(button(tree).props['aria-pressed'], true);
+  assert.equal(mapNode(tree).props.referenceParcelsVisible, true);
+  button(tree).props.onClick();
+  assert.equal(mapNode(w.render()).props.referenceParcelsVisible, false);
 });
 
 test('a shared page past the last result is replaced by the last available page', () => {

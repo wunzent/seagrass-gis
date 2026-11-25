@@ -16,7 +16,8 @@ describe('runtime (real PostGIS)', () => {
       await migrate(pool);
       const before = (await pool.query('SELECT version, checksum, applied_at FROM schema_migrations ORDER BY version'))
         .rows;
-      expect(before).toHaveLength(4);
+      expect(before).toHaveLength(5);
+      expect(before.at(-1).version).toBe('005-reference-parcels.sql');
       await migrate(pool);
       expect(
         (await pool.query('SELECT version, checksum, applied_at FROM schema_migrations ORDER BY version')).rows,
@@ -24,13 +25,28 @@ describe('runtime (real PostGIS)', () => {
       const tables = (
         await pool.query("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
       ).rows.map((r) => r.table_name);
-      for (const table of ['provinces', 'species', 'users', 'sites', 'surveys', 'survey_species', 'access_sessions'])
+      for (const table of [
+        'provinces',
+        'species',
+        'users',
+        'sites',
+        'surveys',
+        'survey_species',
+        'access_sessions',
+        'reference_parcels',
+      ])
         expect(tables).toContain(table);
       const geometries = (
-        await pool.query("SELECT f_table_name, type, srid FROM geometry_columns WHERE f_table_schema='public'")
+        await pool.query(`SELECT f_table_name, f_geometry_column, type, srid FROM geometry_columns
+          WHERE f_table_schema='public' ORDER BY f_table_name, f_geometry_column`)
       ).rows;
-      expect(geometries).toHaveLength(3);
-      expect(geometries.every((g) => g.srid === 4326)).toBe(true);
+      expect(geometries).toEqual([
+        { f_table_name: 'provinces', f_geometry_column: 'geom', type: 'MULTIPOLYGON', srid: 4326 },
+        { f_table_name: 'reference_parcels', f_geometry_column: 'geom', type: 'MULTIPOLYGON', srid: 4326 },
+        { f_table_name: 'reference_parcels', f_geometry_column: 'tile_geom', type: 'MULTIPOLYGON', srid: 3857 },
+        { f_table_name: 'sites', f_geometry_column: 'geom', type: 'MULTIPOLYGON', srid: 4326 },
+        { f_table_name: 'surveys', f_geometry_column: 'geom', type: 'POINT', srid: 4326 },
+      ]);
       const moduleRef = await Test.createTestingModule({ imports: [appModule(pool)] }).compile();
       app = moduleRef.createNestApplication({ logger: false });
       await app.listen(0, '127.0.0.1');

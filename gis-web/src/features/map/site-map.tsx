@@ -32,6 +32,7 @@ import {
   type SurveysGeoJSON,
 } from '../../lib/sites';
 import { popupArrow } from '../../lib/map-overlay';
+import { addReferenceParcels, setReferenceParcelsVisibility } from './reference-parcels';
 import { SURVEY_MIN_ZOOM } from '../../lib/survey-visibility';
 import { BASEMAPS, DEFAULT_BASEMAP, basemapOverlaySources, basemapSource, type BasemapId } from '../../lib/basemaps';
 
@@ -44,6 +45,7 @@ type Props = {
   provinces?: ProvinceCollection;
   surveys?: SurveysGeoJSON;
   surveysVisible?: boolean;
+  referenceParcelsVisible?: boolean;
   onZoom?: (zoom: number) => void;
   selection?: SiteFeature;
   onSelect: (code: string) => void;
@@ -114,6 +116,7 @@ export default function SiteMap({
   provinces,
   surveys,
   surveysVisible = true,
+  referenceParcelsVisible = false,
   onZoom,
   selection,
   onSelect,
@@ -277,6 +280,7 @@ export default function SiteMap({
           filter: ['!=', ['get', 'status'], 'no_data'],
           paint: { 'fill-color': colors, 'fill-opacity': 0.78 },
         });
+        addReferenceParcels(instance, documentOf.location?.origin ?? '');
         let hatch = true;
         try {
           instance.addImage('no-data-hatch', hatchImage());
@@ -467,6 +471,9 @@ export default function SiteMap({
     if (!ready || !provinces) return;
     (map.current?.getSource('provinces') as GeoJSONSource | undefined)?.setData(provinces);
   }, [provinces, ready]);
+  useEffect(() => {
+    if (ready && map.current) setReferenceParcelsVisibility(map.current, referenceParcelsVisible);
+  }, [referenceParcelsVisible, ready]);
   useLayoutEffect(() => {
     const instance = map.current;
     if (!ready || !instance) return;

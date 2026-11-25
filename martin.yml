@@ -1,0 +1,17 @@
+listen_addresses: 0.0.0.0:3000
+cors: false
+postgres:
+  connection_string: ${DATABASE_URL}
+  auto_publish: false
+  tables:
+    reference_parcels:
+      schema: public
+      table: reference_parcels
+      geometry_column: tile_geom
+      srid: 3857
+      id_column: id
+      minzoom: 7
+      maxzoom: 16
+      properties:
+        ref_id: int8
+        density: text

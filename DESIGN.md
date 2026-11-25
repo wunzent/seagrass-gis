@@ -1,6 +1,6 @@
 # DESIGN — Seagrass GIS
 
-**Date**: 2026-11-25 · **Scope**: assessment steps 1–6 + 9.5 CI
+**Date**: 2026-11-25 · **Scope**: assessment steps 1–6, 9.1 vector tiles, 9.5 CI
 
 ## Architecture
 
@@ -17,7 +17,7 @@
 ## (b) Invalid Geometry and Missing CRS
 
 - ไม่ซ่อม geometry: ตรวจ shape (finite, lon ±180, lat ±90, ring ปิด ≥4 จุด) แล้ว `ST_IsValid AND NOT ST_IsEmpty AND ST_Area(geography) > 0` ไม่ผ่าน → importer ปฏิเสธพร้อมเขียนเหตุผลใน `reports/import_report.csv`, API ตอบ 400 `INVALID_GEOMETRY`
-- CRS: ถ้าไม่ระบุ `crs` ถือเป็น WGS84 ตาม GeoJSON (RFC 7946) แต่พิกัดต้องอยู่ในช่วง lon/lat จึงไม่รับค่า UTM ที่ไม่ระบุ CRS; ถ้าระบุต้องเป็น EPSG:4326/CRS84 ไม่เช่นนั้นปฏิเสธ `INVALID_CRS` ไม่ reproject และไม่ relabel ไฟล์ UTM (`seagrass_large_utm.zip` ยังไม่ import)
+- GeoJSON ถือเป็น WGS84 ตาม RFC 7946 พิกัดต้องอยู่ในช่วง lon/lat และปฏิเสธ `INVALID_CRS` เมื่อระบุ CRS อื่น ส่วน importer ของ `seagrass_large_utm.zip` ระบุ EPSG:32647 ตามโจทย์และแปลงเป็น EPSG:4326 หลังตรวจ geometry
 - Import: first occurrence ของ code/ref ชนะ, แถวผิดถูกข้าม (seed: รับ 310 / ปฏิเสธ 29), รันซ้ำข้าม key เดิมโดยไม่ทับการแก้ไขผ่าน API; source files ไม่ถูกแก้
 
 ## (c) Concurrency
@@ -37,20 +37,16 @@
 
 คำนวณตอนอ่าน ไม่เก็บใน DB: ใช้ AVG(`cover_percent`) ของทุก survey ในวันที่สำรวจล่าสุด (MAX `surveyed_on`) ของ site ไม่ปัดก่อนเทียบ: ≥75 `very_good`, ≥50 `good`, ≥25 `fair`, <25 `poor`, ไม่มี survey `no_data` จึงอัปเดตทันทีหลังเขียน survey
 
-## (d) Strategy for 500k Polygons within 2 Seconds (Proposal)
+## (d) Strategy for 500k Polygons within 2 Seconds
 
 ปัจจุบัน API กรอง GeoJSON ด้วย bbox + GiST เว็บ cache แต่ละ layer ตาม bbox ที่ขยายออกเป็นกริด 0.25 องศาและตัวกรอง เก็บใน memory 5 นาที สูงสุด 200 รายการรวมทุก layer แบบ LRU เมื่อเปลี่ยนตัวกรองหรือ session จะล้าง cache ตารางแบ่งหน้าสูงสุด 100 รายการ
 
-แนวทางสำหรับ 500k polygons (ยังไม่ได้วัดผล):
+ขั้น 9.1 ใช้ Martin ออก MVT ตาม zoom จาก `reference_parcels` (~20k polygons) โดยใช้คอลัมน์ Web Mercator ที่คำนวณตอน import และมี GiST เว็บโหลดผ่าน `/tiles/` และ cache 5 นาที งานนำเข้าแยกจาก API
 
-1. กำหนดเพดานจำนวน polygon ต่อ bbox request
-2. Vector tiles (`ST_AsMVT` หรือ tile server) ตาม zoom แทน GeoJSON ก้อนใหญ่; ใช้ geometry ที่ simplify ล่วงหน้าต่อระดับ zoom (`ST_SimplifyPreserveTopology` เก็บเป็นคอลัมน์/ตารางแยก) และ full geometry เฉพาะ zoom สูงหรือ detail
-3. ใช้ keyset pagination สำหรับตารางและการค้นหาเมื่อข้อมูลโต; status ล่าสุดอาจเก็บเป็น materialized/summary table ที่อัปเดตตอนเขียน survey
-4. Cache tiles/lookup ด้วย HTTP cache หรือ CDN โดยล้างตาม version ของข้อมูล; import ขนาดใหญ่ใช้ `COPY` + background job
-5. วัดผลด้วย `EXPLAIN ANALYZE` และ load test ก่อนอ้างตัวเลข
+สำหรับ 500k polygons ให้ simplify ล่วงหน้าตาม zoom (`ST_SimplifyPreserveTopology`) เก็บรูปเต็มสำหรับ zoom สูงและหน้ารายละเอียด กำหนดเพดาน feature ต่อ request และใช้ CDN cache ตาม version ของข้อมูล ใช้ `COPY` กับ background import และ keyset pagination เมื่อข้อมูลโต วัดด้วย `EXPLAIN ANALYZE` และ load test บนชุด 500k ก่อนสรุปว่าเข้าเป้า
 
 ## (e) Remaining Work and Next-Day Plan
 
-- ขอบเขต: ขั้นที่ 1–6 และขั้นที่ 9 ข้อ CI (GitHub Actions); ขั้นที่ 6 รองรับลิงก์แชร์สถานะหน้าและกฎแสดงจุดสำรวจที่ซูม 12 ขึ้นไปหรือเมื่อเลือกแหล่ง
-- ยังไม่ทำ: แนบรูปผลสำรวจ (ข้อเสริมขั้นที่ 4) และขั้นที่ 9 ข้ออื่นนอกจาก CI
-- ถ้ามีเวลาอีก 1 วัน: (1) แนบรูปผลสำรวจ jpg/png ไม่เกิน 5 MB เก็บใน volume (2) E2E test ของหน้าแผนที่ ตาราง และ login (3) vector tiles ตามข้อเสนอด้านบนพร้อมวัดผล (ขั้นที่ 9 ข้อ 1)
+- ขอบเขต: ขั้นที่ 1–6, vector tiles (9.1) และ CI (9.5) ขั้นที่ 6 รองรับลิงก์แชร์สถานะหน้าและกฎแสดงจุดสำรวจ
+- ยังไม่ทำ: แนบรูปผลสำรวจและขั้นที่ 9 ข้อ 2–4
+- ถ้ามีเวลาอีก 1 วัน: แนบรูปผลสำรวจ jpg/png ไม่เกิน 5 MB เก็บใน volume และเพิ่ม E2E test ของแผนที่ ตาราง และ login
