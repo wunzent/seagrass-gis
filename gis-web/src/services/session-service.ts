@@ -20,8 +20,6 @@ function defaultStorage() {
   }
 }
 type SessionSink = ReturnType<typeof createExternalStore<SessionState>>;
-/** The account notice appears this long before the 15-minute session ends. */
-export const EXPIRY_WARNING_MS = 60_000;
 export function createSessionService(sink: SessionSink, options: Options = {}) {
   const request = createAuthService(options.fetcher);
   const now = options.now ?? Date.now;
@@ -61,7 +59,7 @@ export function createSessionService(sink: SessionSink, options: Options = {}) {
     });
   };
   let controller: AbortController | undefined;
-  let expiry: unknown, warning: unknown, retry: unknown;
+  let expiry: unknown, retry: unknown;
   let logoutDeadline: number | undefined;
   let retryDelay = 3000;
   let operation = 0;
@@ -77,9 +75,7 @@ export function createSessionService(sink: SessionSink, options: Options = {}) {
   function clearIdentity(patch: Partial<SessionState> = {}) {
     forget(sink.getSnapshot().session);
     cancel(expiry);
-    cancel(warning);
     expiry = undefined;
-    warning = undefined;
     publish({
       expiryNotice: null,
       session: null,
@@ -102,7 +98,6 @@ export function createSessionService(sink: SessionSink, options: Options = {}) {
   }
   function accept(session: Session) {
     cancel(expiry);
-    cancel(warning);
     const previous = sink.getSnapshot().session;
     const same =
       previous?.user.id === session.user.id &&
@@ -118,11 +113,9 @@ export function createSessionService(sink: SessionSink, options: Options = {}) {
       busy: null,
       error: '',
       generation: sink.getSnapshot().generation + (same ? 0 : 1),
-      expiryNotice: remaining <= EXPIRY_WARNING_MS ? 'soon' : null,
+      expiryNotice: null,
     });
     expiry = schedule(expire, Math.min(remaining, 2147483647));
-    if (remaining > EXPIRY_WARNING_MS)
-      warning = schedule(() => publish({ expiryNotice: 'soon' }), Math.min(remaining - EXPIRY_WARNING_MS, 2147483647));
   }
   /** No request: the server checks the session on every API call; a dead one comes back as 401 or X-Auth-Session. */
   async function restore() {
@@ -267,7 +260,6 @@ export function createSessionService(sink: SessionSink, options: Options = {}) {
       controller?.abort();
       operation++;
       cancel(expiry);
-      cancel(warning);
       cancel(retry);
       retry = undefined;
     },

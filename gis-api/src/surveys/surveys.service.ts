@@ -70,7 +70,7 @@ export class SurveysService {
     return site;
   }
 
-  async update(id: number, change: UpdateSurvey, actor: SessionUser): Promise<SurveyResponseDto> {
+  async update(id: number, change: UpdateSurvey, actor: SessionUser): Promise<CreatedSurveyResponseDto> {
     return this.surveys.transaction(async (tx) => {
       const site = await this.lockSurvey(tx, id);
       const current = await this.surveys.lockOnSite(tx, id, site.id);
@@ -85,7 +85,8 @@ export class SurveysService {
       };
       await this.check(tx, site.id, merged, change.species !== undefined);
       await this.surveys.update(tx, id, merged, actor.id, change.species !== undefined);
-      return SurveyResponseDto.fromRow(await this.surveys.byId(tx, id), true);
+      const { status } = await this.sites.featureById(tx, site.id);
+      return { ...SurveyResponseDto.fromRow(await this.surveys.byId(tx, id), true), siteStatus: status };
     });
   }
 

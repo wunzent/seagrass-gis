@@ -1,5 +1,6 @@
 'use client';
 
+import { Alert, AlertDescription } from '../../components/ui/alert';
 import { area, number, surveyRounds } from '../../lib/map-format';
 import type { SiteFeature, SurveyList } from '../../lib/sites';
 import { Failure, StatusLabel } from './map-ui';
@@ -27,7 +28,11 @@ export function SitePopup({
 }) {
   return (
     <div className="popup-body">
-      {detail.loading && <p role="status">กำลังโหลดรายละเอียด…</p>}
+      {detail.loading && (
+        <Alert role="status">
+          <AlertDescription>กำลังโหลดรายละเอียด…</AlertDescription>
+        </Alert>
+      )}
       {detail.error && !missing && <Failure error={detail.error} retry={retryDetail} />}
       {selected && (
         <dl className="facts">
@@ -57,7 +62,11 @@ export function SitePopup({
       )}
       <section className="rounds" aria-labelledby="history-heading" aria-busy={history.loading}>
         <h3 id="history-heading">ประวัติการสำรวจ</h3>
-        {history.loading && <p role="status">กำลังโหลดประวัติการสำรวจ…</p>}
+        {history.loading && (
+          <Alert role="status">
+            <AlertDescription>กำลังโหลดประวัติการสำรวจ…</AlertDescription>
+          </Alert>
+        )}
         {history.error && !historyMissing && <Failure error={history.error} retry={retryHistory} />}
         {history.data &&
           (rounds.length ? (
@@ -72,7 +81,9 @@ export function SitePopup({
               ))}
             </ol>
           ) : (
-            <p>ยังไม่มีข้อมูลการสำรวจ</p>
+            <Alert role="status">
+              <AlertDescription>ยังไม่มีข้อมูลการสำรวจ</AlertDescription>
+            </Alert>
           ))}
         {history.data && history.data.total > history.data.items.length && (
           <p className="note">

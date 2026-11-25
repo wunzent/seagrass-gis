@@ -66,7 +66,8 @@ export function componentHarness(path, mocks = {}, globals = {}, { inlineFixture
     current.props = value.props;
     if (typeof type === 'string' && type !== 'fragment' && type !== 'array') {
       current.host ??= {
-        tagName: type.toUpperCase(),
+        // The Select fixture identifies its primitive in the tree but renders a native button in browsers.
+        tagName: type === 'select-trigger' ? 'BUTTON' : type.toUpperCase(),
         focus() {
           const old = globals.document.activeElement;
           globals.document.activeElement = this;
@@ -90,7 +91,13 @@ export function componentHarness(path, mocks = {}, globals = {}, { inlineFixture
         querySelector(selector) {
           const descendants = (node) => (node ? [node, ...(node.children ?? []).flatMap(descendants)] : []);
           return descendants(current).find((node) =>
-            selector === 'button:not(:disabled)' ? node.type === 'button' && !node.host.disabled : node.type === 'span',
+            selector === 'button:not(:disabled)'
+              ? node.host?.tagName === 'BUTTON' && !node.host.disabled
+              : selector === '.pagination-navigation button:not(:disabled)'
+                ? node.host?.tagName === 'BUTTON' && !node.host.disabled && node.host.closest('.pagination-navigation')
+                : selector === '[aria-live]'
+                  ? Boolean(node.props?.['aria-live'])
+                  : node.type === 'span',
           )?.host;
         },
       };

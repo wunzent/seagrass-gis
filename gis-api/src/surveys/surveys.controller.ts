@@ -21,7 +21,6 @@ import { CreatedSurveyResponseDto } from './dto/created-survey.response.dto';
 import { ListSurveysQueryDto } from './dto/list-surveys.query.dto';
 import { SurveyFeatureCollectionResponseDto } from './dto/survey-feature-collection.response.dto';
 import { SurveyIdParamsDto } from './dto/survey-id.params.dto';
-import { SurveyResponseDto } from './dto/survey.response.dto';
 import { SurveysPageResponseDto } from './dto/surveys-page.response.dto';
 import { UpdateSurveyDto } from './dto/update-survey.dto';
 import { SurveysService } from './surveys.service';
@@ -97,7 +96,7 @@ export class SurveysController {
   @ApiBearerAuth()
   @ApiCsrfHeaders(false)
   @ApiBody({ type: UpdateSurveyDto })
-  @ApiOkResponse({ type: SurveyResponseDto })
+  @ApiOkResponse({ type: CreatedSurveyResponseDto })
   @ApiErrorResponse(400, ['VALIDATION_ERROR'])
   @ApiErrorResponse(401, ['UNAUTHORIZED'])
   @ApiErrorResponse(403, ['FORBIDDEN', 'CSRF_REJECTED'])
@@ -108,7 +107,7 @@ export class SurveysController {
     @Req() request: HttpRequest,
     @Param() params: SurveyIdParamsDto,
     @JsonBody() body: UpdateSurveyDto,
-  ): Promise<SurveyResponseDto> {
+  ): Promise<CreatedSurveyResponseDto> {
     return this.surveys.update(params.toId(), body.toUpdateSurvey(), actorOf(request));
   }
 

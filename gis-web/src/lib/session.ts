@@ -9,8 +9,8 @@ export type SessionState = {
   error: string;
   errorSource: 'logout' | 'login' | null;
   rateLimitedUntil: number;
-  /** 'soon' one minute before the session ends, 'expired' when it ended (timer or a 401 on a data request). */
-  expiryNotice: 'soon' | 'expired' | null;
+  /** Notice after the session ends (timer or a 401 on a data request). */
+  expiryNotice: 'expired' | null;
 };
 
 // While logout is unconfirmed the cookie may still be valid, so strip creator fields from public data.

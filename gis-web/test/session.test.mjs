@@ -187,14 +187,14 @@ test('expiry timer invalidates generation without making a request', async () =>
   assert.ok(h.store.getSnapshot().generation > generation);
   assert.equal(h.memory.has(SESSION_STORAGE_KEY), false);
 });
-test('expiry notice warns one minute before and says expired at the deadline, without requests', async () => {
+test('expiry notice stays absent until the deadline, without requests', async () => {
   const h = harness(noRequest, { stored: safe('a', new Date(121000).toISOString()) });
   await h.store.restore();
   assert.equal(h.store.getSnapshot().expiryNotice, null);
   await h.advance(59000);
   assert.equal(h.store.getSnapshot().expiryNotice, null);
   await h.advance(1000);
-  assert.equal(h.store.getSnapshot().expiryNotice, 'soon');
+  assert.equal(h.store.getSnapshot().expiryNotice, null);
   assert.ok(h.store.getSnapshot().session);
   await h.advance(60000);
   assert.equal(h.store.getSnapshot().session, null);
@@ -202,10 +202,10 @@ test('expiry notice warns one minute before and says expired at the deadline, wi
   h.store.dismissNotice();
   assert.equal(h.store.getSnapshot().expiryNotice, null);
 });
-test('a session with under a minute left warns at once; a new login clears the notice', async () => {
+test('a session with under a minute left has no notice; a new login clears expiry', async () => {
   const h = harness(async () => json(safe('a', new Date(500000).toISOString())), { stored: safe() });
   await h.store.restore();
-  assert.equal(h.store.getSnapshot().expiryNotice, 'soon');
+  assert.equal(h.store.getSnapshot().expiryNotice, null);
   await h.advance(9000);
   assert.equal(h.store.getSnapshot().expiryNotice, 'expired');
   assert.equal(await h.store.login('a@demo.local', 'secret-pass'), true);

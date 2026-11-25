@@ -1,8 +1,16 @@
 'use client';
 
-import type { FocusEvent, RefObject } from 'react';
+import { useRef, type FocusEvent, type RefObject } from 'react';
 import { number } from '../../lib/map-format';
-import { PAGE_SIZES, pageCount } from '../../lib/map-state';
+import { PAGE_SIZES } from '../../lib/map-state';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, SelectGroup } from '../../components/ui/select';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationPrevious,
+  PaginationNext,
+} from '../../components/ui/pagination';
 
 type Props = {
   page: number;
@@ -11,15 +19,16 @@ type Props = {
   /** Shown page and its size, from the last response; `page` and `pageSize` are the ones asked for. */
   shownPage: number;
   shownPageSize: number;
-  /** Disabled for interaction (loading or invalid filters) without moving focus. */
+  /** Disabled for interaction while loading or filters are invalid. */
   inert: boolean;
   loading: boolean;
   goTo: (page: number) => void;
   setPageSize: (pageSize: number) => void;
   focus: {
-    ref: RefObject<HTMLElement | null>;
+    ref: RefObject<HTMLDivElement | null>;
     onFocusCapture: (event: FocusEvent<HTMLElement>) => void;
     onBlurCapture: (event: FocusEvent<HTMLElement>) => void;
+    rememberSelection: (button: HTMLButtonElement | null) => void;
   };
 };
 
@@ -33,79 +42,69 @@ export function ListPagination({
   loading,
   goTo,
   setPageSize,
-  focus,
+  focus: { ref: paginationRef, onFocusCapture, onBlurCapture, rememberSelection },
 }: Props) {
-  const pages = pageCount(total, shownPageSize);
+  const sizeTrigger = useRef<HTMLButtonElement>(null);
+  const disabled = inert || loading;
   const first = total ? (shownPage - 1) * shownPageSize + 1 : 0;
   const last = Math.min(total, shownPage * shownPageSize);
   return (
-    <nav key="list-pagination" className="pagination" aria-label="หน้ารายการแหล่ง" {...focus}>
-      <button
-        type="button"
-        className="text-button"
-        disabled={!loading && page <= 1}
-        aria-disabled={inert || page <= 1}
-        onClick={() => {
-          if (!inert && page > 1) goTo(page - 1);
+    <div
+      key="list-pagination"
+      className="pagination"
+      aria-label="หน้ารายการแหล่ง"
+      ref={paginationRef}
+      onFocusCapture={onFocusCapture}
+      onBlurCapture={onBlurCapture}
+    >
+      <Select
+        value={pageSize}
+        disabled={disabled}
+        onValueChange={(value) => {
+          if (!disabled && value !== null && (PAGE_SIZES as readonly number[]).includes(value)) {
+            rememberSelection(sizeTrigger.current);
+            setPageSize(value);
+          }
         }}
       >
-        ก่อนหน้า
-      </button>
-      <span tabIndex={-1}>
-        หน้า {shownPage} / {pages}
-      </span>
-      <button
-        type="button"
-        className="text-button"
-        disabled={!loading && page * pageSize >= total}
-        aria-disabled={inert || page * pageSize >= total}
-        onClick={() => {
-          if (!inert && page * pageSize < total) goTo(page + 1);
-        }}
-      >
-        ถัดไป
-      </button>
-      <div className="pagination-options">
-        <small aria-live="polite">
-          {number.format(first)}–{number.format(last)} จาก {number.format(total)}
-        </small>
-        <label>
-          ไปหน้า
-          <select
-            aria-label="ไปหน้า"
-            aria-disabled={inert}
-            value={shownPage}
-            onChange={(event) => {
-              const next = Number(event.target.value);
-              if (!inert && Number.isInteger(next) && next >= 1 && next <= pages) goTo(next);
-            }}
-          >
-            {Array.from({ length: pages }, (_, index) => (
-              <option key={index + 1} value={index + 1}>
-                {index + 1}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          ต่อหน้า
-          <select
-            aria-label="จำนวนต่อหน้า"
-            aria-disabled={inert}
-            value={pageSize}
-            onChange={(event) => {
-              const next = Number(event.target.value);
-              if (!inert && (PAGE_SIZES as readonly number[]).includes(next)) setPageSize(next);
-            }}
-          >
+        <SelectTrigger ref={sizeTrigger} disabled={disabled} aria-label="จำนวนต่อหน้า">
+          <SelectValue>{pageSize} ต่อหน้า</SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
             {PAGE_SIZES.map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
+              <SelectItem key={size} value={size}>
+                {size} ต่อหน้า
+              </SelectItem>
             ))}
-          </select>
-        </label>
-      </div>
-    </nav>
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+      <small aria-live="polite" tabIndex={-1}>
+        {number.format(first)}–{number.format(last)} จาก {number.format(total)}
+      </small>
+      <Pagination className="pagination-navigation" aria-label="เปลี่ยนหน้ารายการแหล่ง">
+        <PaginationContent>
+          <PaginationItem>
+            <PaginationPrevious
+              disabled={disabled || page <= 1}
+              aria-disabled={disabled || page <= 1}
+              onClick={() => {
+                if (!disabled && page > 1) goTo(page - 1);
+              }}
+            />
+          </PaginationItem>
+          <PaginationItem>
+            <PaginationNext
+              disabled={disabled || page * pageSize >= total}
+              aria-disabled={disabled || page * pageSize >= total}
+              onClick={() => {
+                if (!disabled && page * pageSize < total) goTo(page + 1);
+              }}
+            />
+          </PaginationItem>
+        </PaginationContent>
+      </Pagination>
+    </div>
   );
 }

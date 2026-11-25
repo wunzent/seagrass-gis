@@ -598,21 +598,27 @@ describe('BR-04 site status reflects survey CRUD immediately', () => {
     const b = await post('2026-10-01', 69.98);
     expect(b.siteStatus).toBe('good'); // (80 + 69.98) / 2 = 74.99, unrounded before comparing
     expect(await everywhere()).toEqual(['good', { surveyed_on: '2026-10-01', average_cover_percent: 74.99, count: 2 }]);
-    await send('PATCH', `/surveys/${b.id}`, { cookie: cookies.editor, body: { cover_percent: 70 } });
+    const patch = async (id: number, change: Record<string, unknown>, siteStatus: string) => {
+      const response = await send('PATCH', `/surveys/${id}`, { cookie: cookies.editor, body: change });
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({ id, ...change, siteStatus });
+      expect(response.headers.get('cache-control')).toBe('no-store');
+    };
+    await patch(b.id, { cover_percent: 70 }, 'very_good');
     expect(await everywhere()).toEqual([
       'very_good',
       { surveyed_on: '2026-10-01', average_cover_percent: 75, count: 2 },
     ]);
-    await send('PATCH', `/surveys/${a.id}`, { cookie: cookies.editor, body: { cover_percent: 30 } });
+    await patch(a.id, { cover_percent: 30 }, 'good');
     expect((await everywhere())[0]).toBe('good'); // 50
-    await send('PATCH', `/surveys/${a.id}`, { cookie: cookies.editor, body: { cover_percent: 29.98 } });
+    await patch(a.id, { cover_percent: 29.98 }, 'fair');
     expect((await everywhere())[0]).toBe('fair'); // 49.99
-    await send('PATCH', `/surveys/${b.id}`, { cookie: cookies.editor, body: { cover_percent: 20 } });
+    await patch(b.id, { cover_percent: 20 }, 'poor');
     expect((await everywhere())[0]).toBe('poor'); // (29.98 + 20) / 2 = 24.99
-    await send('PATCH', `/surveys/${b.id}`, { cookie: cookies.editor, body: { cover_percent: 20.02 } });
+    await patch(b.id, { cover_percent: 20.02 }, 'fair');
     expect((await everywhere())[0]).toBe('fair'); // 25
     // Moving one survey to a newer day makes it the only one on the latest day.
-    await send('PATCH', `/surveys/${b.id}`, { cookie: cookies.editor, body: { surveyed_on: '2026-10-02' } });
+    await patch(b.id, { surveyed_on: '2026-10-02' }, 'poor');
     expect(await everywhere()).toEqual(['poor', { surveyed_on: '2026-10-02', average_cover_percent: 20.02, count: 1 }]);
     // Deleting the latest day falls back to the remaining latest day, then to no_data.
     for (const id of [b.id, a.id])

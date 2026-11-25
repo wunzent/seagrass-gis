@@ -51,18 +51,18 @@ src/features/map/          map-workspace, top-nav, filters-panel, site-list, sit
                            list-pagination, basemap-select
                            use-resource, use-pagination-focus
 src/services/              http-client, auth-service, session-service
-                           sites-service, surveys-service, lookups-service
+                           sites-service, surveys-service, lookups-service, map-cache-service
 src/stores/                external-store, session-store, session-context
                            map-store, resource-store
-src/components/ui/         button
-src/lib/                   map-state, map-format, sites, session, proxy, demo-accounts, basemaps, map-overlay
+src/components/ui/         button, pagination, alert, select, input, table, badge, card, utils
+src/lib/                   map-state, map-format, sites, session, proxy, demo-accounts, basemaps, map-overlay, map-cache
 ```
 
-SessionProvider สร้าง session-store + createSessionService(sink, options) ต่อ mount แล้ว expose facade เฉพาะ getSnapshot/getServerSnapshot/subscribe/isCurrent และ service actions โดยไม่เปิด setState ให้ features ที่คง identity ผ่าน useSession. ไม่เรียก /auth/me: ตอน mount อ่าน identity ที่จำไว้ตอน login (localStorage key gis-session เก็บเฉพาะ id/email/role/expires_at ไม่มี JWT) แล้วตั้ง timer เตือน 1 นาทีก่อนหมดและหมดอายุ; API ตรวจ session ทุกคำขอ ถ้า 401 หรือ response มี X-Auth-Session: invalid (http-client onSessionInvalid) จะล้าง identity และแจ้งหมดอายุ; storage event จากแท็บอื่นสั่ง restore ใหม่. ไม่มี focus/visibility listener; dispose ยกเลิก timers และ listener. session-context เก็บแค่ context/subscription ไม่มี service wiring; ตอน hydrate useSession อ่าน getServerSnapshot (สถานะ checking คงที่) เพราะ identity จาก storage อาจถูกอ่านก่อน subtree ที่ hydrate ทีหลัง (แผนที่เป็น dynamic import) แล้ว HTML ไม่ตรงกับ server
+SessionProvider สร้าง session-store + createSessionService(sink, options) ต่อ mount แล้ว expose facade เฉพาะ getSnapshot/getServerSnapshot/subscribe/isCurrent และ service actions โดยไม่เปิด setState ให้ features ที่คง identity ผ่าน useSession. ไม่เรียก /auth/me: ตอน mount อ่าน identity ที่จำไว้ตอน login (localStorage key gis-session เก็บเฉพาะ id/email/role/expires_at ไม่มี JWT) แล้วตั้ง timer เฉพาะเวลาหมดอายุ; API ตรวจ session ทุกคำขอ ถ้า 401 หรือ response มี X-Auth-Session: invalid (http-client onSessionInvalid) จะล้าง identity และแจ้งหมดอายุ; storage event จากแท็บอื่นสั่ง restore ใหม่. ไม่มี focus/visibility listener; dispose ยกเลิก timers และ listener. session-context เก็บแค่ context/subscription ไม่มี service wiring; ตอน hydrate useSession อ่าน getServerSnapshot (สถานะ checking คงที่) เพราะ identity จาก storage อาจถูกอ่านก่อน subtree ที่ hydrate ทีหลัง (แผนที่เป็น dynamic import) แล้ว HTML ไม่ตรงกับ server
 
 MapContent สร้าง map-store ต่อ mount มี filters/page/pageSize (10/20/50/100, เปลี่ยนแล้วกลับหน้า 1)/view/bbox/popup และ resource slices provinces/list/sites/surveys/detail/history. useResource(key, load, retry, resource) subscribe slice ผ่าน useSyncExternalStore; slice ถือ identity key/retry/generation, latestRequest/AbortController และ response/error. Loader ref เปลี่ยนได้โดยไม่ fetch ซ้ำหาก key/retry/generation/session เดิม. MapWorkspace key ตาม session generation จึงทิ้ง selection/private payload เมื่อ identity เปลี่ยน
 
-State ที่ยัง local มี basemap ที่เลือก (อ่าน/เขียน localStorage gis-basemap หลัง mount; SiteMap สลับเฉพาะ raster source ใต้ชั้นข้อมูล (ภาพดาวเทียมมี overlay ถนน/ชื่อสถานที่ basemap-overlay-N; tile overlay ที่โหลดไม่ได้ไม่ขึ้นคำเตือน) ไม่สร้างแผนที่ใหม่; จุดสำรวจใช้ GeoJSON cluster (SURVEY_CLUSTER) ตัวเลขกลุ่มเป็น HTML Marker ปุ่ม เพราะ style ไม่มี glyphs; ลูกศร popup เป็น element ใน map container ที่ SiteMap จัดตำแหน่งเอง ไม่ผ่าน React state), validation/selection notice, retry counters, pagination metadata เดิม, ข้อมูลที่แผนที่ยังวาดระหว่างโหลด, MapLibre availability/display flags และ DOM/focus refs. เป็นสถานะการแสดงผลของ mount; response/error ของแต่ละคำขออยู่ใน resource slice. ไม่มี cache ข้าม mount หรือเพิ่ม preload
+State ที่ยัง local มี basemap ที่เลือก (อ่าน/เขียน localStorage gis-basemap หลัง mount; SiteMap สลับเฉพาะ raster source ใต้ชั้นข้อมูล (ภาพดาวเทียมมี overlay ถนน/ชื่อสถานที่ basemap-overlay-N; tile overlay ที่โหลดไม่ได้ไม่ขึ้นคำเตือน) ไม่สร้างแผนที่ใหม่; จุดสำรวจใช้ GeoJSON cluster (SURVEY_CLUSTER) ตัวเลขกลุ่มเป็น HTML Marker ปุ่ม เพราะ style ไม่มี glyphs; ลูกศร popup เป็น element ใน map container ที่ SiteMap จัดตำแหน่งเอง ไม่ผ่าน React state), validation/selection notice, retry counters, pagination metadata เดิม, ข้อมูลที่แผนที่ยังวาดระหว่างโหลด, MapLibre availability/display flags และ DOM/focus refs. เป็นสถานะการแสดงผลของ mount; response/error ของแต่ละคำขออยู่ใน resource slice. geometry cache เป็นของ map-store ต่อ mount ไม่ใช้ singleton หรือ localStorage และไม่เพิ่ม preload
 
 ## Route guards
 
@@ -74,9 +74,9 @@ Page / ประกอบ SessionRoute ใน sessionControls slot ของ Map
 
 ### Load sites in viewport
 
-1. SiteMap debounce moveend300ms → map-store.setBbox; FiltersPanel validate แล้ว debounce300ms commit filters/page1
-2. Feature ใช้ sitesService.listKey(state)/geojsonKey(filters,bbox) และ surveysService.geojsonKey เป็น resource identity; loader เรียก list/geojson ด้วย domain arguments ไม่สร้าง URL เอง
-3. Service สร้าง relative /api URL ผ่าน listQuery/mapQuery → http-client → Next proxy → REST API โดยคง query order, credentials same-origin, cache no-store และ signal เดิม
+1. SiteMap debounce moveend600ms (VIEWPORT_DEBOUNCE_MS) → map-store.setBbox; FiltersPanel validate แล้ว debounce300ms commit filters/page1
+2. Feature ใช้ sitesService.listKey(state)/geojsonKey(filters,bbox) และ surveysService.geojsonKey ซึ่ง snap bbox ออกสู่ grid 0.25 องศา เป็น resource identity; loader เรียก list/geojson ด้วย domain arguments ไม่สร้าง URL เอง
+3. Geometry loaders อ่าน cache ของ map-store ตาม URL key (layer + snapped bbox + filters); cache miss จึงสร้าง relative /api URL ผ่าน mapQuery ส่วน list ใช้ listQuery → http-client → Next proxy → REST API โดยคง query order, credentials same-origin, cache no-store และ signal เดิม
 4. useResource ส่ง callback loader ให้ resource.load; resource-store เรียก loader(signal) ซึ่งเรียก service แล้วรับ promise; resource slice ตรวจ latest request + session isCurrent(generation), strip created_by เมื่อ anonymous แล้ว publish; authenticated401 เรียก unauthorized, anonymous401 เป็น retryable error
 5. Feature subscribe snapshot แล้วส่ง collection ให้ SiteMap; loading/error ไม่แสดงผลเก่าเป็นผลใหม่ แต่ MapLibre ยังวาด collection เดิมพร้อม stale notice แยก sites/surveys
 
@@ -102,3 +102,13 @@ LoginForm → facade.login ที่เป็น session-service action → auth
 ## Test harness
 
 component-harness resolve relative dependency เป็น absolute file path ก่อนหา mock; inline fixtures ระบุรายชื่อไฟล์จาก tests เท่านั้น. ถ้า resolve target ไม่ได้ error ระบุ dependency กับ importer; ถ้า mock เป็น undefined error ระบุ absolute target; absolute mocks ที่ไม่ถูกใช้หรือสะกดผิดจะ throw Unused absolute mock. Harness จำลอง explicit renders/effects/external snapshots/host focus; ไม่ใช่ browser/hydration proof. Node-loaded layers ใช้ relative value imports .ts คู่กับ allowImportingTsExtensions/noEmit โดยไม่เพิ่ม dependency
+
+## Shared UI and layer cache
+
+shadcn@4.23.0 ใช้ Base nova registry fallback เพราะ CLI init ไม่รองรับ setup Tailwind 3 ปัจจุบัน; source อยู่ใน components/ui และ components.json ระบุ Base style. ติดตั้ง @base-ui/react 1.9.0 และ lucide-react 1.79.0 แบบ exact โดยไม่อัปเกรด Tailwind/Next/React/MapLibre หรือเพิ่ม CSP host. Button เดิมคง variants default/outline.
+
+Filters ใช้ Input/Select, table ใช้ Table, status ใช้ Badge พร้อม swatch เดิม, panels/popup ใช้ Card และ loading/error/empty ใช้ Alert. Pagination มี Select จำนวนต่อหน้า + ช่วงรายการที่แสดงจริง + ปุ่ม icon ก่อนหน้า/ถัดไป; ไม่มีตัวเลือกไปหน้า. Expired session ใช้ default Alert role=status พร้อมปุ่ม ตกลง ซึ่ง dismissNotice แล้ว router.push(/login); ไม่มี pre-expiry warning หรือ timer ของ warning.
+
+lib/map-cache.ts ถือ pure snapping และ TTL/LRU (5 นาที, รวมไม่เกิน 200 entries). map-store สร้าง layerCache ต่อ mount และ clear เมื่อ committed filters เปลี่ยน; paging ไม่ล้าง. MapContent cleanup clear เมื่อ session generation remount หรือออกจากหน้า. services/map-cache-service.ts เป็น cache-aside loader ผ่าน http-client; ไม่ cache errors/aborted responses และตรวจ cache generation ก่อนเขียนเพื่อไม่ให้ response เก่ากลับมาเติมหลัง clear(). ทั้ง sites และ surveys ใช้ instance เดียว; clear() เปิดไว้สำหรับ writes ในอนาคต. List/detail/history ไม่ใช้ geometry cache. cache hit ไม่ต่ออายุ TTL; ข้าม grid ที่ยังไม่เคยโหลดส่ง bbox request ใหม่ตาม debounce เดิม.
+
+Cache tests ครอบคลุม snapping/TTL/LRU/filter clear/mount isolation/abort/late response/error retry. Component tests ระบุ UI files ใหม่ใน inlineFixtures และจำลอง Base primitives; browser QA แยกจาก harness.

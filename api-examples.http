@@ -229,6 +229,7 @@ Content-Type: application/json
 
 ### Update survey (editor)
 # expect: 200
+# Response includes siteStatus, recomputed from the parent site's latest survey day (same as createSurvey).
 PATCH {{api}}/surveys/{{createSurvey.response.body.$.id}}
 Origin: {{origin}}
 X-CSRF-Protection: 1

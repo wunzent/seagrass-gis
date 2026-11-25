@@ -1,5 +1,7 @@
 'use client';
 
+import { Alert, AlertDescription } from '../../components/ui/alert';
+
 import {
   Map as MapLibreMap,
   Marker,
@@ -546,17 +548,17 @@ export default function SiteMap({
   return (
     <>
       {failure && (
-        <div className="map-warning" role="status">
-          {failure}{' '}
+        <Alert className="map-warning" role="alert" variant="destructive">
+          <AlertDescription>{failure}</AlertDescription>
           <button type="button" className="text-button" onClick={() => setGeneration((value) => value + 1)}>
-            ลองเปิดแผนที่ใหม่
+            ลองใหม่
           </button>
-        </div>
+        </Alert>
       )}
       {!ready && !failure && (
-        <p className="map-warning" role="status">
-          กำลังเปิดแผนที่…
-        </p>
+        <Alert className="map-warning" role="status">
+          <AlertDescription>กำลังเปิดแผนที่…</AlertDescription>
+        </Alert>
       )}
       <div
         ref={container}

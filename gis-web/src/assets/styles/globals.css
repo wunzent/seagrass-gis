@@ -14,6 +14,11 @@
   --primary-soft: #e6f3fa;
   --sea: #dce7ea;
   --danger: #8f1d1d;
+  --card: var(--bg);
+  --card-foreground: var(--text);
+  --popover: var(--bg);
+  --popover-foreground: var(--text);
+  --primary-foreground: #ffffff;
 }
 
 @layer base {
@@ -133,7 +138,7 @@
   /* Map view: sidebar with filters and the site list beside a full-height chart. */
   .map-layout {
     display: grid;
-    grid-template-columns: 272px minmax(0, 1fr);
+    grid-template-columns: 352px minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
     flex: 1;
     min-height: 480px;
@@ -159,16 +164,12 @@
     font-size: 0.75rem;
     color: var(--text-muted);
   }
-  .filters input,
-  .filters select {
+  .filters [data-slot='select-trigger'] {
     width: 100%;
-    min-height: 40px;
+  }
+  .filters input,
+  .filters [data-slot='select-trigger'] {
     border: 1px solid var(--field-border);
-    border-radius: 6px;
-    background: var(--bg);
-    padding: 6px 9px;
-    font-size: 0.85rem;
-    color: var(--text);
   }
   .filters input::placeholder {
     color: var(--text-muted);
@@ -265,28 +266,17 @@
     gap: 8px;
     font-size: 0.8rem;
   }
-  .pagination-options {
-    flex-basis: 100%;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px 12px;
+  .pagination > small {
+    min-width: 0;
     color: var(--text-muted);
   }
-  .pagination-options label {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
+  .pagination .pagination-navigation {
+    margin: 0;
+    width: auto;
   }
-  .pagination-options select {
-    min-height: 32px;
-    padding: 2px 6px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--bg);
-    color: var(--text);
-    font: inherit;
+  .pagination button {
+    min-height: 44px;
+    min-width: 44px;
   }
   .loading-state,
   .empty-state {
@@ -643,11 +633,7 @@
   }
   .table-view .pagination {
     justify-content: center;
-    gap: 24px;
-  }
-  .table-view .pagination-options {
-    justify-content: center;
-    gap: 8px 24px;
+    gap: 8px;
   }
 
   /* Session controls and login. */

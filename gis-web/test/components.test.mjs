@@ -8,6 +8,13 @@ import * as mapState from '../src/lib/map-state.ts';
 
 const sourceFile = (name) => fileURLToPath(new URL('../src/' + name, import.meta.url));
 const inlineFixtures = [
+  'components/ui/pagination.tsx',
+  'components/ui/alert.tsx',
+  'components/ui/select.tsx',
+  'components/ui/input.tsx',
+  'components/ui/table.tsx',
+  'components/ui/badge.tsx',
+  'components/ui/card.tsx',
   'guards/session-guard.tsx',
   'features/map/basemap-select.tsx',
   'features/map/filters-panel.tsx',
@@ -19,7 +26,42 @@ const inlineFixtures = [
   'features/map/survey-popup.tsx',
   'features/map/top-nav.tsx',
 ].map(sourceFile);
-const componentHarness = (entry, mocks, globals) => createComponentHarness(entry, mocks, globals, { inlineFixtures });
+const selectPrimitives = Object.fromEntries(
+  [
+    'Root',
+    'Trigger',
+    'Value',
+    'Portal',
+    'Positioner',
+    'Popup',
+    'List',
+    'Group',
+    'Item',
+    'ItemText',
+    'ItemIndicator',
+    'Icon',
+    'ScrollUpArrow',
+    'ScrollDownArrow',
+  ].map((name) => [name, 'select-' + name.toLowerCase()]),
+);
+const componentHarness = (entry, mocks, globals) =>
+  createComponentHarness(
+    entry,
+    {
+      '@base-ui/react/select': { Select: selectPrimitives },
+      '@base-ui/react/input': { Input: 'input' },
+      '@base-ui/react/use-render': {
+        useRender: ({ defaultTagName, props, state }) => ({
+          type: defaultTagName,
+          props: { ...props, 'data-slot': state.slot, 'data-variant': state.variant },
+        }),
+      },
+      'next/navigation': { useRouter: () => ({ push() {} }) },
+      ...mocks,
+    },
+    globals,
+    { inlineFixtures },
+  );
 
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 
@@ -318,8 +360,9 @@ test('a login error is left to the login form and never offers a restore retry i
   assert.equal(restores, 0);
   assert.equal(logouts, 0);
 });
-test('expiry notice warns before the end and offers sign-in after expiry, and can be dismissed', () => {
+test('expired session has one default status Alert button which dismisses then opens login', () => {
   let dismissed = 0;
+  const actions = [];
   const state = {
     phase: 'ready',
     session: { user: { email: 'a@demo.local', role: 'viewer' } },
@@ -328,29 +371,39 @@ test('expiry notice warns before the end and offers sign-in after expiry, and ca
     error: '',
     errorSource: null,
     rateLimitedUntil: 0,
-    expiryNotice: 'soon',
-    store: { dismissNotice: () => dismissed++, logout() {} },
+    expiryNotice: 'expired',
+    store: {
+      dismissNotice: () => {
+        dismissed++;
+        actions.push('dismiss');
+      },
+      logout() {},
+    },
   };
   const h = componentHarness('../src/features/auth/session-controls.tsx', {
+    'next/navigation': { useRouter: () => ({ push: (path) => actions.push(path) }) },
     'next/link': { default: 'a', __esModule: true },
     [sourceFile('components/ui/button.tsx')]: { Button: 'button' },
     [sourceFile('stores/session-context.tsx')]: { useSession: () => state },
   });
   const notice = () =>
-    nodes(h.render(() => h.exports.SessionControls())).find((n) => n.props?.className === 'expiry-notice');
+    nodes(h.render(() => h.exports.SessionControls())).find((n) => n.props?.['data-slot'] === 'alert');
   let box = notice();
   assert.equal(box.props.role, 'status');
-  assert.match(textOf(box), /จะหมดอายุในอีก 1 นาที/);
-  state.session = null;
-  state.expiryNotice = 'expired';
-  box = notice();
-  assert.equal(box.props.role, 'alert');
-  assert.match(textOf(box), /หมดอายุแล้ว/);
-  assert.ok(nodes(box).some((n) => n.type === 'a' && n.props.href === '/login'));
+  assert.match(textOf(box), /เซสชันหมดอายุ/);
+  assert.match(textOf(box), /ข้อมูลที่ต้องเข้าสู่ระบบถูกซ่อน กรุณาเข้าสู่ระบบใหม่/);
+  assert.equal(
+    nodes(box).some((n) => n.type === 'a'),
+    false,
+  );
+  assert.equal(nodes(box).filter((n) => n.type === 'button').length, 1);
+  assert.equal(textOf(nodes(box).find((n) => n.type === 'button')), 'ตกลง');
+  assert.ok(!box.props.className.includes('text-destructive'));
   nodes(box)
     .find((n) => n.type === 'button')
     .props.onClick();
   assert.equal(dismissed, 1);
+  assert.deepEqual(actions, ['dismiss', '/login']);
   state.expiryNotice = null;
   assert.equal(notice(), undefined);
 });
@@ -652,7 +705,7 @@ test('map retains last polygons while viewport request is pending and replaces t
 });
 test('only basemap errors show tile warning and later successful idle clears it; map is a region', () => {
   const { render, map } = mapHarness();
-  const warning = () => nodes(render()).find((node) => node.props?.className === 'map-warning');
+  const warning = () => nodes(render()).find((node) => node.props?.className?.split(' ').includes('map-warning'));
   map.emit('error', { sourceId: 'basemap', tile: { tileID: { key: 'a' } } });
   assert.ok(warning());
   map.emit('error', { sourceId: 'basemap', tile: { tileID: { key: 'b' } } });
@@ -673,7 +726,7 @@ test('only basemap errors show tile warning and later successful idle clears it;
 
 test('basemap idle prunes failed tiles outside the current viewport only', () => {
   const { render, map } = mapHarness();
-  const warning = () => nodes(render()).find((node) => node.props?.className === 'map-warning');
+  const warning = () => nodes(render()).find((node) => node.props?.className?.split(' ').includes('map-warning'));
   for (const key of ['a', 'b']) map.emit('error', { sourceId: 'basemap', tile: { tileID: { key } } });
   map.coveringKeys = ['b', 'c'];
   map.emit('idle');
@@ -691,7 +744,7 @@ test('non-basemap errors retain MapLibre console error reporting', () => {
   map.emit('error', { error });
   assert.deepEqual(logged, [error, error]);
   assert.equal(
-    nodes(render()).some((node) => node.props?.className === 'map-warning'),
+    nodes(render()).some((node) => node.props?.className?.split(' ').includes('map-warning')),
     false,
   );
 });
@@ -772,11 +825,11 @@ test('province select options and labels come from the provinces API, falling ba
     data: { type: 'FeatureCollection', features: [feature('81', 'กระบี่'), feature('92', 'ตรัง')] },
     loading: false,
   });
-  const provinceSelect = (tree) => tree.find((node) => node.type === 'select');
+  const provinceSelect = (tree) => tree.find((node) => node.type === 'select-root');
   const options = (tree) =>
     nodes(provinceSelect(tree))
-      .filter((node) => node.type === 'option')
-      .map((option) => [option.props.value, option.props.children]);
+      .filter((node) => node.type === 'select-item')
+      .map((option) => [option.props.value, nodes(option).find((n) => n.type === 'select-itemtext').props.children]);
   assert.deepEqual(options(loaded.render()), [
     ['', 'ทุกจังหวัด'],
     ['81', 'กระบี่'],
@@ -792,7 +845,7 @@ test('province select options and labels come from the provinces API, falling ba
   assert.deepEqual(options(loading.render()), [['', 'ทุกจังหวัด']]);
   assert.equal(loading.provinceCell(), '81');
 
-  provinceSelect(failed.render()).props.onChange({ target: { value: '92' } });
+  provinceSelect(failed.render()).props.onValueChange('92');
   assert.deepEqual(options(failed.render()), [
     ['', 'ทุกจังหวัด'],
     ['92', '92'],
@@ -894,9 +947,9 @@ test('workspace shares province resource and exact bounded filters with survey p
   let tree = w.render();
   assert.equal(mapNode(tree).props.provinces, w.provinces);
   mapNode(tree).props.onViewport([98, 6, 101, 10]);
-  tree.find((node) => node.type === 'select').props.onChange({ target: { value: '81' } });
+  tree.find((node) => node.type === 'select-root').props.onValueChange('81');
   tree = w.render();
-  tree.filter((node) => node.type === 'select')[1].props.onChange({ target: { value: 'good' } });
+  tree.filter((node) => node.type === 'select-root')[1].props.onValueChange('good');
   tree = w.render();
   tree.find((node) => node.type === 'input').props.onChange({ target: { value: 'reef' } });
   tree = w.render();
@@ -1084,6 +1137,11 @@ for (const kind of ['list']) {
     const getNav = () => tree.find((node) => node.props?.['aria-label'] === label);
     const getButtons = () => nodes(getNav()).filter((node) => node.type === 'button');
     const navHost = w.host(getNav());
+    assert.equal(
+      w.host(nodes(getNav()).find((node) => node.type === 'select-trigger')).tagName,
+      'BUTTON',
+      'the page-size Select must participate in native button focus queries',
+    );
     const buttonHosts = getButtons().map(w.host);
     assert.equal(getButtons()[0].props.disabled, true);
     assert.equal(getButtons()[1].props.disabled, false);
@@ -1098,13 +1156,17 @@ for (const kind of ['list']) {
     assert.equal(w.host(loadingNav), navHost);
     buttons.forEach((button, i) => assert.equal(w.host(button), buttonHosts[i]));
     assert.ok(
-      buttons.every((button) => !button.props.disabled),
-      'loading must not natively disable buttons',
+      buttons.every((button) => button.props.disabled),
+      'loading disables paging buttons',
     );
     assert.ok(buttons.every((button) => button.props['aria-disabled'] === true));
-    assert.equal(w.document.activeElement, buttonHosts[1]);
-    const pageLabel = nodes(loadingNav).find((node) => node.type === 'span').props.children;
-    assert.deepEqual(Array.from(pageLabel), ['หน้า ', 1, ' / ', 3]);
+    assert.equal(w.document.activeElement, w.document.body);
+    assert.equal(
+      nodes(loadingNav)
+        .find((node) => node.type === 'small')
+        .props.children.join(''),
+      '1–20 จาก 60',
+    );
     for (const button of buttons) {
       button.props.onClick();
       tree = w.render();
@@ -1120,7 +1182,7 @@ for (const kind of ['list']) {
     getButtons()[1].props.onClick();
     set({ loading: true });
     tree = w.render();
-    assert.equal(w.document.activeElement, buttonHosts[1]);
+    assert.equal(w.document.activeElement, w.document.body);
     set({ data: { items: [], total, page: 3 }, loading: false });
     tree = w.render();
     assert.equal(w.host(getButtons()[1]), buttonHosts[1]);
@@ -1154,7 +1216,7 @@ for (const kind of ['list']) {
     tree = w.render();
     set({ data: { items: [], total: 0, page: 1 }, loading: false });
     tree = w.render();
-    assert.equal(w.document.activeElement, w.host(nodes(getNav()).find((node) => node.type === 'span')));
+    assert.equal(w.document.activeElement, w.host(nodes(getNav()).find((node) => node.props?.['aria-live'])));
   });
 }
 
@@ -1394,7 +1456,7 @@ test('top menu switches between the map and the table view and marks the current
   assert.equal(byClass(tree, 'sidebar'), undefined, 'one set of filter controls at a time');
   const paging = ['ไปหน้า', 'จำนวนต่อหน้า'];
   assert.equal(
-    tree.filter((node) => node.type === 'select' && !paging.includes(node.props['aria-label'])).length,
+    tree.filter((node) => node.type === 'select-trigger' && !paging.includes(node.props['aria-label'])).length,
     2,
     'only the two filter selects (pagination options aside), no basemap select while the map is hidden',
   );
@@ -1702,7 +1764,7 @@ test('basemap prop picks the first basemap and swaps tiles under the data layers
     'basemap is drawn first',
   );
   first.emit('error', { sourceId: 'basemap', tile: { tileID: { key: 'a' } } });
-  assert.ok(nodes(h.render()).some((node) => node.props?.className === 'map-warning'));
+  assert.ok(nodes(h.render()).some((node) => node.props?.className?.split(' ').includes('map-warning')));
   h.render(undefined, { basemap: 'satellite' });
   assert.equal(h.map, first, 'switching keeps the same map');
   assert.match(first.sources.get('basemap').tiles[0], /^https:\/\/server\.arcgisonline\.com\//);
@@ -1710,7 +1772,9 @@ test('basemap prop picks the first basemap and swaps tiles under the data layers
   assert.equal(layer.before, 'provinces-line', 'new basemap goes below provinces, sites and surveys');
   assert.equal(first.layers.filter((item) => item.id === 'basemap').length, 1);
   assert.equal(
-    nodes(h.render(undefined, { basemap: 'satellite' })).some((node) => node.props?.className === 'map-warning'),
+    nodes(h.render(undefined, { basemap: 'satellite' })).some((node) =>
+      node.props?.className?.split(' ').includes('map-warning'),
+    ),
     false,
     'tile errors of the old basemap are forgotten',
   );
@@ -1726,7 +1790,9 @@ test('basemap prop picks the first basemap and swaps tiles under the data layers
   assert.match(first.sources.get('basemap-overlay-1').tiles[0], /World_Boundaries_and_Places/);
   first.emit('error', { sourceId: 'basemap-overlay-0', tile: { tileID: { key: 'o' } } });
   assert.equal(
-    nodes(h.render(undefined, { basemap: 'satellite' })).some((node) => node.props?.className === 'map-warning'),
+    nodes(h.render(undefined, { basemap: 'satellite' })).some((node) =>
+      node.props?.className?.split(' ').includes('map-warning'),
+    ),
     false,
     'a missing label tile does not raise the basemap warning',
   );
@@ -1773,94 +1839,186 @@ test('a basemap chosen before the map loads is used when it loads', () => {
 test('workspace offers a basemap select that drives the map and remembers the choice', () => {
   const w = historyWorkspace();
   let tree = w.render();
-  const select = () => tree.find((node) => node.type === 'select' && node.props['aria-label'] === 'แผนที่ฐาน');
+  const select = () =>
+    tree.find(
+      (node) =>
+        node.type === 'select-root' &&
+        nodes(node).some((n) => n.type === 'select-trigger' && n.props['aria-label'] === 'แผนที่ฐาน'),
+    );
   assert.ok(select(), 'basemap select exists');
-  const options = nodes(select()).filter((node) => node.type === 'option');
+  const options = nodes(select()).filter((node) => node.type === 'select-item');
   assert.deepEqual(
     options.map((option) => option.props.value),
     ['streets', 'satellite'],
   );
   assert.equal(select().props.value, 'streets');
   assert.equal(mapNode(tree).props.basemap, 'streets');
-  select().props.onChange({ target: { value: 'satellite' } });
+  select().props.onValueChange('satellite');
   tree = w.render();
   assert.equal(select().props.value, 'satellite');
   assert.equal(mapNode(tree).props.basemap, 'satellite');
-  select().props.onChange({ target: { value: 'not-a-basemap' } });
+  select().props.onValueChange('not-a-basemap');
   tree = w.render();
   assert.equal(mapNode(tree).props.basemap, 'satellite', 'unknown values are ignored');
 });
 
-test('list pagination offers page size and page jump; both ask the API and return focus-safe controls', () => {
+test('list pagination has a shadcn size select, stable range and icon-only paging commands', () => {
   const w = historyWorkspace();
   w.setResource('/api/sites?', { data: { items: [], total: 45, page: 1 }, loading: false });
   w.render();
   let tree = w.render();
   const nav = () => tree.find((node) => node.props?.['aria-label'] === 'หน้ารายการแหล่ง');
-  const sizeSelect = () =>
-    nodes(nav()).find((node) => node.type === 'select' && node.props['aria-label'] === 'จำนวนต่อหน้า');
-  const pageSelect = () => nodes(nav()).find((node) => node.type === 'select' && node.props['aria-label'] === 'ไปหน้า');
-  assert.deepEqual(
-    nodes(sizeSelect())
-      .filter((node) => node.type === 'option')
-      .map((option) => option.props.value),
-    [10, 20, 50, 100],
-  );
-  assert.equal(sizeSelect().props.value, 20);
-  assert.deepEqual(
-    nodes(pageSelect())
-      .filter((node) => node.type === 'option')
-      .map((option) => option.props.value),
-    [1, 2, 3],
-  );
+  const sizeSelect = () => nodes(nav()).find((node) => node.type === 'select-root');
   const range = () =>
     nodes(nav())
       .find((node) => node.type === 'small')
       .props.children.join('');
-  assert.equal(range(), '1–20 จาก 45');
-  pageSelect().props.onChange({ target: { value: '3' } });
-  tree = w.render();
-  assert.ok(w.calls.some(({ url }) => url?.startsWith('/api/sites?page=3&pageSize=20')));
-  sizeSelect().props.onChange({ target: { value: '50' } });
-  tree = w.render();
-  assert.ok(
-    w.calls.some(({ url }) => url?.startsWith('/api/sites?page=1&pageSize=50')),
-    'new size starts at page 1',
-  );
-  w.setResource('/api/sites?', { loading: true });
-  tree = w.render();
-  assert.equal(range(), '1–20 จาก 45', 'while the new size loads, the range still describes the rows on screen');
-  assert.equal(
-    nodes(nav())
-      .find((node) => node.type === 'span')
-      .props.children.join(''),
-    'หน้า 1 / 3',
-  );
-  assert.equal(sizeSelect().props.value, 50, 'the size select shows the requested size');
-  w.setResource('/api/sites?', { data: { items: [], total: 45, page: 1 }, loading: false });
-  tree = w.render();
   assert.deepEqual(
-    nodes(pageSelect())
-      .filter((node) => node.type === 'option')
-      .map((option) => option.props.value),
-    [1],
+    nodes(nav())
+      .filter((node) => node.type === 'select-item')
+      .map((node) => node.props.value),
+    [10, 20, 50, 100],
   );
-  assert.equal(range(), '1–45 จาก 45');
-  sizeSelect().props.onChange({ target: { value: '7' } });
+  assert.equal(sizeSelect().props.value, 20);
+  assert.ok(nodes(nav()).some((node) => node.props?.['aria-label'] === 'จำนวนต่อหน้า'));
+  assert.ok(nodes(nav()).some((node) => node.type === 'select-value' && node.props.children.join('') === '20 ต่อหน้า'));
+  assert.equal(
+    nodes(nav()).some((node) => node.props?.['aria-label'] === 'ไปหน้า'),
+    false,
+  );
+  const buttons = nodes(nav()).filter((node) => node.type === 'button');
+  assert.deepEqual(
+    buttons.map((node) => node.props['aria-label']),
+    ['หน้าก่อนหน้า', 'หน้าถัดไป'],
+  );
+  assert.equal(range(), '1–20 จาก 45');
+  sizeSelect().props.onValueChange(50);
   tree = w.render();
-  assert.equal(sizeSelect().props.value, 50, 'sizes outside the list are ignored');
+  assert.ok(w.calls.some(({ url }) => url?.startsWith('/api/sites?page=1&pageSize=50')));
   w.setResource('/api/sites?', { loading: true });
   tree = w.render();
-  assert.equal(sizeSelect().props['aria-disabled'], true);
+  assert.equal(range(), '1–20 จาก 45');
+  assert.equal(sizeSelect().props.value, 50);
+  assert.equal(sizeSelect().props.disabled, true);
   w.calls.length = 0;
-  pageSelect().props.onChange({ target: { value: '1' } });
-  sizeSelect().props.onChange({ target: { value: '10' } });
+  sizeSelect().props.onValueChange(10);
   w.render();
   assert.equal(
     w.calls.some(({ url }) => /pageSize=10/.test(url ?? '')),
     false,
-    'loading blocks changes',
   );
+  w.setResource('/api/sites?', { data: { items: [], total: 45, page: 1 }, loading: false });
+  tree = w.render();
+  assert.equal(range(), '1–45 จาก 45');
+  sizeSelect().props.onValueChange(7);
+  tree = w.render();
+  assert.equal(sizeSelect().props.value, 50);
+});
+
+test('page-size selection restores its trigger after portal focus and loading without stealing outside focus', () => {
+  const w = historyWorkspace();
+  const response = { data: { items: [], total: 4585, page: 1 }, loading: false };
+  w.setResource('/api/sites?', response);
+  w.render();
+  let tree = w.render();
+  const pagination = () => tree.find((node) => node.props?.['aria-label'] === 'หน้ารายการแหล่ง');
+  const select = () => nodes(pagination()).find((node) => node.type === 'select-root');
+  const triggerNode = () => nodes(pagination()).find((node) => node.type === 'select-trigger');
+  assert.equal(triggerNode().props.disabled, false, 'native trigger must receive enabled state in the same commit');
+  const trigger = w.host(nodes(pagination()).find((node) => node.type === 'select-trigger'));
+  assert.equal(trigger.tagName, 'BUTTON', 'the mocked Select trigger models its native button host');
+  const option = { tagName: 'DIV', closest: () => null };
+  const choose = (size) => {
+    trigger.focus();
+    pagination().props.onBlurCapture({ target: trigger, relatedTarget: option });
+    w.document.activeElement = option;
+    pagination().props.onFocusCapture({ target: option });
+    select().props.onValueChange(size);
+    w.setResource('/api/sites?', { loading: true });
+    tree = w.render();
+    assert.equal(triggerNode().props.disabled, true, 'native trigger must receive loading state directly');
+    w.document.activeElement = w.document.body;
+    pagination().props.onBlurCapture({ target: option, relatedTarget: null });
+  };
+  choose(50);
+  w.setResource('/api/sites?', response);
+  tree = w.render();
+  assert.equal(triggerNode().props.disabled, false);
+  assert.equal(w.document.activeElement, trigger, 'the Select trigger must regain focus after its portal closes');
+  choose(100);
+  const outside = w.host(tree.find((node) => node.type === 'input'));
+  outside.focus();
+  w.setResource('/api/sites?', response);
+  tree = w.render();
+  assert.equal(w.document.activeElement, outside, 'a user who leaves pagination must keep their chosen focus');
+});
+
+test('page-size focus waits for Base UI native disabled lag and cancels on outside focus or a new load', () => {
+  const document = { body: {} };
+  document.activeElement = document.body;
+  const observers = [];
+  class MutationObserver {
+    constructor(callback) {
+      this.callback = callback;
+      observers.push(this);
+    }
+    observe(target, options) {
+      this.target = target;
+      this.options = options;
+    }
+    disconnect() {
+      this.disconnected = true;
+    }
+  }
+  const trigger = {
+    disabled: true,
+    focus() {
+      document.activeElement = this;
+    },
+  };
+  const next = {
+    focus() {
+      document.activeElement = this;
+    },
+  };
+  const outside = {};
+  const h = componentHarness('../src/features/map/use-pagination-focus.ts', {}, { document, MutationObserver });
+  let loading = false;
+  const render = () => h.render(() => h.exports.usePaginationFocus(loading, 1, 4585));
+  let focus = render();
+  focus.ref.current = { querySelector: () => next };
+  const finish = () => {
+    focus.rememberSelection(trigger);
+    loading = true;
+    render();
+    loading = false;
+    focus = render();
+  };
+  finish();
+  assert.equal(document.activeElement, document.body, 'temporary Select disabling must not transfer focus to Next');
+  assert.equal(observers.length, 1);
+  assert.equal(observers[0].target, trigger);
+  assert.deepEqual(Array.from(observers[0].options.attributeFilter), ['disabled']);
+  trigger.disabled = false;
+  observers[0].callback();
+  assert.equal(document.activeElement, trigger);
+  assert.equal(observers[0].disconnected, true);
+
+  trigger.disabled = true;
+  document.activeElement = document.body;
+  finish();
+  document.activeElement = outside;
+  trigger.disabled = false;
+  observers[1].callback();
+  assert.equal(document.activeElement, outside, 'delayed recovery must not steal focus from another control');
+  assert.equal(observers[1].disconnected, true);
+
+  trigger.disabled = true;
+  document.activeElement = document.body;
+  finish();
+  loading = true;
+  render();
+  assert.equal(observers[2].disconnected, true, 'a new load cleans up its obsolete observer');
 });
 
 test('survey points cluster; individual points exclude clusters; numbered cluster buttons zoom in', async () => {
@@ -1936,4 +2094,90 @@ test('the popup gets an arrow pointing at its anchor, and none without an anchor
   assert.equal(arrow.style.transform, 'translate(392px, 386px)');
   render(undefined, { popupElement, popup: null });
   assert.equal(arrow.hidden, true);
+});
+
+test('P6 filters use grouped Selects and Input while preserving changes and validation', () => {
+  const h = componentHarness('../src/features/map/filters-panel.tsx');
+  const changes = [];
+  const tree = nodes(
+    h.render(() =>
+      h.exports.FiltersPanel({
+        draft: { province: '92', status: 'good', q: 'reef' },
+        provinces: new Map([['81', 'กระบี่']]),
+        change: (value) => changes.push(value),
+        validation: 'คำค้นไม่ถูกต้อง',
+      }),
+    ),
+  );
+  const selects = tree.filter((n) => n.type === 'select-root');
+  assert.equal(selects.length, 2);
+  assert.deepEqual(
+    selects.map((n) => n.props.value),
+    ['92', 'good'],
+  );
+  for (const select of selects) {
+    const items = nodes(select).filter((n) => n.type === 'select-item');
+    const grouped = nodes(select)
+      .filter((n) => n.type === 'select-group')
+      .flatMap(nodes);
+    assert.ok(items.length > 1);
+    assert.ok(items.every((n) => grouped.includes(n)));
+  }
+  selects[0].props.onValueChange('81');
+  selects[1].props.onValueChange('poor');
+  const input = tree.find((n) => n.props?.['data-slot'] === 'input');
+  assert.equal(input.props.maxLength, 200);
+  input.props.onChange({ target: { value: 'new' } });
+  assert.deepEqual(JSON.parse(JSON.stringify(changes)), [{ province: '81' }, { status: 'poor' }, { q: 'new' }]);
+  assert.ok(tree.some((n) => n.props?.['data-slot'] === 'alert' && n.props.role === 'alert'));
+});
+
+test('P6 list and map states use polite Alerts and retain retry controls', () => {
+  const w = historyWorkspace();
+  w.setResource('/api/sites?', { loading: true });
+  let tree = w.render();
+  assert.ok(tree.some((n) => n.props?.['data-slot'] === 'alert' && n.props.role === 'status'));
+  w.setResource('/api/sites?', { data: { items: [], total: 0, page: 1 }, loading: false });
+  tree = w.render();
+  assert.ok(
+    tree.some(
+      (n) =>
+        n.props?.['data-slot'] === 'alert' && nodes(n).some((x) => x.props?.children === 'ไม่พบแหล่งที่ตรงกับตัวกรอง'),
+    ),
+  );
+  assert.ok(tree.some((n) => n.props?.['data-slot'] === 'card'));
+  w.setResource('/api/sites?', { error: new Error('offline'), loading: false });
+  tree = w.render();
+  const failure = tree.find((n) => typeof n.type === 'function' && n.props?.error?.message === 'offline');
+  const h = componentHarness('../src/features/map/map-ui.tsx');
+  const error = nodes(h.render(() => h.exports.Failure(failure.props)));
+  assert.ok(error.some((n) => n.props?.['data-slot'] === 'alert' && n.props.role === 'alert'));
+  assert.ok(error.some((n) => n.props?.children === 'ลองใหม่' && typeof n.props.onClick === 'function'));
+});
+
+test('P6 Table and status Badge preserve column semantics, site selection and status swatches', () => {
+  const h = componentHarness('../src/features/map/sites-table.tsx');
+  const chosen = [];
+  const tree = nodes(
+    h.render(() =>
+      h.exports.SitesTable({
+        loadingList: false,
+        total: '1 แหล่ง',
+        list: siteRows,
+        chooseSite: (code) => chosen.push(code),
+        provinceName: () => 'กระบี่',
+      }),
+    ),
+  );
+  assert.ok(tree.some((n) => n.type === 'table' && n.props['data-slot'] === 'table'));
+  assert.equal(tree.filter((n) => n.type === 'th' && n.props.scope === 'col').length, 5);
+  tree.find((n) => n.props?.className === 'table-link').props.onClick();
+  assert.deepEqual(chosen, ['S1']);
+  const ui = componentHarness('../src/features/map/map-ui.tsx');
+  for (const status of [...Object.keys(mapState.statuses), 'unknown']) {
+    const badge = nodes(ui.render(() => ui.exports.StatusLabel({ status })));
+    assert.ok(badge.some((n) => n.props?.['data-slot'] === 'badge'));
+    const swatch = badge.find((n) => typeof n.type === 'function' && n.props?.status);
+    assert.equal(swatch.props.status, status === 'unknown' ? 'no_data' : status);
+  }
 });

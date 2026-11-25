@@ -1,31 +1,32 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '../../components/ui/button';
+import { Alert, AlertTitle, AlertDescription } from '../../components/ui/alert';
 import { AccountOnly } from '../../guards/session-guard';
 import { useSession } from '../../stores/session-context';
 
 export function SessionControls({ view }: { view?: 'checking' | 'account' | 'guest' } = {}) {
+  const router = useRouter();
   const { phase, busy, logoutPending, error, errorSource, rateLimitedUntil, expiryNotice, store } = useSession();
   const waiting = logoutPending && rateLimitedUntil > 0;
   return (
     <div className="session-controls" aria-label="สถานะผู้ใช้">
       {expiryNotice && (
-        <div className="expiry-notice" role={expiryNotice === 'expired' ? 'alert' : 'status'}>
-          <p>
-            {expiryNotice === 'expired'
-              ? 'เซสชันหมดอายุแล้ว ข้อมูลที่ต้องเข้าสู่ระบบถูกซ่อน กรุณาเข้าสู่ระบบใหม่'
-              : 'เซสชันจะหมดอายุในอีก 1 นาที บันทึกงานที่ค้างไว้ แล้วเข้าสู่ระบบใหม่เมื่อหมดอายุ'}
-          </p>
-          {expiryNotice === 'expired' && (
-            <Link className="session-link" href="/login">
-              เข้าสู่ระบบใหม่
-            </Link>
-          )}
-          <Button variant="outline" onClick={() => store.dismissNotice()}>
-            ปิด
+        <Alert className="expiry-notice" role="status">
+          <AlertTitle>เซสชันหมดอายุ</AlertTitle>
+          <AlertDescription>ข้อมูลที่ต้องเข้าสู่ระบบถูกซ่อน กรุณาเข้าสู่ระบบใหม่</AlertDescription>
+          <Button
+            variant="outline"
+            onClick={() => {
+              store.dismissNotice();
+              router.push('/login');
+            }}
+          >
+            ตกลง
           </Button>
-        </div>
+        </Alert>
       )}
       {(view ? view === 'checking' : phase === 'checking') ? (
         <p role="status">กำลังตรวจสอบผู้ใช้…</p>

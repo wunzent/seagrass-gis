@@ -34,7 +34,7 @@ patch:
       content:
         application/json:
           schema:
-            $ref: ../components/schemas/Survey.yaml
+            $ref: ../components/schemas/CreatedSurvey.yaml
     '400':
       description: VALIDATION_ERROR
       content:

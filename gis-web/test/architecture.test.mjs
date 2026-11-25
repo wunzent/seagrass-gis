@@ -32,7 +32,17 @@ const packages = {
   features: ['react', 'react-dom', 'next/link', 'next/navigation', 'next/dynamic', 'maplibre-gl'],
   services: [],
   stores: ['react'],
-  components: ['react', 'class-variance-authority', 'clsx', 'tailwind-merge'],
+  components: [
+    'react',
+    'class-variance-authority',
+    'clsx',
+    'tailwind-merge',
+    'lucide-react',
+    '@base-ui/react/select',
+    '@base-ui/react/input',
+    '@base-ui/react/merge-props',
+    '@base-ui/react/use-render',
+  ],
   lib: ['geojson'],
   assets: ['next/font/google'],
 };

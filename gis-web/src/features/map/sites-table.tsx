@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../components/ui/table';
 import { area } from '../../lib/map-format';
 import type { SiteList } from '../../lib/sites';
 import { StatusLabel } from './map-ui';
@@ -40,36 +41,36 @@ export function SitesTable({
       {listState}
       {list.data && list.data.items.length > 0 && (
         <div className="table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">รหัส</th>
-                <th scope="col">ชื่อแหล่ง</th>
-                <th scope="col">จังหวัด</th>
-                <th scope="col" className="num">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead scope="col">รหัส</TableHead>
+                <TableHead scope="col">ชื่อแหล่ง</TableHead>
+                <TableHead scope="col">จังหวัด</TableHead>
+                <TableHead scope="col" className="num">
                   พื้นที่ (ไร่)
-                </th>
-                <th scope="col">สถานะ</th>
-              </tr>
-            </thead>
-            <tbody>
+                </TableHead>
+                <TableHead scope="col">สถานะ</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {list.data.items.map((site) => (
-                <tr key={site.code}>
-                  <td className="site-code">{site.code}</td>
-                  <td>
+                <TableRow key={site.code}>
+                  <TableCell className="site-code">{site.code}</TableCell>
+                  <TableCell>
                     <button type="button" className="table-link" onClick={() => chooseSite(site.code)}>
                       {site.name}
                     </button>
-                  </td>
-                  <td>{provinceName(site.province_code)}</td>
-                  <td className="num">{area.format(site.area_rai)}</td>
-                  <td>
+                  </TableCell>
+                  <TableCell>{provinceName(site.province_code)}</TableCell>
+                  <TableCell className="num">{area.format(site.area_rai)}</TableCell>
+                  <TableCell>
                     <StatusLabel status={site.status} />
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       )}
       {pagination}

@@ -45,3 +45,46 @@ describe('SurveysService BR-05 recheck', () => {
     ]);
   });
 });
+
+describe('SurveysService PATCH response', () => {
+  it.each(['very_good', 'good', 'fair', 'poor', 'no_data'] as const)(
+    'returns the recomputed parent status %s after updating, in the same transaction',
+    async (status) => {
+      const tx = {};
+      const events: string[] = [];
+      const actor = { id: 'editor-id' } as SessionUser;
+      const row = { ...valid, id: '7', created_by_id: 'creator-id', created_by_email: 'creator@example.test' };
+      const updated = { ...row, cover_percent: 60 };
+      const instance = new SurveysService(
+        {
+          transaction: (run: (transaction: unknown) => unknown) => run(tx),
+          siteIdOf: async () => 'site-id',
+          lockOnSite: async () => row,
+          isWithinSite: async () => true,
+          update: async (...args: unknown[]) => {
+            expect(args).toEqual([tx, 7, { ...valid, cover_percent: 60 }, actor.id, false]);
+            events.push('update');
+          },
+          byId: async () => updated,
+        } as unknown as SurveysRepository,
+        {
+          shareLockActive: async () => ({ id: 'site-id' }),
+          featureById: async (transaction: unknown, siteId: string) => {
+            expect([transaction, siteId, events]).toEqual([tx, 'site-id', ['update']]);
+            events.push('status');
+            return { status };
+          },
+        } as unknown as SitesRepository,
+      );
+
+      expect(await instance.update(7, { cover_percent: 60 }, actor)).toEqual({
+        ...valid,
+        id: 7,
+        cover_percent: 60,
+        created_by: { id: 'creator-id', email: 'creator@example.test' },
+        siteStatus: status,
+      });
+      expect(events).toEqual(['update', 'status']);
+    },
+  );
+});

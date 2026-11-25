@@ -12,9 +12,9 @@ test('input and select borders use a dedicated token with at least 3:1 contrast 
   const luminance = rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
   const contrast = 1.05 / (luminance + 0.05);
   assert.ok(contrast >= 3, `Field border contrast ${contrast}:1`);
-  for (const selector of ['.filters input', '.filters select', '.login-panel input']) {
-    const block = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].find(([, selectors]) =>
-      selectors.split(',').some((item) => item.trim() === selector),
+  for (const selector of ['.filters input', ".filters [data-slot='select-trigger']", '.login-panel input']) {
+    const block = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].find(
+      ([, selectors, rules]) => selectors.split(',').some((item) => item.trim() === selector) && /border:/.test(rules),
     );
     assert.ok(block, selector);
     assert.match(block[2], /border: 1px solid var\(--field-border\)/);

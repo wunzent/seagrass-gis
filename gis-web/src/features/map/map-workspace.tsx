@@ -1,5 +1,7 @@
 'use client';
 
+import { Alert, AlertDescription } from '../../components/ui/alert';
+import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/card';
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { number, surveyRounds } from '../../lib/map-format';
@@ -29,9 +31,9 @@ import { lookupsService } from '../../services/lookups-service';
 const SiteMap = dynamic(() => import('./site-map'), {
   ssr: false,
   loading: () => (
-    <p className="map-status" role="status">
-      กำลังเปิดแผนที่…
-    </p>
+    <Alert className="map-status" role="status">
+      <AlertDescription>กำลังเปิดแผนที่…</AlertDescription>
+    </Alert>
   ),
 });
 export default function MapWorkspace({ sessionControls }: { sessionControls?: ReactNode } = {}) {
@@ -39,7 +41,10 @@ export default function MapWorkspace({ sessionControls }: { sessionControls?: Re
   return <MapContent key={generation} sessionControls={sessionControls} />;
 }
 function MapContent({ sessionControls }: { sessionControls?: ReactNode } = {}) {
-  const { draft, setDraft, state, setState, bbox, setBbox, popup, setPopup, view, setView, resources } = useMapStore();
+  const { draft, setDraft, state, setState, bbox, setBbox, popup, setPopup, view, setView, resources, layerCache } =
+    useMapStore();
+  // Session generation remounts MapContent; discard the old identity's cached payloads too.
+  useEffect(() => () => layerCache.clear(), [layerCache]);
   const [validation, setValidation] = useState('');
   const [selectionNotice, setSelectionNotice] = useState('');
   const [mapAvailable, setMapAvailable] = useState(true);
@@ -85,12 +90,12 @@ function MapContent({ sessionControls }: { sessionControls?: ReactNode } = {}) {
   const provinceName = (code: string) => provinces.get(code) ?? code;
   const loadList = useCallback((signal: AbortSignal) => sitesService.list(state, signal), [state]);
   const loadSites = useCallback(
-    (signal: AbortSignal) => sitesService.geojson(state.filters, bbox!, signal),
-    [state.filters, bbox],
+    (signal: AbortSignal) => sitesService.geojson(state.filters, bbox!, signal, layerCache),
+    [state.filters, bbox, layerCache],
   );
   const loadSurveys = useCallback(
-    (signal: AbortSignal) => surveysService.geojson(state.filters, bbox!, signal),
-    [state.filters, bbox],
+    (signal: AbortSignal) => surveysService.geojson(state.filters, bbox!, signal, layerCache),
+    [state.filters, bbox, layerCache],
   );
   const list = useResource(pending ? null : sitesService.listKey(state), loadList, listRetry, resources.list);
   const geojson = useResource(
@@ -265,19 +270,19 @@ function MapContent({ sessionControls }: { sessionControls?: ReactNode } = {}) {
     <>
       {loadingList && (
         <div className="loading-state" role="status">
-          <p>กำลังโหลดรายการ…</p>
-          <div className="skeleton" />
-          <div className="skeleton" />
+          <Alert role="status">
+            <AlertDescription>กำลังโหลดรายการ…</AlertDescription>
+          </Alert>
         </div>
       )}
       {list.error && <Failure error={list.error} retry={() => setListRetry((n) => n + 1)} />}
       {list.data && !list.data.items.length && (
-        <div className="empty-state">
-          <p>ไม่พบแหล่งที่ตรงกับตัวกรอง</p>
+        <Alert role="status" className="empty-state">
+          <AlertDescription>ไม่พบแหล่งที่ตรงกับตัวกรอง</AlertDescription>
           <button type="button" className="text-button" onClick={() => change(emptyFilters)}>
             ล้างตัวกรอง
           </button>
-        </div>
+        </Alert>
       )}
     </>
   );
@@ -326,15 +331,21 @@ function MapContent({ sessionControls }: { sessionControls?: ReactNode } = {}) {
               <h2 id="map-heading" ref={mapHeading} tabIndex={-1}>
                 แผนที่
               </h2>
-              <span className="map-progress" aria-live="polite" aria-atomic="true">
-                {loadingMap
-                  ? `กำลังปรับขอบเขต / โหลดข้อมูล…${staleNotice ? ` ${staleNotice}` : ''}`
-                  : geojson.error || surveys.error || validation
-                    ? staleNotice
-                    : geojson.data
-                      ? `${geojson.data.features.length} แหล่งในมุมมอง`
-                      : ''}
-              </span>
+              <Alert
+                role="status"
+                className="map-progress-alert w-auto max-w-[75%]"
+                hidden={!loadingMap && !staleNotice && !geojson.data}
+              >
+                <span className="map-progress" aria-live="polite" aria-atomic="true">
+                  {loadingMap
+                    ? `กำลังปรับขอบเขต / โหลดข้อมูล…${staleNotice ? ` ${staleNotice}` : ''}`
+                    : geojson.error || surveys.error || validation
+                      ? staleNotice
+                      : geojson.data
+                        ? `${geojson.data.features.length} แหล่งในมุมมอง`
+                        : ''}
+                </span>
+              </Alert>
             </div>
             {(geojson.error || surveys.error) && (
               <Failure
@@ -354,9 +365,9 @@ function MapContent({ sessionControls }: { sessionControls?: ReactNode } = {}) {
               />
             )}
             {selectionNotice && (
-              <p className="map-notice" role="alert">
-                {selectionNotice}
-              </p>
+              <Alert className="map-notice">
+                <AlertDescription>{selectionNotice}</AlertDescription>
+              </Alert>
             )}
             <div
               className="map-container"
@@ -389,38 +400,44 @@ function MapContent({ sessionControls }: { sessionControls?: ReactNode } = {}) {
                   aria-labelledby="detail-heading"
                   aria-busy={popup.kind === 'site' && (detail.loading || history.loading)}
                 >
-                  <div className="popup-heading">
-                    <h2 id="detail-heading" ref={detailHeading} tabIndex={-1}>
-                      {survey
-                        ? `จุดสำรวจ ${survey.surveyed_on}`
-                        : `${code}${selected ? ` ${selected.properties.name}` : ''}`}
-                    </h2>
-                    <button type="button" className="popup-close" aria-label="ปิดรายละเอียด" onClick={closePopup}>
-                      ×
-                    </button>
-                  </div>
-                  {survey ? (
-                    <SurveyPopup
-                      survey={survey}
-                      siteName={siteName}
-                      openSite={(code) => {
-                        focusDetail.current = true;
-                        select(code);
-                      }}
-                    />
-                  ) : (
-                    <SitePopup
-                      detail={detail}
-                      missing={missing}
-                      retryDetail={() => setDetailRetry((n) => n + 1)}
-                      selected={selected}
-                      provinceName={provinceName}
-                      history={history}
-                      historyMissing={historyMissing}
-                      retryHistory={() => setHistoryRetry((n) => n + 1)}
-                      rounds={rounds}
-                    />
-                  )}
+                  <Card className="popup-card [--card-spacing:0px] gap-0 overflow-visible rounded-none ring-0">
+                    <CardHeader className="popup-heading flex items-center justify-between">
+                      <CardTitle>
+                        <h2 id="detail-heading" ref={detailHeading} tabIndex={-1}>
+                          {survey
+                            ? `จุดสำรวจ ${survey.surveyed_on}`
+                            : `${code}${selected ? ` ${selected.properties.name}` : ''}`}
+                        </h2>
+                      </CardTitle>
+                      <button type="button" className="popup-close" aria-label="ปิดรายละเอียด" onClick={closePopup}>
+                        ×
+                      </button>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      {survey ? (
+                        <SurveyPopup
+                          survey={survey}
+                          siteName={siteName}
+                          openSite={(code) => {
+                            focusDetail.current = true;
+                            select(code);
+                          }}
+                        />
+                      ) : (
+                        <SitePopup
+                          detail={detail}
+                          missing={missing}
+                          retryDetail={() => setDetailRetry((n) => n + 1)}
+                          selected={selected}
+                          provinceName={provinceName}
+                          history={history}
+                          historyMissing={historyMissing}
+                          retryHistory={() => setHistoryRetry((n) => n + 1)}
+                          rounds={rounds}
+                        />
+                      )}
+                    </CardContent>
+                  </Card>
                 </section>
               )}
               <Legend />

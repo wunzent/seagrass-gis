@@ -1,5 +1,8 @@
 'use client';
 
+import { Input } from '../../components/ui/input';
+import { Alert, AlertDescription } from '../../components/ui/alert';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem } from '../../components/ui/select';
 import { emptyFilters, statuses, type Filters } from '../../lib/map-state';
 
 export function FiltersPanel({
@@ -17,30 +20,56 @@ export function FiltersPanel({
     <>
       <label>
         <span>จังหวัด</span>
-        <select value={draft.province} onChange={(e) => change({ province: e.target.value })}>
-          <option value="">ทุกจังหวัด</option>
-          {Array.from(provinces, ([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-          {draft.province && !provinces.has(draft.province) && <option value={draft.province}>{draft.province}</option>}
-        </select>
+        <Select
+          value={draft.province}
+          onValueChange={(value) => {
+            if (value !== null) change({ province: value });
+          }}
+        >
+          <SelectTrigger aria-label="จังหวัด">
+            <SelectValue>{provinces.get(draft.province) ?? (draft.province || 'ทุกจังหวัด')}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value="">ทุกจังหวัด</SelectItem>
+              {Array.from(provinces, ([value, label]) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+              {draft.province && !provinces.has(draft.province) && (
+                <SelectItem value={draft.province}>{draft.province}</SelectItem>
+              )}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </label>
       <label>
         <span>สถานะ</span>
-        <select value={draft.status} onChange={(e) => change({ status: e.target.value })}>
-          <option value="">ทุกสถานะ</option>
-          {Object.entries(statuses).map(([value, item]) => (
-            <option value={value} key={value}>
-              {item.label}
-            </option>
-          ))}
-        </select>
+        <Select
+          value={draft.status}
+          onValueChange={(value) => {
+            if (value !== null) change({ status: value });
+          }}
+        >
+          <SelectTrigger aria-label="สถานะ">
+            <SelectValue>{statuses[draft.status as keyof typeof statuses]?.label ?? 'ทุกสถานะ'}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value="">ทุกสถานะ</SelectItem>
+              {Object.entries(statuses).map(([value, item]) => (
+                <SelectItem value={value} key={value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </label>
       <label>
         <span>ค้นหาแหล่ง</span>
-        <input
+        <Input
           type="search"
           value={draft.q}
           maxLength={200}
@@ -52,9 +81,11 @@ export function FiltersPanel({
         ล้างตัวกรอง
       </button>
       {validation && (
-        <p className="filter-error" role="alert">
-          {validation}
-        </p>
+        <div className="filter-error">
+          <Alert variant="destructive">
+            <AlertDescription>{validation}</AlertDescription>
+          </Alert>
+        </div>
       )}
     </>
   );
