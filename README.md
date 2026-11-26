@@ -16,7 +16,6 @@ docker compose up --build -d --wait
 | API health | http://localhost:3001/health |
 | เอกสาร API (Swagger) | http://localhost:3001/docs |
 | ตัวอย่างเรียก API | [api-examples.http](api-examples.http) |
-| Vector tiles (Martin) | http://localhost:3002/catalog |
 
 วัดเวลาตั้งแต่สั่ง `up` จน `/health` ตอบ `db: ok` (ถ้าต้องการวัดแบบติดตั้งใหม่ ให้รัน `docker compose down -v` ก่อน ซึ่งจะลบข้อมูลในฐาน):
 
