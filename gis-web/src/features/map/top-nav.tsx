@@ -14,8 +14,8 @@ export function TopNav({
   return (
     <header className="topbar">
       <h1>ติดตามแหล่งหญ้าทะเล</h1>
-      <nav ref={navigationRef} className="topbar-nav" aria-label="เมนูหลัก">
-        <TabsList aria-label="มุมมอง">
+      <nav ref={navigationRef} className="topbar-nav min-w-0 max-md:overflow-x-auto" aria-label="เมนูหลัก">
+        <TabsList className="max-md:shrink-0" aria-label="มุมมอง">
           <TabsTrigger value="map" data-view="map" aria-current={view === 'map' ? 'page' : undefined}>
             แผนที่
           </TabsTrigger>

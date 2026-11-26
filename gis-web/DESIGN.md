@@ -71,7 +71,7 @@ IBM Plex Sans Thai 400/500 ผ่าน next/font/google ที่ src/assets/fo
 
 ### Spacing, Radius, Borders, Elevation
 
-ไม่มี named spacing tokens ใน code ค่าที่ใช้คือ0,2,4,6,7,8,9,10,12,14,16,18,20,24,28px เช่น filter gap10, sidebar padding16/gap18, topbar gap24/padding20, facts gap8×12, table padding16/20/24 ใช้ค่าจาก selectors ไม่แปลงเป็น scale ใหม่
+ไม่มี named spacing tokens ใน code ค่าที่ใช้คือ0,2,4,6,7,8,9,10,12,14,16,18,20,24,28px เช่น desktop sidebar ใช้ padding16 ด้านบนและด้านข้าง และ gap18 ส่วน topbar ใช้ gap24/padding20, facts gap8×12 และ table padding16/20/24 ใช้ค่าจาก selectors และ Tailwind spacing
 
 Legend และ login panel ใช้ radius 6px ส่วน Button, Input, Select, Tabs และ Card ใช้ radius/spacing ตาม shadcn Base Nova เส้นแบ่งใช้ border และ input ใช้ token --input สีของ focus มาจาก --ring
 
@@ -87,7 +87,9 @@ Button ใช้ transition และ hover จาก shadcn Base Nova Skeleton 
 
 Desktop ≥768px: app สูง100svh, topbar min56px; main flex/scroll แนวตั้ง; map-layout grid `352px minmax(0,1fr)` เพื่อให้ pagination อยู่ในแถวเดียว min-height480px; sidebar scroll; map/table เป็น view ของ route / เดียว แผนที่คง instance เมื่อซ่อนด้วย view-hidden
 
-Mobile ≤767px รวม375px: topbar wrap ชื่อและ session ก่อน เมนูเต็มแถวล่าง; app height auto/min100svh; sidebar อยู่เหนือ map padding12; map-container70svh; table padding12 และ filter field กว้าง100%; table scroll แนวนอนเฉพาะ .table-scroll Login panel กว้าง100% max420px padding24; login page padding24px 16px
+Mobile ≤767px รวม375px: topbar แสดงชื่อและ session ก่อน เมนู Tabs อยู่เต็มแถวล่างและเลื่อนแนวนอนภายใน nav ได้เมื่อพื้นที่ไม่พอ ส่วน app ใช้ height auto/min100svh โดย sidebar อยู่เหนือ map และใช้ padding12 ส่วน map-container สูง70svh ตารางใช้ padding12 และ filter field กว้าง100% ตารางเลื่อนแนวนอนภายใน .table-scroll ส่วน login panel กว้าง100% max420px padding24 และ login page ใช้ padding24px 16px
+
+Sidebar ใช้ gap16 ระหว่างกลุ่มตัวกรอง และ gap8 ระหว่าง Label กับ control ปุ่มล้างตัวกรองชิดขอบเดียวกับช่องกรอก หัวรายการ แถวรายการ และ pagination footer ใช้ padding แนวนอน12px เท่ากัน Footer มีเส้นแบ่งขอบบน padding แนวตั้ง12px และจัด controls ในแถวเดียว บน desktop footer ติดขอบล่างของพื้นที่เลื่อนใน sidebar ส่วน mobile แสดงต่อท้ายรายการตามลำดับ
 
 Map overlays: basemap warning relative z2; ข้อความเปิดแผนที่ครั้งแรกซ้อนด้านบนแบบ absolute เพื่อคงขนาด canvas แถวสถานะในหัวแผนที่จัดกึ่งกลางและใช้ line-height 1.25rem เท่าความสูง Badge เพื่อให้ข้อความบรรทัดเดียวกับ Badge สลับกันได้โดยไม่เปลี่ยนขนาด canvas ส่วน legend absolute right10 bottom28 z3 และ popup absolute z5 กว้าง min(300px,100%−16px) scroll ภายใน เริ่ม translate8px/8px แล้ว SiteMap จัดตำแหน่งตาม anchor/ขอบ8px โดยนับพื้นที่ใต้ warning และ gap14px ด้วย MapLibre controls อยู่ใน control containers ของ library ไม่มี app z-index override
 

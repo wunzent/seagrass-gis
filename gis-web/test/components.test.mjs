@@ -1461,6 +1461,9 @@ test('top menu switches between the map and the table view and marks the current
   assert.equal(navItem(tree, 'แผนที่').props['aria-current'], 'page');
   assert.equal(navItem(tree, 'ตารางแหล่งหญ้าทะเล').props['aria-current'], undefined);
   assert.ok(byClass(tree, 'sidebar'), 'filters and list sit in the map sidebar');
+  assert.ok(byClass(tree, 'max-md:overflow-x-auto'), 'mobile tabs contain their own overflow');
+  assert.ok(byClass(tree, 'list-heading').props.className.includes('px-3'));
+  assert.ok(byClass(tree, 'site-meta').props.className.includes('items-center'));
   assert.equal(byClass(tree, 'table-view'), undefined);
   switchTab(tree, 'ตารางแหล่งหญ้าทะเล');
   tree = w.render();
@@ -1887,6 +1890,9 @@ test('list pagination has a shadcn size select, stable range and icon-only pagin
   w.render();
   let tree = w.render();
   const nav = () => tree.find((node) => node.props?.['aria-label'] === 'หน้ารายการแหล่ง');
+  const footer = byClass(tree, 'site-list-footer');
+  assert.ok(footer?.props.className.includes('md:sticky md:bottom-0'));
+  assert.ok(footer.props.className.includes('px-3 py-3'));
   const sizeSelect = () => nodes(nav()).find((node) => node.type === 'select-root');
   const range = () =>
     nodes(nav())

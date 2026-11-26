@@ -80,7 +80,12 @@ export function FiltersPanel({
           onChange={(e) => change({ q: e.target.value })}
         />
       </div>
-      <Button variant="link" size="sm" className="justify-self-start" onClick={() => change(emptyFilters)}>
+      <Button
+        variant="link"
+        size="sm"
+        className="justify-self-start in-[.sidebar]:px-0"
+        onClick={() => change(emptyFilters)}
+      >
         ล้างตัวกรอง
       </Button>
       {validation && (
