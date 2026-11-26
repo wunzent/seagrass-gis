@@ -4,7 +4,7 @@
 
 ## Architecture
 
-`gis-web` (Next.js, MapLibre) → proxy `/api/*` → `gis-api` (NestJS, `pg`) → PostgreSQL 16 + PostGIS 3.5 รันด้วย Docker Compose บนเครื่อง local (loopback เท่านั้น) API รัน migrations แบบ versioned/checksum และ importer ก่อนรับ HTTP ไม่มี schema synchronize; CI ใช้ GitHub Actions; ธีม UI อยู่ที่ [gis-web/DESIGN.md](gis-web/DESIGN.md)
+`gis-web` (Next.js, MapLibre) → proxy `/api/*` → `gis-api` (NestJS, `pg`) → PostgreSQL 16 + PostGIS 3.5 รันด้วย Docker Compose บนเครื่อง local (loopback เท่านั้น) API รัน migrations แบบ versioned/checksum และ importer ก่อนรับ HTTP ไม่มี schema synchronize; CI ใช้ GitHub Actions
 
 ## (a) Geometry, SRID and Indexes
 

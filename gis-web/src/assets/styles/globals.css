@@ -49,7 +49,7 @@
   --radius-xl: calc(var(--radius) * 1.4);
 }
 
-/* Bright palette: gis-web/DESIGN.md. */
+/* Bright palette. */
 :root {
   --bg: #ffffff;
   --surface: #f6f8fa;

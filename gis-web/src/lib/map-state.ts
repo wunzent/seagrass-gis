@@ -1,4 +1,4 @@
-// Bright survey marks follow gis-web/DESIGN.md.
+// Bright survey marks.
 export const POINT_STROKE = '#0077B6';
 export const POINT_FILL = '#FFFFFF';
 export const SITE_OUTLINE = '#1B2A3A';
