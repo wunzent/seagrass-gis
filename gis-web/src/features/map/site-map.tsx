@@ -15,8 +15,7 @@ import {
 } from 'maplibre-gl';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
-  debounce,
-  VIEWPORT_DEBOUNCE_MS,
+  createViewportUpdates,
   POINT_FILL,
   POINT_STROKE,
   SITE_OUTLINE,
@@ -212,17 +211,22 @@ export default function SiteMap({
     callbacks.current.onAvailabilityChange?.(true);
     callbacks.current.onViewport(null);
     callbacks.current.onZoom?.(camera.current.zoom);
-    const updateViewport = debounce(() => {
-      const bounds = map.current?.getBounds();
-      if (!bounds) return;
-      const bbox = [
-        Math.max(-180, bounds.getWest()),
-        Math.max(-90, bounds.getSouth()),
-        Math.min(180, bounds.getEast()),
-        Math.min(90, bounds.getNorth()),
-      ];
-      if (validBbox(bbox)) callbacks.current.onViewport(bbox);
-    }, VIEWPORT_DEBOUNCE_MS);
+    const viewport = createViewportUpdates(
+      () => {
+        const box = container.current;
+        if (!box?.clientWidth || !box.clientHeight) return;
+        const bounds = map.current?.getBounds();
+        if (!bounds) return;
+        const bbox = [
+          Math.max(-180, bounds.getWest()),
+          Math.max(-90, bounds.getSouth()),
+          Math.min(180, bounds.getEast()),
+          Math.min(90, bounds.getNorth()),
+        ];
+        if (validBbox(bbox)) return bbox;
+      },
+      (bounds) => callbacks.current.onViewport(bounds),
+    );
     let instance: MapLibreMap;
     const errored = new Set<string>();
     erroredTiles.current = errored;
@@ -232,6 +236,7 @@ export default function SiteMap({
         container: container.current,
         ...camera.current,
         renderWorldCopies: false,
+        trackResize: false, // The observer below labels layout resizes and also handles pending fits and popups.
         style: {
           version: 8,
           sources: {},
@@ -393,16 +398,15 @@ export default function SiteMap({
           }
         });
         setReady(true);
-        updateViewport.run(undefined);
+        viewport.ready();
       });
-      instance.on('movestart', () => {
-        callbacks.current.onViewport(null);
-        updateViewport.cancel();
+      instance.on('movestart', (event) => {
+        viewport.moveStart('layoutResize' in event);
       });
       instance.on('move', () => placePopup.current());
       instance.on('moveend', () => {
         camera.current = { center: instance.getCenter().toArray(), zoom: instance.getZoom() };
-        updateViewport.run(undefined);
+        viewport.moveEnd();
       });
       instance.on('error', (event) => {
         if ('sourceId' in event && event.sourceId === 'basemap') {
@@ -436,14 +440,14 @@ export default function SiteMap({
       callbacks.current.onAvailabilityChange?.(false);
     }
     const observer = new ResizeObserver(() => {
-      map.current?.resize();
+      map.current?.resize({ layoutResize: true });
       pendingFit.current();
       placePopup.current();
     });
     observer.observe(container.current);
     return () => {
       observer.disconnect();
-      updateViewport.cancel();
+      viewport.cancel();
       if (map.current) camera.current = { center: map.current.getCenter().toArray(), zoom: map.current.getZoom() };
       map.current?.remove();
       map.current = null;
@@ -560,7 +564,7 @@ export default function SiteMap({
         </Alert>
       )}
       {!ready && !failure && (
-        <Alert className="map-warning" role="status">
+        <Alert className="map-warning absolute inset-x-0 top-0" role="status">
           <AlertDescription>กำลังเปิดแผนที่…</AlertDescription>
         </Alert>
       )}

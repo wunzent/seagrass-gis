@@ -103,3 +103,31 @@ export function debounce<T>(callback: (value: T) => void, delay = 300) {
     },
   };
 }
+
+export function createViewportUpdates(readBounds: () => Bbox | undefined, publish: (bounds: Bbox | null) => void) {
+  let ready = false;
+  let lastBounds: Bbox | undefined;
+  const publishCurrent = () => {
+    const bounds = readBounds();
+    if (!bounds || bounds.every((value, index) => value === lastBounds?.[index])) return;
+    lastBounds = bounds;
+    publish(bounds);
+  };
+  const settled = debounce(publishCurrent, VIEWPORT_DEBOUNCE_MS);
+  return {
+    ready() {
+      ready = true;
+      publishCurrent();
+    },
+    moveStart(layoutResize: boolean) {
+      if (!ready || layoutResize) return;
+      settled.cancel();
+      lastBounds = undefined;
+      publish(null);
+    },
+    moveEnd() {
+      if (ready) settled.run(undefined);
+    },
+    cancel: settled.cancel,
+  };
+}

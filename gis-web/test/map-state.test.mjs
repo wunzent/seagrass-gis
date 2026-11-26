@@ -7,9 +7,9 @@ import {
   validBbox,
   latestRequest,
   debounce,
+  createViewportUpdates,
   VIEWPORT_DEBOUNCE_MS,
 } from '../src/lib/map-state.ts';
-import { readFileSync } from 'node:fs';
 
 test('filter change resets pagination and gives list/map identical filter snapshot', () => {
   const state = filterState(
@@ -74,11 +74,63 @@ test('debounce commits only latest snapshot at 300ms and cleanup cancels it', (t
   assert.deepEqual(values, ['new']);
 });
 
-test('map viewport requests wait 600ms after the map stops moving', () => {
+test('first viewport publishes immediately and a layout resize keeps the current viewport until it settles', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let bounds = [98, 6, 101, 10];
+  const published = [];
+  const updates = createViewportUpdates(
+    () => bounds,
+    (box) => published.push(box),
+  );
+
+  updates.moveStart(true);
+  updates.moveEnd();
+  t.mock.timers.tick(600);
+  assert.deepEqual(published, []);
+
+  updates.ready();
+  assert.deepEqual(published, [[98, 6, 101, 10]]);
+  bounds = [98, 5, 101, 11];
+  updates.moveStart(true);
+  updates.moveEnd();
+  t.mock.timers.tick(599);
+  assert.deepEqual(published, [[98, 6, 101, 10]]);
+  t.mock.timers.tick(1);
+  assert.deepEqual(published, [
+    [98, 6, 101, 10],
+    [98, 5, 101, 11],
+  ]);
+});
+
+test('camera movement invalidates immediately and publishes only after the last stop', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
   assert.equal(VIEWPORT_DEBOUNCE_MS, 600);
-  const source = readFileSync(new URL('../src/features/map/site-map.tsx', import.meta.url), 'utf8');
-  assert.match(source, /const updateViewport = debounce\([\s\S]*?\}, VIEWPORT_DEBOUNCE_MS\);/);
-  assert.match(source, /instance\.on\('moveend'/);
+  let bounds = [98, 6, 101, 10];
+  const published = [];
+  const updates = createViewportUpdates(
+    () => bounds,
+    (box) => published.push(box),
+  );
+  updates.ready();
+
+  updates.moveStart(false);
+  updates.moveEnd();
+  assert.deepEqual(published, [[98, 6, 101, 10], null]);
+  t.mock.timers.tick(400);
+  updates.moveStart(false);
+  t.mock.timers.tick(600);
+  assert.deepEqual(published, [[98, 6, 101, 10], null, null]);
+
+  bounds = [99, 6, 102, 10];
+  updates.moveEnd();
+  t.mock.timers.tick(599);
+  assert.equal(published.length, 3);
+  t.mock.timers.tick(1);
+  assert.deepEqual(published.at(-1), bounds);
+  updates.moveEnd();
+  updates.cancel();
+  t.mock.timers.tick(600);
+  assert.equal(published.length, 4);
 });
 
 test('page size options: list asks for the chosen size, a new size or filter returns to page 1 and keeps the size', async () => {

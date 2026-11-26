@@ -89,7 +89,7 @@ Desktop ≥768px: app สูง100svh, topbar min56px; main flex/scroll แน�
 
 Mobile ≤767px รวม375px: topbar wrap ชื่อและ session ก่อน เมนูเต็มแถวล่าง; app height auto/min100svh; sidebar อยู่เหนือ map padding12; map-container70svh; table padding12 และ filter field กว้าง100%; table scroll แนวนอนเฉพาะ .table-scroll Login panel กว้าง100% max420px padding24; login page padding24px 16px
 
-Map overlays: warning/status relative z2; legend absolute right10 bottom28 z3; popup absolute z5 กว้าง min(300px,100%−16px) scroll ภายใน เริ่ม translate8px/8px แล้ว SiteMap จัดตำแหน่งตาม anchor/ขอบ8px โดยนับพื้นที่ใต้ warning และ gap14pxด้วย MapLibre controls อยู่ใน control containers ของ library ไม่มี app z-index override
+Map overlays: basemap warning relative z2; ข้อความเปิดแผนที่ครั้งแรกซ้อนด้านบนแบบ absolute เพื่อคงขนาด canvas แถวสถานะในหัวแผนที่จัดกึ่งกลางและใช้ line-height 1.25rem เท่าความสูง Badge เพื่อให้ข้อความบรรทัดเดียวกับ Badge สลับกันได้โดยไม่เปลี่ยนขนาด canvas ส่วน legend absolute right10 bottom28 z3 และ popup absolute z5 กว้าง min(300px,100%−16px) scroll ภายใน เริ่ม translate8px/8px แล้ว SiteMap จัดตำแหน่งตาม anchor/ขอบ8px โดยนับพื้นที่ใต้ warning และ gap14px ด้วย MapLibre controls อยู่ใน control containers ของ library ไม่มี app z-index override
 
 แปลงอ้างอิง (ขั้น 9) ใช้เส้นสี muted `#57606A` กว้าง 1.15 px ที่ opacity 0.65 ใต้ polygon ของแหล่งเพื่อให้สีสถานะอ่านง่าย ปุ่มใน legend ใช้ outline ขนาด sm มีสัญลักษณ์เส้นและ `aria-pressed` เริ่มปิดและแสดงได้ตั้งแต่ zoom 7
 

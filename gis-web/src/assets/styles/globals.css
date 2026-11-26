@@ -278,7 +278,7 @@
   .map-heading {
     background: var(--background);
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: 12px;
     padding: 6px 14px;
     border-bottom: 1px solid var(--border);
@@ -287,6 +287,12 @@
   }
   .map-heading h2 {
     color: var(--text);
+  }
+  .map-progress {
+    display: flex;
+    align-items: center;
+    min-height: 1.25rem;
+    line-height: 1.25rem;
   }
   .map-notice {
     padding: 8px 14px;

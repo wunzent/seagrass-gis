@@ -81,7 +81,7 @@ Page / ประกอบ SessionRoute ใน sessionControls slot ของ Map
 
 ### Load sites in viewport
 
-1. SiteMap debounce moveend600ms (VIEWPORT_DEBOUNCE_MS) → map-store.setBbox; FiltersPanel validate แล้ว debounce300ms commit filters/page1
+1. SiteMap ส่ง bbox แรกทันทีเมื่อ style และกล้องพร้อม การเลื่อนกล้องล้าง bbox เดิมแล้ว debounce moveend 600ms ก่อนส่ง bbox ใหม่ ส่วนการเปลี่ยนขนาด canvas คง bbox เดิมไว้จนขนาดนิ่ง จากนั้นส่ง bbox ใหม่เมื่อขอบเขตเปลี่ยน FiltersPanel validate แล้ว debounce 300ms เพื่อ commit filters/page1
 2. Feature ใช้ sitesService.listKey(state)/geojsonKey(filters,bbox) และ surveysService.geojsonKey ซึ่ง snap bbox ออกสู่ grid 0.25 องศา เป็น resource identity; loader เรียก list/geojson ด้วย domain arguments ไม่สร้าง URL เอง
 3. Geometry loaders อ่าน cache ของ map-store ตาม URL key (layer + snapped bbox + filters); cache miss จึงสร้าง relative /api URL ผ่าน mapQuery ส่วน list ใช้ listQuery → http-client → Next proxy → REST API โดยคง query order, credentials same-origin, cache no-store และ signal เดิม
 4. useResource ส่ง callback loader ให้ resource.load; resource-store เรียก loader(signal) ซึ่งเรียก service แล้วรับ promise; resource slice ตรวจ latest request + session isCurrent(generation), strip created_by เมื่อ anonymous แล้ว publish; authenticated401 เรียก unauthorized, anonymous401 เป็น retryable error
